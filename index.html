@@ -129,7 +129,9 @@ select:hover{border-color:var(--accent)}
 .stat .k{font-size:13.5px;font-weight:600;color:var(--ink-2)}
 .stat .v{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.2;font-variant-numeric:tabular-nums;margin-top:4px}
 .stat .v.sm{font-size:22px;font-weight:700;letter-spacing:-.02em;padding-top:6px}
-.stat .s{font-size:12.5px;color:var(--muted);line-height:1.45}
+.stat .s{font-size:12.5px;color:var(--muted);line-height:1.5}
+.stat .s b{color:var(--ink);font-weight:700}
+.stat .hint{display:block;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line-strong);font-size:11.5px}
 .v-blue{color:var(--accent-ink)} .v-red{color:var(--bad)} .v-green{color:var(--ok)}
 
 /* Notatki */
@@ -317,13 +319,21 @@ function renderOffer(main){
       <td>${ruleText(s)}</td><td>${s.capitalization==="roczna"?'<span class="pill p-warn">roczna</span>':esc(s.capitalization||"–")}</td><td>${esc(s.payout||"–")}</td>
       <td class="r num">${zl(s.fee)}</td><td class="r num">${zl(s.swapPrice)}</td><td>${s.availability&&s.availability!=="wszyscy"?'<span class="pill p-part">'+esc(s.availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>':"wszyscy"}</td>
       <td>${src}</td></tr>`}).join("");
-const best=seriesKeys(rec).map(k=>[k,rec.series[k].rate1]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1])[0];
+  const ranked=seriesKeys(rec).map(k=>[k,rec.series[k].rate1]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1]);
+  const best=ranked[0];
+  const isOpen=k=>{const a=rec.series[k].availability;return !a||a==="wszyscy"};
+  const bestOpen=ranked.find(x=>isOpen(x[0]));
+  const real=r=>{if(rec.cpi==null)return"";const d=Math.round((r-rec.cpi)*100)/100;return `realnie ${fmt(Math.abs(d))} p.p. ${d>=0?"ponad":"poniżej"} CPI`};
+  const avail=k=>isOpen(k)?"":' <span class="pill p-part">'+esc(rec.series[k].availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>';
+  const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`
+    +(bestOpen&&bestOpen!==best?`<br>Dla wszystkich: <b>${esc(rec.series[bestOpen[0]].code||bestOpen[0])} ${pct(bestOpen[1])}</b>${rec.cpi!=null?" · "+real(bestOpen[1]):""}`:"")
+    +(rec.cpi!=null?`<br><span class="hint">„Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.</span>`:""):"";
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)}</p></div>${monthSelect(rec.id)}</div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Stopa referencyjna NBP</span><span class="v">${pct(rec.nbpRef)}</span><span class="s">${esc(rec.nbpNote||"obowiązująca 1. dnia miesiąca")}</span></div>
       <div class="stat t-red"><span class="k">Inflacja CPI r/r ${rec.cpiRefMonth?"za "+mShort(rec.cpiRefMonth):""}</span><span class="v v-red">${pct(rec.cpi)}</span><span class="s">${rec.cpiKind?'<span class="pill '+(rec.cpiKind==="finalny"?"p-ok":"p-warn")+'">'+esc(rec.cpiKind)+'</span> ':""}${esc(rec.cpiNote||"")}</span></div>
-      <div class="stat t-green"><span class="k">Najwyższe oprocentowanie 1. okresu</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${best?esc(rec.series[best[0]].code||best[0])+" · "+esc(rec.series[best[0]].term||""):""}${best&&rec.cpi!=null?" · realnie "+fmt(best[1]-rec.cpi)+" p.p. ponad CPI":""}</span></div>
+      <div class="stat t-green"><span class="k">Najwyższe oprocentowanie 1. okresu</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${bestSub}</span></div>
       <div class="stat t-gold"><span class="k">Porównanie z</span><span class="v sm">${prev?mLabel(prev.id):"brak rekordu"}</span><span class="s">Kolumna Δ m/m w tabeli: zmiana oprocentowania 1. okresu w p.p.</span></div>
     </div>
     ${rec.changeNote?`<div class="insight"><span class="t">zmiany m/m</span>${esc(rec.changeNote)}</div>`:""}
@@ -418,9 +428,9 @@ function renderSeries(main){
     return `<tr><td>${mLabel(m.id)}</td><td><span class="code">${esc(s.code||k)}</span>${s.verify?' <span class="pill p-warn">sprawdzić</span>':""}</td><td class="r num"><b>${pct(s.rate1)}</b></td><td class="r num">${delta(s.rate1,p?.rate1)}</td><td>${ruleText(s)}</td><td class="r num">${zl(s.fee)}</td><td class="r num">${zl(s.swapPrice)}</td><td class="r num">${pct(m.cpi)}</td><td class="r num">${pct(m.nbpRef)}</td><td class="r num">${real}</td></tr>`}).join("");
   const cur=state.months[state.months.length-1].series?.[k];const first=state.months.find(m=>m.series?.[k]);
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 3 · historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:500;font-size:.75em">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to realne oprocentowanie 1. okresu: stawka minus CPI z rekordu miesiąca.${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 3 · historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:500;font-size:.75em">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to orientacyjne realne oprocentowanie 1. okresu: stawka minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki.${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
     <div class="chips" role="group" aria-label="Wybór serii">${order.map(s=>`<button type="button" class="chip" data-s="${s}" aria-pressed="${s===k}"><span class="dot" style="background:${colorOf(s)}"></span>${s}${s==="DOS"||s==="TOZ"?' <span class="sub">do 2022</span>':""}</button>`).join("")}</div>
-    <div class="card table-card"><div class="frame"><table><thead><tr><th>Miesiąc oferty</th><th>Kod</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th class="r">Opłata</th><th class="r">Zamiana</th><th class="r">CPI r/r</th><th class="r">NBP</th><th class="r">1. okres − CPI</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Brak rekordów tej serii.</td></tr>'}</tbody></table></div></div></div>`;
+    <div class="card table-card"><div class="frame"><table><thead><tr><th>Miesiąc oferty</th><th>Kod</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th class="r">Opłata</th><th class="r">Zamiana</th><th class="r">CPI r/r</th><th class="r">NBP</th><th class="r" title="Oprocentowanie 1. okresu minus ostatni odczyt CPI r/r z rekordu miesiąca, przed podatkiem Belki">1. okres − CPI</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Brak rekordów tej serii.</td></tr>'}</tbody></table></div></div></div>`;
   main.querySelectorAll("button.chip[data-s]").forEach(b=>b.addEventListener("click",()=>{state.serie=b.dataset.s;render()}));
 }
 
