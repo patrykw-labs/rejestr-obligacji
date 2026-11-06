@@ -1,8 +1,8 @@
 # rejestr-obligacji
 
-<a href="https://www.buymeacoffee.com/pwolszaw"><img src="assets/banner.jpg" alt="Rejestr ofert obligacji — postaw mi kawę" width="100%" /></a>
+<a href="https://www.buymeacoffee.com/patrykw"><img src="assets/banner.jpg" alt="Rejestr ofert obligacji — postaw mi kawę" width="100%" /></a>
 
-<a href="https://www.buymeacoffee.com/pwolszaw"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&amp;emoji=&amp;slug=pwolszaw&amp;button_colour=FFDD00&amp;font_colour=000000&amp;font_family=Cookie&amp;outline_colour=000000&amp;coffee_colour=ffffff" alt="Buy me a coffee" /></a>
+<a href="https://www.buymeacoffee.com/patrykw"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&amp;emoji=&amp;slug=patrykw&amp;button_colour=FFDD00&amp;font_colour=000000&amp;font_family=Cookie&amp;outline_colour=000000&amp;coffee_colour=ffffff" alt="Buy me a coffee" /></a>
 
 [![Walidacja danych](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml/badge.svg)](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml)
 
@@ -60,7 +60,7 @@ Jeśli jakaś liczba nie zgadza się z listem emisyjnym, [załóż zgłoszenie](
 
 ## Wsparcie
 
-Jeśli rejestr Ci się przydaje: [☕ Postaw mi kawę](https://buymeacoffee.com/pwolszaw).
+Jeśli rejestr Ci się przydaje: [☕ Postaw mi kawę](https://buymeacoffee.com/patrykw).
 
 ## Licencja
 
