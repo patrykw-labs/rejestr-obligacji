@@ -264,7 +264,6 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
       <p><b>Nieoficjalne zestawienie.</b> Projekt nie jest powiązany z Ministerstwem Finansów, PKO BP ani serwisem obligacjeskarbowe.pl i nie jest rekomendacją inwestycyjną. Wiążące są listy emisyjne. Strona zbiera anonimowe statystyki odwiedzin (<a href="https://www.goatcounter.com" target="_blank" rel="noopener">GoatCounter</a>, bez cookies).</p>
     </div>
     <nav class="flinks" aria-label="Linki">
-      <a href="data/months.json" download>Pobierz dane (JSON)</a>
       <a href="https://github.com/patrykw-labs/rejestr-obligacji" target="_blank" rel="noopener">Kod na GitHubie</a>
       <a href="https://github.com/patrykw-labs/rejestr-obligacji/issues" target="_blank" rel="noopener">Zgłoś błąd w danych</a>
       <a href="https://www.obligacjeskarbowe.pl/" target="_blank" rel="noopener">Kup obligacje: obligacjeskarbowe.pl</a>
@@ -435,7 +434,7 @@ let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>
     state.months=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>a.id<b.id?-1:1);
     state.loaded=true;
     const last=state.months[state.months.length-1];
-    $("#stamp").innerHTML=last?`<dt>rekordów</dt><dd>${state.months.length} mies.</dd><dt>zakres</dt><dd>${mShort(state.months[0].id)} – ${mShort(last.id)}</dd><dt>ostatni</dt><dd>${mLabel(last.id)}</dd><dt>dane</dt><dd><a href="data/months.json" download>months.json</a></dd>`:"<dt>stan</dt><dd>brak rekordów</dd>";
+    $("#stamp").innerHTML=last?`<dt>rekordów</dt><dd>${state.months.length} mies.</dd><dt>zakres</dt><dd>${mShort(state.months[0].id)} – ${mShort(last.id)}</dd><dt>ostatni</dt><dd>${mLabel(last.id)}</dd>`:"<dt>stan</dt><dd>brak rekordów</dd>";
   }catch(e){state.dbOk=false;$("#stamp").innerHTML="<dt>stan</dt><dd>błąd wczytywania</dd>"}
   render();
 })();
