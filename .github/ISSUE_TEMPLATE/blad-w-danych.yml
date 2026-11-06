@@ -1,0 +1,33 @@
+name: Błąd w danych
+description: Liczba w rejestrze nie zgadza się z listem emisyjnym, GUS albo NBP
+title: "[dane] RRRR-MM SERIA: "
+labels: ["dane"]
+body:
+  - type: input
+    id: miesiac
+    attributes:
+      label: Miesiąc oferty
+      placeholder: "2026-11"
+    validations:
+      required: true
+  - type: input
+    id: seria
+    attributes:
+      label: Seria lub wskaźnik
+      placeholder: "EDO1136 albo CPI / stopa NBP"
+    validations:
+      required: true
+  - type: textarea
+    id: opis
+    attributes:
+      label: Co jest nie tak
+      description: Jakie pole (oprocentowanie, marża, opłata, cena zamiany…), co pokazuje rejestr, a co powinno być.
+    validations:
+      required: true
+  - type: input
+    id: zrodlo
+    attributes:
+      label: Źródło
+      description: Link do listu emisyjnego, komunikatu GUS albo tabeli NBP.
+    validations:
+      required: true

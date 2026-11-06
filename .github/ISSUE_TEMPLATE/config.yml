@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Strona rejestru
+    url: https://patrykw-labs.github.io/rejestr-obligacji/
+    about: Przeglądaj archiwum ofert obligacji
