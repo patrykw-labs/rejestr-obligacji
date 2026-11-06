@@ -322,12 +322,9 @@ function renderOffer(main){
   const ranked=seriesKeys(rec).map(k=>[k,rec.series[k].rate1]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1]);
   const best=ranked[0];
   const isOpen=k=>{const a=rec.series[k].availability;return !a||a==="wszyscy"};
-  const bestOpen=ranked.find(x=>isOpen(x[0]));
   const real=r=>{if(rec.cpi==null)return"";const d=Math.round((r-rec.cpi)*100)/100;return `realnie ${fmt(Math.abs(d))} p.p. ${d>=0?"ponad":"poniżej"} CPI`};
   const avail=k=>isOpen(k)?"":' <span class="pill p-part">'+esc(rec.series[k].availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>';
-  const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`
-    +(bestOpen&&bestOpen!==best?`<br>Dla wszystkich: <b>${esc(rec.series[bestOpen[0]].code||bestOpen[0])} ${pct(bestOpen[1])}</b>${rec.cpi!=null?" · "+real(bestOpen[1]):""}`:"")
-    +(rec.cpi!=null?`<br><span class="hint">„Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.</span>`:""):"";
+  const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`    +(rec.cpi!=null?`<br><span class="hint">„Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.</span>`:""):"";
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)}</p></div>${monthSelect(rec.id)}</div>
     <div class="stats">
