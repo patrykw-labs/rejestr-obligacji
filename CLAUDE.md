@@ -14,7 +14,7 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - Commituj i wypychaj **bezpośrednio na `main`** (bez osobnych gałęzi i pull requestów). Każdy push na `main` odświeża stronę na GitHub Pages.
 
 ## Wygląd strony
-- Styl strony: font Inter, kremowe tło (`#f8f7f2`) / granatowy tryb ciemny (`#0f1117`), białe karty z zaokrągleniem 24px, niebieski akcent (`#0b6cd6`), „eyebrow” (małe wersaliki w kolorze akcentu) nad nagłówkami, kafelki z ikonami, etykiety `pill` (p-ok, p-part, p-warn, p-bad).
+- Własny styl „księgi archiwalnej” (nie kopiuj wyglądu innych serwisów): nagłówki Spectral (szeryfowe), tekst IBM Plex Sans, liczby i etykiety IBM Plex Mono; chłodne jasne tło (`#f3f5f4`) / ciemna zieleń nocą (`#0d1513`); zielono-morski akcent (`#0f6b5c`); karty z zaokrągleniem 10px; podkreślone zakładki; sekcje oznaczone „§ n · …”; tabele z grubą linią pod nagłówkiem i paskami wierszy; etykiety `pill` (p-ok, p-part, p-warn, p-bad).
 - Kolory tylko przez zmienne CSS w `:root` (jasny i ciemny motyw); przełącznik motywu zapisuje wybór w `localStorage`.
 
 Dane edytuj skryptem (Python: wczytaj → zmień → zapisz z `indent=1, sort_keys=True, ensure_ascii=False`), nie ręcznym przepisywaniem dużych fragmentów.

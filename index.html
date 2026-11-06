@@ -6,9 +6,9 @@
 <title>Rejestr ofert obligacji</title>
 <meta name="description" content="Archiwum miesięcznych ofert detalicznych obligacji skarbowych od 2019: oprocentowanie, marże, opłaty i ceny zamiany na tle inflacji GUS i stopy referencyjnej NBP.">
 <link rel="canonical" href="https://patrykw-labs.github.io/rejestr-obligacji/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b6cd6'/%3E%3Cpath d='M7 22 L13 16 L17 19 L25 10' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<meta name="theme-color" content="#f8f7f2" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f1117" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230f6b5c'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f3f5f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1513" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pl_PL">
 <meta property="og:title" content="Rejestr ofert obligacji">
@@ -21,191 +21,199 @@
 <script>try{const t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,600;0,700;1,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
-/* Wygląd: jasne kremowe tło / granatowy tryb ciemny, białe karty 24px, Inter, niebieski akcent */
+/* Wygląd: „księga archiwalna” — szeryfowe nagłówki (Spectral), tekst IBM Plex Sans, liczby IBM Plex Mono,
+   chłodne jasne tło / ciemna zieleń nocą, zielono-morski akcent, ostrzejsze rogi, linie jak w rejestrze */
 :root{
-  --bg:#f8f7f2; --bg-alt:#f0efe8; --surface:#ffffff; --ink:#1c1c1e; --ink-2:#3d3d40; --muted:#6e6e73;
-  --line:#f0f0f0; --line-strong:#e5e7eb; --th:#f0efe8; --input:#f7f6f1; --footer:#f5f3ed; --nav:rgba(255,255,255,.72);
-  --accent:#0b6cd6; --accent-ink:#0866c5; --accent-soft:#f0f7ff; --accent-tint:rgba(13,127,242,.06);
-  --ok:#047857; --ok-soft:rgba(16,185,129,.1); --warn:#7c2d12; --warn-soft:rgba(245,158,11,.12); --warn-icon:#d97706; --bad:#be123c; --bad-soft:rgba(244,63,94,.1);
-  --up:#047857; --down:#be123c;
-  --shadow:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.03); --shadow-pop:0 10px 30px rgba(15,23,42,.12);
-  --s-OTS:#7a8790; --s-ROR:#2b7bb9; --s-DOR:#5a54b8; --s-TOS:#b86a14; --s-COI:#c2417a; --s-EDO:#0d8a6f; --s-ROS:#8a9a1c; --s-ROD:#6b3fa0;
-  --s-CPI:#e11d48; --s-NBP:#1c1c1e;
-  --f-body:"Inter","Inter Fallback",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#f8faf9; --ink:#14201d; --ink-2:#3e4b47; --muted:#66746f;
+  --line:#dfe5e2; --line-strong:#c9d3cf; --input:#ffffff; --footer:#e8ecea; --nav:rgba(243,245,244,.86);
+  --accent:#0f6b5c; --accent-ink:#0b5e51; --accent-soft:#e2f1ed; --accent-tint:rgba(15,107,92,.05);
+  --gold:#b7791f;
+  --ok:#1d7a3e; --ok-soft:#e3f3e7; --warn:#8a4b00; --warn-soft:#fbefdc; --warn-icon:#b7791f; --bad:#b4232a; --bad-soft:#fbe7e6;
+  --up:#1d7a3e; --down:#b4232a;
+  --shadow:0 1px 0 rgba(20,32,29,.04); --shadow-pop:0 8px 24px rgba(20,32,29,.14);
+  --s-OTS:#7a8790; --s-ROR:#2b7bb9; --s-DOR:#5a54b8; --s-TOS:#b86a14; --s-COI:#c2417a; --s-EDO:#0f6b5c; --s-ROS:#8a9a1c; --s-ROD:#6b3fa0;
+  --s-CPI:#c0392b; --s-NBP:#14201d;
+  --f-display:"Spectral",Georgia,"Times New Roman",serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:10px;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0f1117; --bg-alt:#151925; --surface:#14171f; --ink:#f1f3f9; --ink-2:#a3a9bd; --muted:#8a91a6;
-  --line:#1b1f2b; --line-strong:#232838; --th:#181c26; --input:#1e2235; --footer:#0b0d11; --nav:rgba(15,23,42,.72);
-  --accent:#0b6cd6; --accent-ink:#6cb2f8; --accent-soft:#0f1d33; --accent-tint:rgba(13,127,242,.1);
-  --ok:#34d399; --ok-soft:rgba(16,185,129,.1); --warn:#fbbf24; --warn-soft:rgba(245,158,11,.12); --warn-icon:#fbbf24; --bad:#fb7185; --bad-soft:rgba(244,63,94,.1);
-  --up:#34d399; --down:#fb7185;
-  --shadow:0 1px 3px rgba(0,0,0,.25); --shadow-pop:0 10px 30px rgba(0,0,0,.45);
-  --s-OTS:#9aa8b0; --s-ROR:#5fa8e0; --s-DOR:#9a94ec; --s-TOS:#e69a45; --s-COI:#ec7fae; --s-EDO:#34d399; --s-ROS:#c3d24a; --s-ROD:#b58ae6;
-  --s-CPI:#fb7185; --s-NBP:#e8eaf0; color-scheme:dark}}
+  --bg:#0d1513; --surface:#131d1a; --surface-2:#172320; --ink:#e4ebe8; --ink-2:#a9b8b3; --muted:#879792;
+  --line:#22302c; --line-strong:#2f3f3a; --input:#172320; --footer:#0a100e; --nav:rgba(13,21,19,.86);
+  --accent:#3fb59f; --accent-ink:#5fcbb6; --accent-soft:#16312b; --accent-tint:rgba(63,181,159,.07);
+  --gold:#e0a84a;
+  --ok:#6fd08b; --ok-soft:#163020; --warn:#f0b35a; --warn-soft:#3a2a12; --warn-icon:#f0b35a; --bad:#ff8a80; --bad-soft:#3a1a19;
+  --up:#6fd08b; --down:#ff8a80;
+  --shadow:none; --shadow-pop:0 8px 24px rgba(0,0,0,.5);
+  --s-OTS:#9aa8b0; --s-ROR:#5fa8e0; --s-DOR:#9a94ec; --s-TOS:#e69a45; --s-COI:#ec7fae; --s-EDO:#4fc2ae; --s-ROS:#c3d24a; --s-ROD:#b58ae6;
+  --s-CPI:#ff7a6b; --s-NBP:#e4ebe8; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f1117; --bg-alt:#151925; --surface:#14171f; --ink:#f1f3f9; --ink-2:#a3a9bd; --muted:#8a91a6;
-  --line:#1b1f2b; --line-strong:#232838; --th:#181c26; --input:#1e2235; --footer:#0b0d11; --nav:rgba(15,23,42,.72);
-  --accent:#0b6cd6; --accent-ink:#6cb2f8; --accent-soft:#0f1d33; --accent-tint:rgba(13,127,242,.1);
-  --ok:#34d399; --ok-soft:rgba(16,185,129,.1); --warn:#fbbf24; --warn-soft:rgba(245,158,11,.12); --warn-icon:#fbbf24; --bad:#fb7185; --bad-soft:rgba(244,63,94,.1);
-  --up:#34d399; --down:#fb7185;
-  --shadow:0 1px 3px rgba(0,0,0,.25); --shadow-pop:0 10px 30px rgba(0,0,0,.45);
-  --s-OTS:#9aa8b0; --s-ROR:#5fa8e0; --s-DOR:#9a94ec; --s-TOS:#e69a45; --s-COI:#ec7fae; --s-EDO:#34d399; --s-ROS:#c3d24a; --s-ROD:#b58ae6;
-  --s-CPI:#fb7185; --s-NBP:#e8eaf0; color-scheme:dark}
+  --bg:#0d1513; --surface:#131d1a; --surface-2:#172320; --ink:#e4ebe8; --ink-2:#a9b8b3; --muted:#879792;
+  --line:#22302c; --line-strong:#2f3f3a; --input:#172320; --footer:#0a100e; --nav:rgba(13,21,19,.86);
+  --accent:#3fb59f; --accent-ink:#5fcbb6; --accent-soft:#16312b; --accent-tint:rgba(63,181,159,.07);
+  --gold:#e0a84a;
+  --ok:#6fd08b; --ok-soft:#163020; --warn:#f0b35a; --warn-soft:#3a2a12; --warn-icon:#f0b35a; --bad:#ff8a80; --bad-soft:#3a1a19;
+  --up:#6fd08b; --down:#ff8a80;
+  --shadow:none; --shadow-pop:0 8px 24px rgba(0,0,0,.5);
+  --s-OTS:#9aa8b0; --s-ROR:#5fa8e0; --s-DOR:#9a94ec; --s-TOS:#e69a45; --s-COI:#ec7fae; --s-EDO:#4fc2ae; --s-ROS:#c3d24a; --s-ROD:#b58ae6;
+  --s-CPI:#ff7a6b; --s-NBP:#e4ebe8; color-scheme:dark}
 *{box-sizing:border-box}
-html{scroll-padding-top:80px}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;margin:0;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html{scroll-padding-top:72px}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;margin:0;-webkit-font-smoothing:antialiased}
 img{max-width:100%}
 [hidden]{display:none!important}
-a{color:var(--accent-ink)}
-svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+a{color:var(--accent-ink);text-underline-offset:2px}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.num,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 
 /* Pasek górny */
-.topbar{position:sticky;top:0;z-index:50;background:var(--nav);-webkit-backdrop-filter:saturate(180%) blur(16px);backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--line-strong);padding-top:env(safe-area-inset-top,0px)}
-.topbar-in{max-width:1180px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.025em;color:var(--ink);text-decoration:none;white-space:nowrap}
-.brand .logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 4px 12px rgba(11,108,214,.3)}
-.brand .logo svg{width:20px;height:20px;stroke-width:2.4}
-.brand .acc{color:var(--accent-ink)}
-.actions{display:flex;align-items:center;gap:8px}
-.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;text-decoration:none;padding:0}
-.icon-btn:hover{border-color:var(--accent)}
-.icon-btn svg{width:19px;height:19px}
+.topbar{position:sticky;top:0;z-index:50;background:var(--nav);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.topbar-in{max-width:1160px;margin:0 auto;height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:600;font-size:19px;color:var(--ink);text-decoration:none;white-space:nowrap}
+.brand .seal{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:-.02em}
+.brand small{font-family:var(--f-mono);font-size:11px;font-weight:500;color:var(--muted);margin-left:2px}
+.actions{display:flex;align-items:center;gap:6px}
+.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line-strong);background:transparent;color:var(--ink-2);display:grid;place-items:center;cursor:pointer;text-decoration:none;padding:0}
+.icon-btn:hover{color:var(--ink);border-color:var(--accent)}
+.icon-btn svg{width:18px;height:18px}
 .icon-btn .i-sun{display:none}
 .icon-btn.is-dark .i-sun{display:block} .icon-btn.is-dark .i-moon{display:none}
-.coffee-btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px;border-radius:999px;background:#FFDD00;color:#111;font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;box-shadow:0 4px 14px rgba(255,221,0,.25)}
-.coffee-btn:hover{filter:brightness(1.05)}
+.coffee-btn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;border-radius:8px;background:#FFDD00;color:#111;font-weight:600;font-size:14px;text-decoration:none;white-space:nowrap;border:1px solid #e6c700}
+.coffee-btn:hover{filter:brightness(1.04)}
 
 /* Układ */
-.wrap{max-width:1180px;margin:0 auto;padding-top:32px;padding-bottom:64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
-.crumb{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0}
-.crumb .sep{margin:0 10px;color:var(--muted)}
-h1{font-size:clamp(30px,4.4vw,40px);font-weight:700;letter-spacing:-.045em;line-height:1.08;margin:12px 0 0;text-wrap:balance}
-h2{font-size:clamp(22px,2.6vw,28px);font-weight:700;letter-spacing:-.035em;line-height:1.15;margin:6px 0 0}
-.acc{color:var(--accent-ink)}
-.lead{color:var(--ink-2);font-size:16px;max-width:68ch;margin:12px 0 0}
-.eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin:0}
-.center{text-align:center}
-.hero .eyebrow.center{margin-top:28px}
+.wrap{max-width:1160px;margin:0 auto;padding-top:28px;padding-bottom:56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:26px}
+.masthead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 40px;align-items:end;border-bottom:2px solid var(--ink);padding-bottom:18px}
+.kicker{font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--muted);margin:0;letter-spacing:.02em}
+.kicker b{color:var(--accent-ink);font-weight:600}
+h1{font-family:var(--f-display);font-size:clamp(30px,4.6vw,46px);font-weight:600;letter-spacing:-.01em;line-height:1.05;margin:8px 0 0;text-wrap:balance}
+h2{font-family:var(--f-display);font-size:clamp(23px,2.8vw,30px);font-weight:600;letter-spacing:-.005em;line-height:1.15;margin:4px 0 0}
+h2 .acc{color:var(--accent-ink);font-style:italic}
+.lead{color:var(--ink-2);font-size:15.5px;max-width:64ch;margin:10px 0 0}
+.ledger{font-family:var(--f-mono);font-size:12.5px;color:var(--ink-2);border-left:3px solid var(--accent);padding:4px 0 4px 14px;display:grid;grid-template-columns:auto auto;gap:3px 14px;white-space:nowrap}
+.ledger dt{color:var(--muted)} .ledger dd{margin:0;color:var(--ink);font-weight:600}
 
-/* Przełącznik widoków */
-.seg{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px;box-shadow:var(--shadow);width:max-content;max-width:100%;margin:12px auto 0}
-.seg button{font:inherit;font-weight:600;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:none;color:var(--ink-2);padding:12px 28px;border-radius:999px;cursor:pointer;white-space:nowrap}
-.seg button:hover{color:var(--ink)}
-.seg button[aria-selected="true"]{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(11,108,214,.3)}
-.seg-note{text-align:center;font-size:13.5px;color:var(--ink-2);margin:14px 0 0}
-.seg-note b{color:var(--ink)}
-.seg-note .dotsep{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--muted);margin:0 10px;vertical-align:middle}
+/* Zakładki */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line-strong);margin-top:-8px;overflow-x:auto;scrollbar-width:none}
+.tabs button{font:inherit;font-weight:500;font-size:15px;display:inline-flex;align-items:center;gap:8px;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);padding:12px 16px 10px;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
+.tabs button[aria-selected="true"] svg{color:var(--accent)}
+.tabs .no{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 
-/* Karty */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:28px}
-.sec-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px 24px}
-.desc{color:var(--ink-2);font-size:14.5px;margin:8px 0 0;max-width:64ch}
+/* Karty i sekcje */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:24px}
+.sec-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:14px 24px}
+.desc{color:var(--ink-2);font-size:14.5px;margin:6px 0 0;max-width:64ch}
 .vlist{display:flex;flex-direction:column;gap:18px}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 
 /* Pola wyboru */
-.field{display:flex;flex-direction:column;gap:6px}
-.flabel{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.field{display:flex;flex-direction:column;gap:5px}
+.flabel{font-family:var(--f-mono);font-size:11.5px;font-weight:500;color:var(--muted)}
 .sel{position:relative;display:inline-block}
-.sel::after{content:"";position:absolute;right:18px;top:50%;width:7px;height:7px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);transform:translateY(-70%) rotate(45deg);pointer-events:none}
-select{font:inherit;font-weight:700;font-size:15px;color:var(--ink);background:var(--input);border:1px solid var(--line-strong);border-radius:14px;padding:11px 44px 11px 16px;-webkit-appearance:none;appearance:none;cursor:pointer;min-width:200px}
+.sel::after{content:"";position:absolute;right:14px;top:50%;width:6px;height:6px;border-right:1.5px solid var(--ink-2);border-bottom:1.5px solid var(--ink-2);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+select{font:inherit;font-weight:500;font-size:15px;color:var(--ink);background:var(--input);border:1px solid var(--line-strong);border-radius:8px;padding:9px 38px 9px 12px;-webkit-appearance:none;appearance:none;cursor:pointer;min-width:200px}
 select:hover{border-color:var(--accent)}
 
-/* Kafelki z liczbami */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:22px 22px 20px;display:flex;flex-direction:column;gap:4px;min-width:0}
-.stat .k{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
-.stat .k svg{width:15px;height:15px}
-.stat .v{font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums;margin-top:8px}
-.stat .v.sm{font-size:22px;padding-top:6px}
-.stat .s{font-size:13px;color:var(--muted);line-height:1.45}
+/* Kafelki */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stat{padding:18px 20px;display:flex;flex-direction:column;gap:3px;min-width:0;border-right:1px solid var(--line);border-top:3px solid var(--line-strong);margin-right:-1px}
+.stat.t-acc{border-top-color:var(--accent)} .stat.t-red{border-top-color:var(--s-CPI)} .stat.t-green{border-top-color:var(--ok)} .stat.t-gold{border-top-color:var(--gold)}
+.stat .k{font-size:13.5px;font-weight:600;color:var(--ink-2)}
+.stat .v{font-family:var(--f-mono);font-size:28px;font-weight:500;letter-spacing:-.02em;line-height:1.2;font-variant-numeric:tabular-nums;margin-top:4px}
+.stat .v.sm{font-family:var(--f-display);font-size:22px;font-weight:600;letter-spacing:0;padding-top:4px}
+.stat .s{font-size:12.5px;color:var(--muted);line-height:1.45}
 .v-blue{color:var(--accent-ink)} .v-red{color:var(--bad)} .v-green{color:var(--ok)}
 
-/* Komunikaty */
-.insight{display:flex;gap:12px;border-radius:14px;padding:14px 18px;font-size:14px;line-height:1.55;color:var(--ink-2);background:var(--accent-tint);border:1px solid color-mix(in srgb,var(--accent) 24%,transparent)}
-.insight .t{display:block;color:var(--ink);font-weight:700;margin-bottom:2px}
-.insight > svg{color:var(--accent-ink);margin-top:2px}
-.insight.warn{background:var(--warn-soft);border-color:color-mix(in srgb,#f59e0b 32%,transparent)}
-.insight.warn > svg{color:var(--warn-icon)}
+/* Notatki */
+.insight{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:12px 16px;font-size:14px;line-height:1.55;color:var(--ink-2)}
+.insight .t{display:block;font-family:var(--f-mono);font-size:11.5px;color:var(--accent-ink);margin-bottom:3px}
+.insight.warn{border-left-color:var(--gold)} .insight.warn .t{color:var(--warn)}
 
 /* Etykiety */
-.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;white-space:nowrap;vertical-align:middle}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:4px;white-space:nowrap;vertical-align:middle;border:1px solid transparent}
 .p-ok{background:var(--ok-soft);color:var(--ok)} .p-part{background:var(--accent-soft);color:var(--accent-ink)} .p-warn{background:var(--warn-soft);color:var(--warn)} .p-bad{background:var(--bad-soft);color:var(--bad)}
 
-/* Chipy (serie na wykresie, wybór serii) */
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{position:relative;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--ink);cursor:pointer;user-select:none;line-height:1.3}
+/* Przełączniki serii */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{position:relative;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:6px;padding:5px 10px;font:inherit;font-family:var(--f-mono);font-size:12.5px;font-weight:500;background:var(--surface);color:var(--ink);cursor:pointer;user-select:none;line-height:1.3}
 .chip:hover{border-color:var(--accent)}
 .chip input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.chip::before{content:"";width:11px;height:11px;border-radius:2px;border:1.5px solid var(--line-strong);flex:none}
+.chip:has(input:checked)::before{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--surface)}
 .chip:has(input:not(:checked)){color:var(--muted)}
 .chip:has(input:not(:checked)) .dot{opacity:.3}
-.chip:has(input:checked){border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:var(--accent-soft)}
-button.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
-button.chip[aria-pressed="true"] .dot{box-shadow:0 0 0 2px #fff}
-.chip .sub{font-weight:500;opacity:.75}
+button.chip::before{display:none}
+button.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip .sub{opacity:.7}
 
 /* Tabele */
 .table-card{padding:0;overflow:hidden}
 .frame{overflow-x:auto}
-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
-th:first-child,td:first-child{padding-left:18px}th:last-child,td:last-child{padding-right:18px}
-th{background:var(--th);color:var(--ink-2);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:13px 11px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
-td{padding:12px 11px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{background:var(--surface);color:var(--muted);font-family:var(--f-mono);font-size:11.5px;font-weight:500;padding:12px 11px 10px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--ink)}
+td{padding:10px 11px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+th:first-child,td:first-child{padding-left:18px} th:last-child,td:last-child{padding-right:18px}
+tbody tr:nth-child(even) td{background:var(--surface-2)}
 tbody tr:last-child td{border-bottom:0}
-tbody tr:hover td{background:var(--accent-tint)}
+tbody tr:hover td{background:var(--accent-soft)}
 td.r,th.r{text-align:right}
-.num{font-variant-numeric:tabular-nums}
-td b{font-weight:700}
-.code{font-weight:700;letter-spacing:-.01em}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:baseline;flex:none}
+td.num,td .num{font-family:var(--f-mono)}
+td.r{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td b{font-weight:600}
+.code{font-family:var(--f-mono);font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:8px;vertical-align:baseline;flex:none}
 .chip .dot{margin-right:0}
-.d-up{color:var(--up);font-weight:600} .d-down{color:var(--down);font-weight:600} .d-0{color:var(--muted)}
-.ext{text-decoration:none;font-weight:600;white-space:nowrap}
+.d-up{color:var(--up)} .d-down{color:var(--down)} .d-0{color:var(--muted)}
+.ext{text-decoration:none;white-space:nowrap}
 .ext:hover{text-decoration:underline}
 
 /* Wykres */
-.chart{position:relative;margin-top:4px}
+.chart{position:relative;margin-top:6px}
 .chart svg{display:block;width:100%;height:auto}
-.chart text{fill:var(--muted);font-family:var(--f-body);font-size:11.5px}
-.tip{position:absolute;z-index:2;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-pop);padding:10px 12px;font-size:12.5px;line-height:1.4;width:max-content;max-width:300px;pointer-events:none}
-.tip .tt{font-weight:700;margin-bottom:4px;font-size:14px;letter-spacing:-.01em}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.tip{position:absolute;z-index:2;background:var(--surface);border:1px solid var(--line-strong);border-radius:6px;box-shadow:var(--shadow-pop);padding:8px 10px;font-size:12.5px;line-height:1.4;width:max-content;max-width:300px;pointer-events:none}
+.tip .tt{font-family:var(--f-display);font-weight:600;margin-bottom:4px;font-size:15px}
 .tip .tr{margin:4px 0}
 .tip .td{color:var(--muted);font-size:11.5px;margin-left:17px}
-.notes{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);margin-top:18px;padding-top:16px}
+.notes{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line-strong);margin-top:16px;padding-top:14px}
 
 .small{font-size:13px;color:var(--muted);margin:0}
-.empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:24px;padding:28px;color:var(--ink-2)}
-.empty strong{color:var(--ink);display:block;font-size:18px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+.empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:var(--r);padding:26px;color:var(--ink-2)}
+.empty strong{color:var(--ink);display:block;font-family:var(--f-display);font-size:19px;font-weight:600;margin-bottom:4px}
 
 /* Baner i stopka */
-.banner{display:block;border-radius:24px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow)}
+.banner{display:block;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)}
 .banner img{display:block;width:100%;height:auto}
-.site-footer{background:var(--footer);color:var(--ink-2);font-size:13.5px;line-height:1.6;padding:48px 0 calc(40px + env(safe-area-inset-bottom,0px))}
-.footer-in{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:28px 48px}
+.site-footer{background:var(--footer);color:var(--ink-2);font-size:13.5px;line-height:1.6;padding:40px 0 calc(32px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--ink)}
+.footer-in{max-width:1160px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:24px 48px}
 .site-footer p{margin:0 0 10px}
-.site-footer .brand{margin-bottom:14px;font-size:16px}
-.site-footer .brand .logo{width:30px;height:30px;border-radius:8px}
-.site-footer .brand .logo svg{width:17px;height:17px}
-.flinks{display:flex;flex-direction:column;gap:8px}
-.flinks a{color:var(--ink);text-decoration:none;font-weight:600}
-.flinks a:hover{color:var(--accent-ink)}
-.fbottom{grid-column:1/-1;border-top:1px solid var(--line-strong);padding-top:16px;font-size:12.5px;color:var(--muted)}
+.site-footer .brand{margin-bottom:12px;font-size:17px}
+.site-footer .brand .seal{width:28px;height:28px;font-size:13px}
+.flinks{display:flex;flex-direction:column;gap:7px;font-family:var(--f-mono);font-size:13px}
+.flinks a{color:var(--ink);text-decoration:none}
+.flinks a::before{content:"→ ";color:var(--accent)}
+.flinks a:hover{color:var(--accent-ink);text-decoration:underline}
+.fbottom{grid-column:1/-1;border-top:1px solid var(--line-strong);padding-top:14px;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 
 button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px}
-@media (prefers-reduced-motion:no-preference){.chart path{transition:opacity .2s}.seg button{transition:background .15s,color .15s}}
+@media (prefers-reduced-motion:no-preference){.chart path{transition:opacity .2s}}
 @media (max-width:720px){
-  .wrap{padding-top:22px;gap:22px}
-  .card{padding:20px;border-radius:20px}
+  .wrap{padding-top:20px;gap:20px}
+  .masthead{grid-template-columns:1fr}
+  .card{padding:18px}
   .table-card{padding:0}
-  .seg{width:100%}
-  .seg button{flex:1 1 0;flex-direction:column;gap:4px;padding:10px 6px;font-size:12.5px;white-space:normal;line-height:1.2}
-  .stat .v{font-size:26px}
+  .tabs button{padding:11px 10px 9px;font-size:14px;gap:6px}
+  .tabs button svg{display:none}
+  .stat{border-right:0;margin-right:0}
   .coffee-btn span{display:none}
-  .coffee-btn{padding:0 13px}
-  .brand .txt-long{display:none}
+  .coffee-btn{padding:0 11px}
+  .brand small{display:none}
   .footer-in{grid-template-columns:1fr}
   select{min-width:0;width:100%}
   .sec-head .field,.sec-head .sel{width:100%}
@@ -216,7 +224,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
 
 <header class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="./" aria-label="Rejestr ofert obligacji — strona główna"><span class="logo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 3 7-8"/><path d="M15 7h5v5"/></svg></span><span>Rejestr<span class="acc">Obligacji</span></span></a>
+    <a class="brand" href="./" aria-label="Rejestr ofert obligacji — strona główna"><span class="seal" aria-hidden="true">R</span><span>Rejestr obligacji <small>od 2019</small></span></a>
     <div class="actions">
       <button class="icon-btn" id="theme-btn" type="button" aria-label="Przełącz jasny/ciemny motyw" title="Jasny / ciemny motyw"><svg class="i i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="i i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
       <a class="icon-btn" href="https://github.com/patrykw-labs/rejestr-obligacji" target="_blank" rel="noopener" aria-label="Kod źródłowy na GitHubie" title="Kod źródłowy na GitHubie"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg></a>
@@ -226,18 +234,20 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
 </header>
 
 <div class="wrap">
-  <section class="hero">
-    <p class="crumb">Obligacje skarbowe<span class="sep">›</span>Archiwum ofert</p>
-    <h1>Rejestr ofert <span class="acc">obligacji skarbowych</span></h1>
-    <p class="lead">Każda miesięczna oferta od 2019 roku: oprocentowanie 1. okresu, marże, opłaty i ceny zamiany wszystkich serii — na tle inflacji (GUS) i stopy referencyjnej NBP.</p>
-    <p class="eyebrow center">Wybierz widok</p>
-    <nav class="seg tabs" role="tablist" aria-label="Widoki">
-      <button role="tab" id="tab-oferta" data-view="oferta" aria-selected="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18M12 3l9 5H3z"/></svg>Oferta miesiąca</button>
-      <button role="tab" id="tab-wykres" data-view="wykres" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Wykres w czasie</button>
-      <button role="tab" id="tab-seria" data-view="seria" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>Historia serii</button>
-    </nav>
-    <p class="seg-note" id="stamp">Ładowanie danych…</p>
+  <section class="masthead">
+    <div>
+      <p class="kicker">Detaliczne obligacje skarbowe · <b>archiwum miesięcznych ofert</b></p>
+      <h1>Rejestr ofert obligacji</h1>
+      <p class="lead">Jeden rekord na każdy miesiąc od stycznia 2019: oprocentowanie 1. okresu, marże, opłaty i ceny zamiany wszystkich serii, zestawione z inflacją (GUS) i stopą referencyjną NBP.</p>
+    </div>
+    <dl class="ledger" id="stamp"><dt>stan</dt><dd>wczytywanie…</dd></dl>
   </section>
+
+  <nav class="tabs" role="tablist" aria-label="Widoki">
+    <button role="tab" id="tab-oferta" data-view="oferta" aria-selected="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Oferta miesiąca</button>
+    <button role="tab" id="tab-wykres" data-view="wykres" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Wykres w czasie</button>
+    <button role="tab" id="tab-seria" data-view="seria" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v4M8 10v4M8 16v4"/></svg>Historia serii</button>
+  </nav>
 
   <main id="main">
     <div class="empty"><strong>Archiwum się wczytuje</strong>Dane są w pliku data/months.json. Jeśli nic się nie pojawi, odśwież stronę.</div>
@@ -249,7 +259,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
 <footer class="site-footer">
   <div class="footer-in">
     <div>
-      <a class="brand" href="./"><span class="logo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5 4 3 7-8"/><path d="M15 7h5v5"/></svg></span><span>Rejestr<span class="acc">Obligacji</span></span></a>
+      <a class="brand" href="./"><span class="seal" aria-hidden="true">R</span><span>Rejestr obligacji</span></a>
       <p>Źródła: listy emisyjne i strony serii na obligacjeskarbowe.pl, komunikaty MF (gov.pl), GUS (CPI r/r), NBP (stopa referencyjna). CPI w rekordzie miesiąca M to odczyt za miesiąc M−1 (szybki szacunek zastępowany odczytem finalnym). Stopa NBP to wartość obowiązująca 1. dnia miesiąca oferty.</p>
       <p><b>Nieoficjalne zestawienie.</b> Projekt nie jest powiązany z Ministerstwem Finansów, PKO BP ani serwisem obligacjeskarbowe.pl i nie jest rekomendacją inwestycyjną. Wiążące są listy emisyjne. Strona zbiera anonimowe statystyki odwiedzin (<a href="https://www.goatcounter.com" target="_blank" rel="noopener">GoatCounter</a>, bez cookies).</p>
     </div>
@@ -267,8 +277,6 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
 <script>
 const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};
-const IC={bank:'<path d="M3 10h18M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18M12 3l9 5H3z"/>',pct:'<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',up:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',spark:'<path d="M3 17l6-6 4 4 8-8"/>',alert:'<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5h.01"/>'};
-const icon=(n,c="i")=>`<svg class="${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 const state={months:[],view:"oferta",month:null,serie:"EDO",chartMode:"rate1",chartOn:new Set(["TOS","COI","EDO","ROD","CPI","NBP"]),loaded:false,dbOk:true};
 const $=s=>document.querySelector(s);
 const fmt=(v,d=2)=>v==null||v===""||isNaN(v)?"–":Number(v).toFixed(d).replace(".",",");
@@ -311,15 +319,15 @@ function renderOffer(main){
       <td>${src}</td></tr>`}).join("");
 const best=seriesKeys(rec).map(k=>[k,rec.series[k].rate1]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1])[0];
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="eyebrow">Oferta miesiąca</p><h2>Oferta: <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii · status rekordu: ${statusPill(rec.status)}</p></div>${monthSelect(rec.id)}</div>
+    <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)}</p></div>${monthSelect(rec.id)}</div>
     <div class="stats">
-      <div class="stat"><span class="k">${icon("bank")}Stopa ref. NBP</span><span class="v">${pct(rec.nbpRef)}</span><span class="s">${esc(rec.nbpNote||"obowiązująca 1. dnia miesiąca")}</span></div>
-      <div class="stat"><span class="k">${icon("pct")}CPI r/r ${rec.cpiRefMonth?"za "+mShort(rec.cpiRefMonth):""}</span><span class="v v-red">${pct(rec.cpi)}</span><span class="s">${rec.cpiKind?'<span class="pill '+(rec.cpiKind==="finalny"?"p-ok":"p-warn")+'">'+esc(rec.cpiKind)+'</span> ':""}${esc(rec.cpiNote||"")}</span></div>
-      <div class="stat"><span class="k">${icon("up")}Najwyższe 1. okres</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${best?esc(rec.series[best[0]].code||best[0])+" · "+esc(rec.series[best[0]].term||""):""}${best&&rec.cpi!=null?" · realnie "+fmt(best[1]-rec.cpi)+" p.p. ponad CPI":""}</span></div>
-      <div class="stat"><span class="k">${icon("cal")}Poprzedni miesiąc</span><span class="v sm">${prev?mLabel(prev.id):"brak rekordu"}</span><span class="s">Kolumna Δ m/m w tabeli: zmiana oprocentowania 1. okresu w p.p.</span></div>
+      <div class="stat t-acc"><span class="k">Stopa referencyjna NBP</span><span class="v">${pct(rec.nbpRef)}</span><span class="s">${esc(rec.nbpNote||"obowiązująca 1. dnia miesiąca")}</span></div>
+      <div class="stat t-red"><span class="k">Inflacja CPI r/r ${rec.cpiRefMonth?"za "+mShort(rec.cpiRefMonth):""}</span><span class="v v-red">${pct(rec.cpi)}</span><span class="s">${rec.cpiKind?'<span class="pill '+(rec.cpiKind==="finalny"?"p-ok":"p-warn")+'">'+esc(rec.cpiKind)+'</span> ':""}${esc(rec.cpiNote||"")}</span></div>
+      <div class="stat t-green"><span class="k">Najwyższe oprocentowanie 1. okresu</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${best?esc(rec.series[best[0]].code||best[0])+" · "+esc(rec.series[best[0]].term||""):""}${best&&rec.cpi!=null?" · realnie "+fmt(best[1]-rec.cpi)+" p.p. ponad CPI":""}</span></div>
+      <div class="stat t-gold"><span class="k">Porównanie z</span><span class="v sm">${prev?mLabel(prev.id):"brak rekordu"}</span><span class="s">Kolumna Δ m/m w tabeli: zmiana oprocentowania 1. okresu w p.p.</span></div>
     </div>
-    ${rec.changeNote?`<div class="insight">${icon("spark")}<div><span class="t">Zmiany względem poprzedniego miesiąca</span>${esc(rec.changeNote)}</div></div>`:""}
-    ${rec.verifyNote?`<div class="insight warn">${icon("alert")}<div><span class="t">Do sprawdzenia</span>${esc(rec.verifyNote)}</div></div>`:""}
+    ${rec.changeNote?`<div class="insight"><span class="t">zmiany m/m</span>${esc(rec.changeNote)}</div>`:""}
+    ${rec.verifyNote?`<div class="insight warn"><span class="t">do sprawdzenia</span>${esc(rec.verifyNote)}</div>`:""}
     <div class="card table-card"><div class="frame"><table><thead><tr><th>Seria</th><th>Okres</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th>Kapitalizacja</th><th>Wypłata odsetek</th><th class="r" title="Opłata za przedterminowy wykup">Opłata</th><th class="r">Zamiana</th><th>Dostępność</th><th>Źródło</th></tr></thead><tbody>${rows||'<tr><td colspan="11">Brak serii w rekordzie.</td></tr>'}</tbody></table></div></div>
   </div>`;
   $("#sel-month").addEventListener("change",e=>{state.month=e.target.value;render()});
@@ -329,7 +337,7 @@ function renderChart(main){
   const keys=[...SERIES,"DOS","TOZ","CPI","NBP"];
   const chips=keys.map(k=>`<label class="chip"><input type="checkbox" id="c-${k}" data-k="${k}"${state.chartOn.has(k)?" checked":""}><span class="dot" style="background:${colorOf(k)}"></span>${k==="CPI"?"CPI r/r":k==="NBP"?"stopa NBP":k}${k==="DOS"||k==="TOZ"?' <span class="sub">(do 2022)</span>':""}</label>`).join("");
   main.innerHTML=`<div class="card">
-    <div class="sec-head"><div><p class="eyebrow">Wizualizacja</p><h2>Oprocentowanie w czasie</h2><p class="desc">Wybrane serie miesiąc po miesiącu na tle inflacji (CPI r/r) i stopy referencyjnej NBP. Najedź na wykres, aby zobaczyć wartości.</p></div>
+    <div class="sec-head"><div><p class="kicker">§ 2 · wykres</p><h2>Oprocentowanie w czasie</h2><p class="desc">Wybrane serie miesiąc po miesiącu na tle inflacji (CPI r/r) i stopy referencyjnej NBP. Najedź na wykres, aby zobaczyć wartości.</p></div>
       <label class="field"><span class="flabel">Miara</span><span class="sel"><select id="sel-mode"><option value="rate1"${state.chartMode==="rate1"?" selected":""}>Oprocentowanie 1. okresu</option><option value="margin"${state.chartMode==="margin"?" selected":""}>Marża (kolejne okresy)</option><option value="next"${state.chartMode==="next"?" selected":""}>Oprocentowanie kolejnych okresów</option></select></span></label></div>
     <div class="chips" style="margin-top:20px">${chips}</div>
     <div class="chart" id="chart"></div>
@@ -410,7 +418,7 @@ function renderSeries(main){
     return `<tr><td>${mLabel(m.id)}</td><td><span class="code">${esc(s.code||k)}</span>${s.verify?' <span class="pill p-warn">sprawdzić</span>':""}</td><td class="r num"><b>${pct(s.rate1)}</b></td><td class="r num">${delta(s.rate1,p?.rate1)}</td><td>${ruleText(s)}</td><td class="r num">${zl(s.fee)}</td><td class="r num">${zl(s.swapPrice)}</td><td class="r num">${pct(m.cpi)}</td><td class="r num">${pct(m.nbpRef)}</td><td class="r num">${real}</td></tr>`}).join("");
   const cur=state.months[state.months.length-1].series?.[k];const first=state.months.find(m=>m.series?.[k]);
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="eyebrow">Historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:600">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to realne oprocentowanie 1. okresu: stawka minus CPI z rekordu miesiąca.${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 3 · historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:500;font-size:.75em">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to realne oprocentowanie 1. okresu: stawka minus CPI z rekordu miesiąca.${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
     <div class="chips" role="group" aria-label="Wybór serii">${order.map(s=>`<button type="button" class="chip" data-s="${s}" aria-pressed="${s===k}"><span class="dot" style="background:${colorOf(s)}"></span>${s}${s==="DOS"||s==="TOZ"?' <span class="sub">do 2022</span>':""}</button>`).join("")}</div>
     <div class="card table-card"><div class="frame"><table><thead><tr><th>Miesiąc oferty</th><th>Kod</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th class="r">Opłata</th><th class="r">Zamiana</th><th class="r">CPI r/r</th><th class="r">NBP</th><th class="r">1. okres − CPI</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Brak rekordów tej serii.</td></tr>'}</tbody></table></div></div></div>`;
   main.querySelectorAll("button.chip[data-s]").forEach(b=>b.addEventListener("click",()=>{state.serie=b.dataset.s;render()}));
@@ -427,8 +435,8 @@ let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>
     state.months=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>a.id<b.id?-1:1);
     state.loaded=true;
     const last=state.months[state.months.length-1];
-    $("#stamp").innerHTML=last?`<b>${state.months.length}</b> miesięcy w archiwum<span class="dotsep"></span>ostatnia oferta: <b>${mLabel(last.id)}</b><span class="dotsep"></span><a href="data/months.json" download>pobierz dane (JSON)</a>`:"Brak rekordów";
-  }catch(e){state.dbOk=false;$("#stamp").textContent="Nie udało się wczytać danych"}
+    $("#stamp").innerHTML=last?`<dt>rekordów</dt><dd>${state.months.length} mies.</dd><dt>zakres</dt><dd>${mShort(state.months[0].id)} – ${mShort(last.id)}</dd><dt>ostatni</dt><dd>${mLabel(last.id)}</dd><dt>dane</dt><dd><a href="data/months.json" download>months.json</a></dd>`:"<dt>stan</dt><dd>brak rekordów</dd>";
+  }catch(e){state.dbOk=false;$("#stamp").innerHTML="<dt>stan</dt><dd>błąd wczytywania</dd>"}
   render();
 })();
 render();
