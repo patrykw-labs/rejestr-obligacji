@@ -10,6 +10,13 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - `assets/banner.jpg` — baner (README, strona, podgląd linku og:image). `.github/FUNDING.yml` — przycisk „Sponsor” (Buy Me a Coffee `pwolszaw`).
 - W `index.html` zostaw licznik GoatCounter (`rejestr-obligacji.goatcounter.com`), atrybuty `data-goatcounter-click` na linkach Buy Me a Coffee i zastrzeżenie w stopce.
 
+## Git
+- Commituj i wypychaj **bezpośrednio na `main`** (bez osobnych gałęzi i pull requestów). Każdy push na `main` odświeża stronę na GitHub Pages.
+
+## Wygląd strony
+- Styl strony: font Inter, kremowe tło (`#f8f7f2`) / granatowy tryb ciemny (`#0f1117`), białe karty z zaokrągleniem 24px, niebieski akcent (`#0b6cd6`), „eyebrow” (małe wersaliki w kolorze akcentu) nad nagłówkami, kafelki z ikonami, etykiety `pill` (p-ok, p-part, p-warn, p-bad).
+- Kolory tylko przez zmienne CSS w `:root` (jasny i ciemny motyw); przełącznik motywu zapisuje wybór w `localStorage`.
+
 Dane edytuj skryptem (Python: wczytaj → zmień → zapisz z `indent=1, sort_keys=True, ensure_ascii=False`), nie ręcznym przepisywaniem dużych fragmentów.
 
 ## Schemat rekordu miesiąca
