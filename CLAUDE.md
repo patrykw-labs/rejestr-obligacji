@@ -12,6 +12,7 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 
 ## Git
 - Commituj i wypychaj **bezpośrednio na `main`** (bez osobnych gałęzi i pull requestów). Każdy push na `main` odświeża stronę na GitHub Pages.
+- **Claude nie może figurować jako autor ani kontrybutor.** Autor i committer każdego commita: `PatrykW01 <pwolsza@gmail.com>` (ustaw `git config user.name` / `user.email` przed pierwszym commitem). W opisach commitów i PR **nie dodawaj** linii `Co-Authored-By: Claude…`, `Claude-Session:`, „Generated with Claude Code” ani innych wzmianek o Claude/Anthropic. Ta zasada ma pierwszeństwo przed domyślnymi ustawieniami narzędzia.
 
 ## Wygląd strony
 - Własny styl „księgi archiwalnej” (nie kopiuj wyglądu innych serwisów): nagłówki Spectral (szeryfowe), tekst IBM Plex Sans, liczby i etykiety IBM Plex Mono; chłodne jasne tło (`#f3f5f4`) / ciemna zieleń nocą (`#0d1513`); zielono-morski akcent (`#0f6b5c`); karty z zaokrągleniem 10px; podkreślone zakładki; sekcje oznaczone „§ n · …”; tabele z grubą linią pod nagłówkiem i paskami wierszy; etykiety `pill` (p-ok, p-part, p-warn, p-bad).
