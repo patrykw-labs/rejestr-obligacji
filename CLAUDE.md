@@ -15,7 +15,7 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - **Claude nie może figurować jako autor ani kontrybutor.** Autor i committer każdego commita: `PatrykW01 <pwolsza@gmail.com>` (ustaw `git config user.name` / `user.email` przed pierwszym commitem). W opisach commitów i PR **nie dodawaj** linii `Co-Authored-By: Claude…`, `Claude-Session:`, „Generated with Claude Code” ani innych wzmianek o Claude/Anthropic. Ta zasada ma pierwszeństwo przed domyślnymi ustawieniami narzędzia.
 
 ## Wygląd strony
-- Własny styl „księgi archiwalnej” (nie kopiuj wyglądu innych serwisów): nagłówki Spectral (szeryfowe), tekst IBM Plex Sans, liczby i etykiety IBM Plex Mono; chłodne jasne tło (`#f3f5f4`) / ciemna zieleń nocą (`#0d1513`); zielono-morski akcent (`#0f6b5c`); karty z zaokrągleniem 10px; podkreślone zakładki; sekcje oznaczone „§ n · …”; tabele z grubą linią pod nagłówkiem i paskami wierszy; etykiety `pill` (p-ok, p-part, p-warn, p-bad).
+- Własny styl w tonacji „chłodny kobalt” (nie kopiuj wyglądu innych serwisów): font Plus Jakarta Sans; niebieskawoszare tło (`#f4f6fa`) / granat nocą (`#0b1220`); akcent kobaltowy (`#2454d6`); karty z zaokrągleniem 14px; logo-pieczęć „R”; metryczka archiwum w nagłówku; podkreślone zakładki; sekcje oznaczone „§ n · …”; kafelki w jednym pasie z kolorową górną krawędzią; notatki z lewą krawędzią; tabele z paskami wierszy; etykiety `pill` (p-ok, p-part, p-warn, p-bad).
 - Kolory tylko przez zmienne CSS w `:root` (jasny i ciemny motyw); przełącznik motywu zapisuje wybór w `localStorage`.
 
 Dane edytuj skryptem (Python: wczytaj → zmień → zapisz z `indent=1, sort_keys=True, ensure_ascii=False`), nie ręcznym przepisywaniem dużych fragmentów.
