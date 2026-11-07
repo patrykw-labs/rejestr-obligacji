@@ -7,7 +7,7 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - `data/months.json` — jedyne źródło danych: obiekt kluczowany id miesiąca `"RRRR-MM"` (klucze posortowane, wcięcie 1 spacja, UTF-8, `ensure_ascii=False`).
 - `index.html` — widok (zakładki: Oferta miesiąca, Wykres w czasie, Historia serii). Zmieniaj tylko na prośbę.
 - `scripts/validate.py` — walidacja schematu i statusów. **Uruchom przed każdym commitem**; commituj tylko przy 0 błędów.
-- `assets/banner.jpg` — baner (README, strona, podgląd linku og:image). `.github/FUNDING.yml` — przycisk „Sponsor” (Buy Me a Coffee `patrykw`).
+- `assets/banner.jpg` — baner (README, strona, podgląd linku og:image); `assets/banner-mobile.jpg` — wersja 2:1 z dużym przyciskiem „Postaw mi kawę”, pokazywana na stronie na ekranach do 720 px (`<picture>`). `.github/FUNDING.yml` — przycisk „Sponsor” (Buy Me a Coffee `patrykw`).
 - W `index.html` zostaw licznik GoatCounter (`rejestr-obligacji.goatcounter.com`), atrybuty `data-goatcounter-click` na linkach Buy Me a Coffee i zastrzeżenie w stopce.
 
 ## Git
