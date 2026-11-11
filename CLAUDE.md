@@ -45,6 +45,13 @@ Dane edytuj skryptem (Python: wczytaj → zmień → zapisz z `indent=1, sort_ke
 ## Procedura: nowy miesiąc (ok. 4. dnia miesiąca)
 1. Ustal bieżący miesiąc. Pobierz ofertę z https://www.obligacjeskarbowe.pl/oferta-obligacji/ i listy emisyjne wszystkich serii; spisz pola schematu.
 2. Dodaj rekord `RRRR-MM`: nbpRef z 1. dnia miesiąca, cpi = najnowszy odczyt GUS za M−1 (zwykle szybki szacunek; wtedy `macroVerify` może być false, ale `cpiKind` = "szybki szacunek").
-3. W rekordzie poprzedniego miesiąca zamień szybki szacunek CPI na odczyt finalny, jeśli GUS go opublikował.
+3. W każdym rekordzie z `cpiKind` = "szybki szacunek" (4. dnia zwykle rekord poprzedniego miesiąca) zamień go na odczyt finalny, jeśli GUS już go opublikował dla `cpiRefMonth`.
 4. Napisz `changeNote`, ustaw `status`/`verifyNote`, uruchom `python3 scripts/validate.py`.
 5. Commit: `oferta RRRR-MM` (i ewentualnie `CPI RRRR-MM finalny`). Podsumuj zmiany w 3–6 linijkach.
+
+## Procedura: odczyt finalny CPI (ok. 17. dnia miesiąca)
+GUS publikuje szybki szacunek CPI ostatniego dnia roboczego miesiąca, a odczyt finalny ok. 15. dnia następnego miesiąca. W połowie miesiąca szybki szacunek jest więc w rekordzie **bieżącego** miesiąca (CPI za M−1).
+1. Znajdź rekordy z `cpiKind` = "szybki szacunek". Dla każdego sprawdź w GUS, czy jest już odczyt finalny za `cpiRefMonth`.
+2. Jeśli jest: ustaw `cpi` na wartość finalną, `cpiKind` = "finalny", `cpiNote` ze źródłem i datą publikacji; dopisz do `changeNote`, jeśli wartość się zmieniła; `updatedAt` = dziś. Nie zmieniaj serii.
+3. `python3 scripts/validate.py`, commit `CPI RRRR-MM finalny` (RRRR-MM = miesiąc, którego dotyczy odczyt). Jeśli GUS jeszcze nie opublikował odczytu — zakończ bez commita.
+Kontrola w GitHub Actions 20. dnia zgłosi błąd, jeśli w rekordzie bieżącego miesiąca nadal jest szybki szacunek.
