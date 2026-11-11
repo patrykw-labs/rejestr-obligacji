@@ -24,7 +24,7 @@ Na stronie są trzy widoki:
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`CLAUDE.md`](CLAUDE.md).
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji
 - `.github/workflows/validate.yml`: uruchamia walidację po każdej zmianie danych
-- `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP; przy rozbieżności przebieg kończy się błędem
+- `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP, a 20. dnia sprawdza też, czy szybki szacunek CPI zastąpiono odczytem finalnym GUS; przy rozbieżności przebieg kończy się błędem
 - `assets/`: grafiki (baner)
 - `CLAUDE.md`: instrukcje dla Claude Code, w tym procedura dopisywania miesiąca
 

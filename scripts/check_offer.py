@@ -7,10 +7,13 @@ Niczego nie zapisuje. Sprawdza:
   - oprocentowanie 1. okresu, marżę, opłatę za przedterminowy wykup i cenę zamiany
     każdej serii z listem emisyjnym (PDF, odczyt przez pdftotext),
   - stopę referencyjną NBP obowiązującą 1. dnia miesiąca (archiwum XML NBP),
-  - czy CPI w rekordzie dotyczy poprzedniego miesiąca.
+  - czy CPI w rekordzie dotyczy poprzedniego miesiąca, a od 18. dnia miesiąca
+    (i zawsze dla wcześniejszych miesięcy) czy jest już odczytem finalnym GUS
+    (szybki szacunek GUS zastępuje odczytem finalnym ok. 15. dnia).
 
 Kod wyjścia 1, gdy coś się nie zgadza albo nie da się tego odczytać.
 Użycie: python3 scripts/check_offer.py [RRRR-MM]
+Zmienna CHECK_TODAY=RRRR-MM-DD podmienia dzisiejszą datę (do testów).
 """
 import datetime as dt
 import json
@@ -102,7 +105,8 @@ def nbp_ref_on(day):
 
 def main():
     tz = ZoneInfo("Europe/Warsaw")
-    month = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else dt.datetime.now(tz).strftime("%Y-%m")
+    today = dt.date.fromisoformat(os.environ["CHECK_TODAY"]) if os.environ.get("CHECK_TODAY") else dt.datetime.now(tz).date()
+    month = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else today.strftime("%Y-%m")
     y, m = map(int, month.split("-"))
     first_day = dt.date(y, m, 1)
     prev = (first_day - dt.timedelta(days=1)).strftime("%Y-%m")
@@ -112,6 +116,12 @@ def main():
     print(f"Kontrola rekordu {month}")
     if rec is None:
         errors.append(f"brak rekordu {month} w data/months.json (miesięczna aktualizacja się nie odbyła?)")
+        return report(month)
+
+    cur = today.strftime("%Y-%m")
+    if month < cur:
+        oks.append(f"serie i listy emisyjne pominięte: strona oferty pokazuje bieżące serie, a rekord {month} dotyczy wcześniejszego miesiąca")
+        check_macro(rec, month, first_day, prev, today, cur)
         return report(month)
 
     # Oferta: kody serii na stronie vs rekord
@@ -161,6 +171,11 @@ def main():
         else:
             check(f"{code} cena zamiany", s.get("swapPrice"), got["swapPrice"])
 
+    check_macro(rec, month, first_day, prev, today, cur)
+    return report(month)
+
+
+def check_macro(rec, month, first_day, prev, today, cur):
     # NBP
     nbp = nbp_ref_on(first_day)
     if nbp is None:
@@ -174,9 +189,13 @@ def main():
     elif rec.get("cpiRefMonth") != prev:
         errors.append(f"CPI dotyczy {rec.get('cpiRefMonth')}, a powinno {prev}")
     else:
-        oks.append(f"CPI {fmt(rec['cpi'])}% za {prev} ({rec.get('cpiKind') or 'bez rodzaju'})")
-
-    return report(month)
+        kind = rec.get("cpiKind") or "bez rodzaju"
+        need_final = month < cur or (month == cur and today.day >= 18)
+        if need_final and kind != "finalny":
+            errors.append(f"CPI za {prev} w rekordzie {month} to nadal „{kind}” — GUS publikuje odczyt finalny ok. 15. dnia, "
+                          "powinien już zastąpić szybki szacunek")
+        else:
+            oks.append(f"CPI {fmt(rec['cpi'])}% za {prev} ({kind})" + ("" if need_final else "; odczyt finalny wymagany od 18. dnia"))
 
 
 def report(month):

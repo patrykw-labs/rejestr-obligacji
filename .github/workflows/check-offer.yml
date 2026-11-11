@@ -4,6 +4,7 @@ name: Kontrola oferty
 on:
   schedule:
     - cron: "17 7 5 * *"   # 5. dnia miesiąca, ok. 8:17–9:17 czasu polskiego (dzień po aktualizacji)
+    - cron: "17 7 20 * *"  # 20. dnia: czy szybki szacunek CPI zastąpiono odczytem finalnym
   workflow_dispatch:
     inputs:
       month:
