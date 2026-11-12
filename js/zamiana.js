@@ -23,7 +23,12 @@
     ROS: { term: 72, indexed: true, coupon: false, label: "ROS (6 lat, 800+)" },
     COI: { term: 48, indexed: true, coupon: true, label: "COI (4 lata)" },
     TOS: { term: 36, indexed: false, coupon: false, label: "TOS (3 lata)" },
+    // ROR/DOR: miesięczne okresy odsetkowe, stopa = referencyjna NBP + marża, odsetki wypłacane co miesiąc;
+    // od 2. okresu przy przedterminowym wykupie stała opłata (bez progu 100 zł) — listy emisyjne, np. 113/2025
+    DOR: { term: 24, period: 1, nbp: true, coupon: true, flatFee: true, label: "DOR (2 lata)" },
+    ROR: { term: 12, period: 1, nbp: true, coupon: true, flatFee: true, label: "ROR (1 rok)" },
   };
+  const periodOf = (type) => TYPES[type].period || 12;
   const NOMINAL = 100;
 
   // ---------- daty "RRRR-MM" ----------
@@ -43,15 +48,23 @@
 
   /**
    * Stopy procentowe kolejnych okresów obligacji.
-   * spec: {type, rate1 (%), margin (%), purchase "RRRR-MM"}; cpiAt(ym) → % CPI r/r za miesiąc ym.
-   * Zwraca tablicę ułamków (0.0535 itd.) o długości liczby okresów.
+   * spec: {type, rate1 (%), margin (%), purchase "RRRR-MM"}; cpiAt(ym) → % CPI r/r za miesiąc ym;
+   * nbpAt(ym) → % stopa referencyjna NBP dla okresu odsetkowego zaczynającego się w miesiącu ym (ROR/DOR).
+   * Zwraca tablicę ułamków (0.0535 itd.) o długości liczby okresów (lat; dla ROR/DOR — miesięcy).
    */
-  function periodRates(spec, cpiAt) {
+  function periodRates(spec, cpiAt, nbpAt) {
     const t = TYPES[spec.type];
-    const n = Math.ceil(t.term / 12);
+    const P = periodOf(spec.type);
+    const n = Math.ceil(t.term / P);
     const out = [];
     for (let k = 1; k <= n; k++) {
-      if (k === 1 || !t.indexed) { out.push(spec.rate1 / 100); continue; }
+      if (k === 1 || (!t.indexed && !t.nbp)) { out.push(spec.rate1 / 100); continue; }
+      if (t.nbp) {
+        // stopa NBP z 10. dnia roboczego przed 1. dniem miesiąca, w którym zaczyna się okres (ujemna = 0) + marża
+        const ref = nbpAt ? nbpAt(addMonths(spec.purchase, (k - 1) * P)) : spec.rate1 - (spec.margin || 0);
+        out.push((Math.max(ref, 0) + (spec.margin || 0)) / 100);
+        continue;
+      }
       const start = addMonths(spec.purchase, (k - 1) * 12);
       const cpi = cpiAt(addMonths(start, -2));
       out.push((Math.max(cpi, 0) + spec.margin) / 100);
@@ -70,12 +83,13 @@
     const term = t.term;
     const matured = age >= term;
     const a = Math.min(age, term);
-    const fullPeriods = Math.floor(a / 12);
-    const partial = a - fullPeriods * 12;
+    const P = periodOf(spec.type);
+    const fullPeriods = Math.floor(a / P);
+    const partial = a - fullPeriods * P;
     const coupons = [];
     let base = NOMINAL;
     if (t.coupon) {
-      for (let k = 1; k <= fullPeriods; k++) coupons.push({ age: k * 12, amount: NOMINAL * rates[k - 1] });
+      for (let k = 1; k <= fullPeriods; k++) coupons.push({ age: k * P, amount: couponAmount(spec.type, rates[k - 1], round) });
     } else {
       for (let k = 1; k <= fullPeriods; k++) base *= 1 + rates[k - 1];
     }
@@ -92,10 +106,17 @@
       gross = base * (1 + rates[fullPeriods] * partial / 12);
     }
     if (round) gross = r2(gross);
-    const accrued = gross - NOMINAL; // narosłe odsetki (dla COI: tylko bieżący okres)
-    const fee = Math.max(0, Math.min(spec.fee, accrued));
+    const accrued = gross - NOMINAL; // narosłe odsetki (dla COI, ROR, DOR: tylko bieżący okres)
+    // ROR/DOR od 2. okresu: stała opłata, także gdy przekracza narosłe odsetki (wypłata może być < 100 zł)
+    const fee = t.flatFee && fullPeriods >= 1 ? spec.fee : Math.max(0, Math.min(spec.fee, accrued));
     const net = round ? r2(gross - fee) : gross - fee;
     return { gross, fee, net, coupons, matured: false };
+  }
+
+  /** Kupon od jednej obligacji za pełny okres (COI: roczny; ROR/DOR: N·r/12, zaokrąglony do grosza). */
+  function couponAmount(type, rate, round) {
+    const c = NOMINAL * rate * periodOf(type) / 12;
+    return TYPES[type].nbp && round ? r2(c) : c;
   }
 
   /** Stała miesięczna stopa konta (netto po podatku, jeśli tax). */
@@ -108,13 +129,13 @@
    * Zwraca tablicę wartości likwidacyjnych netto (po opłacie i podatku) dla t = 0..H.
    */
   function simulateLeg(leg, ctx) {
-    const { H, cpiAt, tax, taxRate, savingsRate, swapPrice, rollover, opts } = ctx;
+    const { H, cpiAt, nbpAt, tax, taxRate, savingsRate, swapPrice, rollover, opts } = ctx;
     const mSav = monthlySavings(savingsRate, tax, taxRate);
     let spec = leg.spec;
     let count = leg.count;
     let ageAt0 = leg.ageAt0;       // wiek obligacji w t = 0
     let startT = 0;                // t, w którym bieżąca obligacja ma wiek ageAt0
-    let rates = periodRates(spec, cpiAt);
+    let rates = periodRates(spec, cpiAt, nbpAt);
     let costBasis = leg.costBasis != null ? leg.costBasis : NOMINAL; // koszt nabycia 1 szt. (podatek)
     let cash = leg.cash0 || 0;
     let paidCoupons = new Set();
@@ -128,9 +149,10 @@
 
       // kupony COI wypłacone w tym miesiącu (kupon z rocznicy przypadającej dziś, t = 0, inwestor dostaje
       // w obu wariantach — tak jak wcześniejsze kupony nie wchodzi do porównania)
-      if (TYPES[spec.type].coupon && t > 0 && age > 0 && age % 12 === 0 && age <= term && !paidCoupons.has(age)) {
+      const P = periodOf(spec.type);
+      if (TYPES[spec.type].coupon && t > 0 && age > 0 && age % P === 0 && age <= term && !paidCoupons.has(age)) {
         paidCoupons.add(age);
-        const c = NOMINAL * rates[age / 12 - 1] * count;
+        const c = couponAmount(spec.type, rates[age / P - 1], opts.roundPerBond) * count;
         const cNet = c * (tax ? 1 - taxRate : 1);
         cash += cNet;
         events.push({ t, kind: "kupon", amount: cNet });
@@ -147,7 +169,7 @@
         const n = Math.floor((proceeds + cash) / swapPrice);
         events.push({ t, kind: "wykup", spec, count, proceeds, newCount: n });
         cash = proceeds + cash - n * swapPrice;
-        spec = roll; count = n; ageAt0 = 0; startT = t; rates = periodRates(spec, cpiAt);
+        spec = roll; count = n; ageAt0 = 0; startT = t; rates = periodRates(spec, cpiAt, nbpAt);
         costBasis = opts.taxBasisNominal ? NOMINAL : swapPrice; paidCoupons = new Set();
         age = 0;
       }
@@ -165,6 +187,30 @@
   }
 
   /** Inflacja przyszła: future[y] dla roku y (0 = pierwsze 12 mies. od teraz). */
+  /**
+   * Stopa NBP dla okresu zaczynającego się w miesiącu ym: z historii (stopa z 1. dnia miesiąca — od 2022 r. NBP
+   * zmieniał stopy zawsze przed 10. dniem miesiąca, więc to ta sama stopa co z 10. dnia roboczego przed nim),
+   * dla przyszłych miesięcy — scenariusz (liczba: stała stopa; tablica: rok po roku od dziś).
+   */
+  function makeNbpAt(history, future, now) {
+    const keys = Object.keys(history || {}).sort();
+    const last = keys.length ? history[keys[keys.length - 1]] : 0;
+    const fut = future == null ? [last] : [].concat(future);
+    return function (ym) {
+      if (history && history[ym] != null) return history[ym];
+      const d = monthsBetween(now, ym);
+      if (d <= 0) { const prev = keys.filter((k) => k <= ym).pop(); return prev ? history[prev] : fut[0]; }
+      return fut[Math.min(Math.floor((d - 1) / 12), fut.length - 1)];
+    };
+  }
+
+  /** Historia stopy referencyjnej NBP z data/months.json: {"RRRR-MM": % obowiązujące 1. dnia miesiąca}. */
+  function nbpHistoryFromMonths(monthsObj) {
+    const h = {};
+    for (const [ym, rec] of Object.entries(monthsObj)) if (rec && typeof rec.nbpRef === "number") h[ym] = rec.nbpRef;
+    return h;
+  }
+
   function makeCpiAt(history, future, now) {
     return function (ym) {
       if (history && history[ym] != null) return history[ym];
@@ -200,17 +246,18 @@
     const swapPrice = p.swapPrice || 99.9;
     const future = (p.cpiFuture && p.cpiFuture.length) ? p.cpiFuture : [2.5];
     const cpiAt = makeCpiAt(p.cpiHistory || {}, future, now);
+    const nbpAt = makeNbpAt(p.nbpHistory || {}, p.nbpFuture, now);
     // taxBasisNominal: podatek od zysku liczony względem 100 zł także po zamianie po 99,90 (zgodność z arkuszem kontrolnym)
     const opts = { roundPerBond: p.roundPerBond !== false, taxBasisNominal: !!p.taxBasisNominal,
       valuation: p.valuation === "liquidate" ? "liquidate" : "hold" };
     const rollover = Object.assign({}, p.rollover || p.target);
-    const ctx = { H, cpiAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
+    const ctx = { H, cpiAt, nbpAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
 
     const oldSpec = Object.assign({}, p.old);
     const age0 = monthsBetween(oldSpec.purchase, now);
     if (age0 < 0) throw new Error("Data zakupu jest późniejsza niż data zamiany");
     if (age0 >= TYPES[oldSpec.type].term) throw new Error("Obligacje są już po terminie wykupu");
-    const oldRates = periodRates(oldSpec, cpiAt);
+    const oldRates = periodRates(oldSpec, cpiAt, nbpAt);
 
     // historia: wartość inwestycji od miesiąca zakupu do dziś (ta sama wycena co dalej) — obligacje po podatku
     // od narosłych odsetek plus kupony COI wypłacone do danego miesiąca (netto, bez oprocentowania)
@@ -278,7 +325,7 @@
       months, past, paidCoupons, keepEvents: keep.events, swapEvents: swap.events,
       atHorizon: { keep: last.keep, swap: last.swap, diff: last.diff, keepReal: last.keepReal, swapReal: last.swapReal, diffReal: last.diffReal },
       breakEvenMonth,
-      oldRates, targetRates: periodRates(targetSpec, cpiAt),
+      oldRates, targetRates: periodRates(targetSpec, cpiAt, nbpAt),
     };
   }
 
@@ -380,7 +427,7 @@
   }
 
   const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation,
-    cpiHistoryFromMonths, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
+    cpiHistoryFromMonths, nbpHistoryFromMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

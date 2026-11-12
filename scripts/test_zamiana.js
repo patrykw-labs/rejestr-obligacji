@@ -4,6 +4,7 @@
 const path = require("path");
 const fs = require("fs");
 const Z = require(path.join(__dirname, "..", "js", "zamiana.js"));
+const r2 = (x) => Math.round(x * 100) / 100;
 
 let pass = 0, fail = 0;
 function eq(name, got, exp, tol = 0.01) {
@@ -176,6 +177,51 @@ eq("seria z archiwum: EDO1136 opłata", s1.fee, 3);
 const hist = Z.cpiHistoryFromMonths(months);
 eq("CPI za 02.2023 z archiwum", hist["2023-02"], 18.4);
 eq("CPI za 02.2024 z archiwum", hist["2024-02"], 2.8);
+
+// ---------------------------------------------------------------------------
+// 4. ROR i DOR (list emisyjny 113/2025 i analogiczny DOR): miesięczne okresy, stopa NBP + marża,
+//    kupon N·r/12 co miesiąc, od 2. okresu stała opłata 0,50 / 0,70 zł bez progu 100 zł
+// ---------------------------------------------------------------------------
+const nbpHist = Z.nbpHistoryFromMonths(months);
+eq("NBP z archiwum: 12.2025", nbpHist["2025-12"], 4.25);
+const ror = Z.seriesFromArchive(months, "ROR1126");
+eq("ROR1126 z archiwum", [ror.found, ror.purchase, ror.rate1, ror.margin, ror.fee], [true, "2025-11", 4.5, 0, 0.5]);
+const rorSpec = { type: "ROR", rate1: ror.rate1, margin: ror.margin, fee: ror.fee, purchase: ror.purchase };
+const nbpAt = Z.makeNbpAt(nbpHist, 3, "2026-11");
+const rorRates = Z.periodRates(rorSpec, () => 0, nbpAt);
+eq("ROR: 12 okresów miesięcznych", rorRates.length, 12);
+eq("ROR: stopy 11.2025–04.2026 (1. okres stały, dalej NBP z miesiąca okresu)", rorRates.slice(0, 6).map((r) => +(r * 100).toFixed(2)), [4.5, 4.25, 4, 4, 4, 3.75]);
+eq("NBP w przyszłości ze scenariusza", nbpAt("2027-01"), 3);
+eq("NBP na dziś z archiwum", nbpAt("2026-11"), 3.75);
+eq("ROR: kupon 4,50% = 0,38 zł (N·r/12, zaokrąglenie do grosza)", Z.couponAmount("ROR", 0.045, true), 0.38);
+eq("ROR: kupon 3,75% = 0,31 zł", Z.couponAmount("ROR", 0.0375, true), 0.31);
+const rv = Z.bondValue(rorSpec, 6, rorRates);
+eq("ROR od 2. okresu: opłata stała 0,50 zł", rv.fee, 0.5);
+eq("ROR od 2. okresu: wypłata 99,50 zł (bez progu 100 zł)", rv.net, 99.5);
+eq("ROR: 6 kuponów do 6. miesiąca", rv.coupons.length, 6);
+eq("ROR w 1. okresie: opłata ≤ narosłe odsetki", Z.bondValue(rorSpec, 0, rorRates).fee, 0);
+const dorSpec = { type: "DOR", rate1: 4.65, margin: 0.15, fee: 0.7, purchase: "2025-11" };
+const dorRates = Z.periodRates(dorSpec, () => 0, nbpAt);
+eq("DOR: 24 okresy, marża 0,15", [dorRates.length, +(dorRates[1] * 100).toFixed(2)], [24, 4.4]);
+eq("DOR: opłata 0,70 zł", Z.bondValue(dorSpec, 3, dorRates).net, 99.3);
+
+const rorBase = { now: "2026-05", old: Object.assign({ count: 100 }, rorSpec), target: { type: "EDO", rate1: 5.6, margin: 2, fee: 3 },
+  cpiHistory: hist, nbpHistory: nbpHist, nbpFuture: 3.75, cpiFuture: [2.5], savingsRate: 0, tax: true };
+const rc = Z.compare(rorBase);
+eq("ROR: domyślny horyzont = do wykupu (6 mies.)", rc.horizonMonths, 6);
+eq("ROR: zerwanie — opłata 50 zł, bez podatku (strata)", [rc.switchNow.fee, rc.switchNow.tax], [50, 0]);
+eq("ROR: z 9950 zł → 99 szt. po 100 zł + 50 zł", [rc.switchNow.newCount, r2(rc.switchNow.cashRest)], [99, 50]);
+eq("ROR: kupon miesięczny netto w wariancie „trzymam”", rc.months[1].keep - rc.months[0].keep, Z.couponAmount("ROR", rc.oldRates[6], true) * 100 * 0.81, 1e-9);
+eq("ROR: kupony do dziś w wartości (6 mies.)", rc.paidCoupons, rc.oldRates.slice(0, 6).reduce((a, r) => a + Z.couponAmount("ROR", r, true), 0) * 100 * 0.81, 1e-9);
+eq("ROR: historia łączy się z dziś", rc.past[rc.past.length - 1].value, rc.months[0].keep, 1e-9);
+const rw = rc.keepEvents.filter((e) => e.kind === "wykup");
+eq("ROR: wykup w terminie po 6 mies. (100 zł/szt.) → zamiana po 99,90 razem z kuponami z konta", [rw.length, rw[0].t, rw[0].proceeds, rw[0].newCount],
+  [1, 6, 10000, Math.floor((10000 + rc.months[5].keep - 10000 + Z.couponAmount("ROR", rc.oldRates[11], true) * 100 * 0.81 - rc.paidCoupons) / 99.9)]);
+// zamiana EDO → ROR: kupony ROR co miesiąc na konto, stopa ze scenariusza NBP
+const toRor = Z.compare(Object.assign({}, rorBase, { old: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 10 },
+  target: { type: "ROR", rate1: 4, margin: 0, fee: 0.5 }, nbpFuture: 2 }));
+eq("cel ROR: okres w miesiącu z archiwum — NBP z archiwum", +(toRor.targetRates[2] * 100).toFixed(2), 3.75);
+eq("cel ROR: okres po archiwum (12.2026) — NBP ze scenariusza", +(toRor.targetRates[7] * 100).toFixed(2), 2);
 
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
