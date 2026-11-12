@@ -27,6 +27,9 @@
     // od 2. okresu przy przedterminowym wykupie stała opłata (bez progu 100 zł) — listy emisyjne, np. 113/2025
     DOR: { term: 24, period: 1, nbp: true, coupon: true, flatFee: true, label: "DOR (2 lata)" },
     ROR: { term: 12, period: 1, nbp: true, coupon: true, flatFee: true, label: "ROR (1 rok)" },
+    // OTS: 3 miesiące, stała stopa, odsetki (N·r·3/12) przy wykupie; przy przedterminowym wykupie odsetki
+    // nie przysługują (wypłata = 100 zł); cena zamiany na OTS 100,00 zł — listy emisyjne, np. OTS0227
+    OTS: { term: 3, period: 3, coupon: false, noEarlyInterest: true, swapPrice: 100, label: "OTS (3 mies.)" },
   };
   const periodOf = (type) => TYPES[type].period || 12;
   const NOMINAL = 100;
@@ -111,7 +114,7 @@
     if (t.coupon) {
       for (let k = 1; k <= fullPeriods; k++) coupons.push({ age: k * P, amount: couponAmount(spec.type, rates[k - 1], round) });
     } else {
-      for (let k = 1; k <= fullPeriods; k++) base *= 1 + rates[k - 1];
+      for (let k = 1; k <= fullPeriods; k++) base *= 1 + rates[k - 1] * P / 12;
     }
     if (matured) {
       const gross = t.coupon ? NOMINAL : base;
@@ -128,7 +131,8 @@
     if (round) gross = r2(gross);
     const accrued = gross - NOMINAL; // narosłe odsetki (dla COI, ROR, DOR: tylko bieżący okres)
     // ROR/DOR od 2. okresu: stała opłata, także gdy przekracza narosłe odsetki (wypłata może być < 100 zł)
-    const fee = t.flatFee && fullPeriods >= 1 ? spec.fee : Math.max(0, Math.min(spec.fee, accrued));
+    const fee = t.noEarlyInterest ? Math.max(0, accrued)
+      : t.flatFee && fullPeriods >= 1 ? spec.fee : Math.max(0, Math.min(spec.fee, accrued));
     const net = round ? r2(gross - fee) : gross - fee;
     return { gross, fee, net, coupons, matured: false };
   }
@@ -188,13 +192,15 @@
         const taxPaid = tax ? r2(Math.max(0, gain) * taxRate) : 0;
         const proceeds = gross - taxPaid;
         const roll = Object.assign({}, rollover, { purchase: addMonths(ctx.now, t) });
-        const n = Math.floor((proceeds + cash) / swapPrice);
+        // cena zamiany zależy od kupowanej serii (OTS 100,00 zł, pozostałe 99,90 zł), chyba że podano ją wprost
+        const rollPrice = rollover.swapPrice || TYPES[rollover.type].swapPrice || swapPrice;
+        const n = Math.floor((proceeds + cash) / rollPrice);
         events.push({ t, kind: "wykup", spec, count, proceeds, newCount: n });
-        cash = proceeds + cash - n * swapPrice;
+        cash = proceeds + cash - n * rollPrice;
         // nowa seria kupiona w dniu wykupu (przy zerwaniu w środku miesiąca — ułamek miesiąca przed krokiem t)
         boughtAt = boughtAt + term; age = Math.max(0, t - boughtAt);
         spec = roll; count = n; rates = periodRates(spec, cpiAt, nbpAt);
-        costBasis = opts.taxBasisNominal ? NOMINAL : swapPrice; paidUpTo = 0;
+        costBasis = opts.taxBasisNominal ? NOMINAL : rollPrice; paidUpTo = 0;
       }
 
       // wycena z końcem miesiąca t:

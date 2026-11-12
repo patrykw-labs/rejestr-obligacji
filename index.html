@@ -503,9 +503,13 @@ const CALC_ACC_NOTE={std:"Podatek 19% od zysku przy zerwaniu, wykupie i od odset
   ikze:"W IKZE bez podatku Belki; przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty — wartości są po tym podatku. Opłata za zerwanie w ramach konta zostaje."};
 const calcTaxTxt=c=>({std:"po podatku Belki",ike:"bez podatku (IKE)",ikze:"w IKZE: bez podatku Belki, po 10% ryczałcie przy wypłacie"})[c.acc||"std"];
 const calcLiqTxt=c=>c.ike?`(wypłata z ${c.acc==="ikze"?"IKZE — bez opłaty za wykup, po 10% ryczałcie":"IKE — bez opłaty za wykup i bez podatku"})`:"(po opłacie i podatku)";
-const CALC_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR"];
+const CALC_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR","OTS"];
+// cena zamiany przy wykupie w terminie zależy od kupowanej serii (OTS 100,00 zł, pozostałe 99,90 zł)
+const calcSwapPrice=t=>Zamiana.TYPES[t]?.swapPrice||99.9;
+const calcSwapTxt=t=>fmt(calcSwapPrice(t))+" zł";
+const calcUsesOts=c=>c.pos.some(o=>o.type==="OTS")||c.tt==="OTS";
 const calcIsNbp=t=>!!Zamiana.TYPES[t]?.nbp;
-const calcR1Label=t=>calcIsNbp(t)?"1. miesiąc":"1. rok";
+const calcR1Label=t=>t==="OTS"?"Oprocentowanie":calcIsNbp(t)?"1. miesiąc":"1. rok";
 const calcNbpNow=()=>state.months[state.months.length-1].nbpRef??0;
 // czy w wyliczeniu jest ROR/DOR (pokazujemy wtedy scenariusz stopy NBP)
 const calcUsesNbp=c=>c.pos.some(o=>calcIsNbp(o.type))||calcIsNbp(c.tt);
@@ -641,7 +645,7 @@ function renderCalc(main){
     const mat=calcMaturity(o);
     return `<div class="pos"><div class="pos-head"><b>${i+1}. ${esc(o.code||"seria wpisana ręcznie")}</b><button type="button" class="pos-del" data-del="${i}" aria-label="Usuń serię ${i+1} z portfela">usuń</button></div>
       <div class="pos-row">${sel}${nF.replace("Liczba sztuk","Szt.")}${dF.replace("Dzień zakupu","Dzień")}</div>
-      ${o.code?`<span class="fnote">zakup ${mShort(o.p)} · wykup ${mat?mShort(mat):"–"} · ${calcR1Label(o.type)} ${fmt(o.r1)}% · marża ${fmt(o.m)} p.p. · opłata ${fmt(o.f)} zł/szt. (z listu emisyjnego)</span>`:`<div class="frow">${typeF}${pF}</div>${parF}`}</div>`;
+      ${o.code?`<span class="fnote">zakup ${mShort(o.p)} · wykup ${mat?mShort(mat):"–"} · ${calcR1Label(o.type)} ${fmt(o.r1)}% · marża ${fmt(o.m)} p.p. · ${o.type==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(o.f)} zł/szt.`} (z listu emisyjnego)</span>`:`<div class="frow">${typeF}${pF}</div>${parF}`}</div>`;
   };
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je dziś</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii do dziś liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div></div>
@@ -653,7 +657,7 @@ function renderCalc(main){
       </div>
       <div class="card">
         <h3>Na co zamieniasz <small>oferta ${esc(mLabel(now))}</small></h3>
-        <label class="field"><span class="flabel">Nowa seria</span><span class="sel"><select id="z-tt">${selOpts(targets.concat([["custom","własne parametry (np. przyszła oferta)"]]),c.tc?"custom":c.tt)}</select></span><span class="fnote">Po zerwaniu nowe obligacje kupujesz po 100 zł (cena zamiany 99,90 zł obowiązuje tylko przy wykupie w terminie).</span></label>
+        <label class="field"><span class="flabel">Nowa seria</span><span class="sel"><select id="z-tt">${selOpts(targets.concat([["custom","własne parametry (np. przyszła oferta)"]]),c.tc?"custom":c.tt)}</select></span><span class="fnote">Po zerwaniu nowe obligacje kupujesz po 100 zł (cena zamiany na ${esc(c.tt)}, ${calcSwapTxt(c.tt)}, obowiązuje tylko przy wykupie w terminie).</span></label>
         <div class="frow">
           ${c.tc?`<label class="field"><span class="flabel">Typ</span><span class="sel"><select id="z-ttype">${selOpts(CALC_TYPES.map(t=>[t,t]),c.tt)}</select></span></label>`:""}
           <label class="field"><span class="flabel">${calcR1Label(c.tt)}, %</span><input id="z-tr1"${c.tc?"":" disabled"} type="number" step="0.01" inputmode="decimal" value="${esc(c.tr1)}"></label>
@@ -711,6 +715,7 @@ function calcYearTable(ms,H,events,lab){
     </tbody></table></div></div>`;
 }
 function calcRateTxt(rates,purchase,type){
+  if(type==="OTS")return `3 mies. (od ${mShort(purchase)}): <b>${fmt(rates[0]*100)}%</b>, odsetki przy wykupie`;
   if(!calcIsNbp(type))return rates.map((x,i)=>`${i+1}. rok (od ${mShort(Zamiana.addMonths(purchase,i*12))}): <b>${fmt(x*100)}%</b>`).slice(0,Math.ceil(Zamiana.TYPES[type].term/12)).join(" · ");
   // ROR/DOR: miesiące o tej samej stopie łączone w przedziały
   const g=[];rates.forEach((x,i)=>{const last=g[g.length-1];if(last&&Math.abs(last.r-x)<1e-12)last.to=i;else g.push({r:x,from:i,to:i})});
@@ -734,8 +739,9 @@ const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.sli
 const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
 const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości dziś wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>
       <li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||calcNow())} z archiwum GUS, dalej Twój scenariusz.</li>
+      ${calcUsesOts(c)?`<li><b>OTS:</b> stałe oprocentowanie przez 3 miesiące, odsetki (100 zł × stopa × 3/12) wypłacane przy wykupie. Przy zerwaniu dostajesz 100 zł za sztukę, a odsetki przepadają. Zamiana na OTS kosztuje 100,00 zł (nie 99,90 zł)${c.tt==="OTS"?"; OTS w obliczeniach odnawia się co 3 miesiące na dzisiejszych warunkach (tych odnowień nie wyróżniamy w tabeli ani na wykresie)":""}.</li>`:""}
       ${calcUsesNbp(c)?`<li><b>ROR i DOR:</b> odsetki za każdy miesiąc (100 zł × stopa / 12, do grosza) trafiają na konto. Od 2. miesiąca stopa = stopa referencyjna NBP z 10. dnia roboczego przed miesiącem okresu + marża; do ${mShort(calcNow())} z archiwum NBP, dalej ${fmt(+c.nbp)}% (Twoje założenie). Przy zerwaniu od 2. miesiąca opłata jest stała (0,50 zł ROR, 0,70 zł DOR), także gdy przekracza narosłe odsetki — wtedy dostajesz mniej niż 100 zł za sztukę.</li>`:""}
-      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania dziś)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
+      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}${calcUsesOts(c)?"; OTS — 100 zł bez odsetek":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania dziś)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
 const calcCouponTxt=v=>v>0.005?`; w tym odsetki wypłacone do dziś: ${zl0(v)}`:"";
 const calcCouponDesc=v=>v>0.005?` Wartość obejmuje odsetki wypłacone do dziś (kupony COI, odsetki ROR/DOR: ${zl0(v)}, bez oprocentowania) — dostajesz je w obu wariantach, więc nie zmieniają różnicy.`:"";
 const calcShareHtml=`<div class="row"><button type="button" class="btn" id="z-share" data-goatcounter-click="kalkulator-link">Kopiuj link do tego wyliczenia</button><span class="small" id="z-share-msg"></span></div>`;
@@ -770,7 +776,7 @@ function calcRecompute(){
       <div class="stat t-red"><span class="k">Koszt zerwania dziś</span><span class="v">${zl0(sn.cost)}</span><span class="s">opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. + ${zl2(sn.cashRest)} na konto</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${beInflTxt}</span></div>
     </div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Wartość obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(r.paidCoupons)}</p></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Wartość obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(r.paidCoupons)}</p></div>
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>trzymam ${esc(oldCode)}</span><span><i style="background:var(--accent)"></i>zamieniam na ${esc(tgtCode)}</span></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"})}
@@ -778,7 +784,7 @@ function calcRecompute(){
       <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, dziś ${calcAgeTxt(r.ageNow)}): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
-      <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po 99,90 zł na nową serię ${esc(tgtCode)} na dzisiejszych warunkach. <b>Zamieniam:</b> zrywasz dziś (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
+      <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po ${calcSwapTxt(c.tt)} na nową serię ${esc(tgtCode)} na dzisiejszych warunkach. <b>Zamieniam:</b> zrywasz dziś (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${calcShareHtml}
@@ -825,7 +831,7 @@ function calcRecomputePortfolio(out,c,now){
       ${rowsP.map(z=>{const s=z.x.result.switchNow;return `<tr><td><b>${esc(z.code)}</b> <a class="small" href="${esc(detailHref(z))}" target="_blank" rel="noopener" title="Otwórz wyliczenie tylko dla tej serii w nowej karcie">szczegóły ↗</a></td><td class="r num">${Math.floor(+z.o.n)}</td><td>${mShort(z.x.result.maturity)}</td><td class="r num">${zl0(s.valueBeforeFee)}</td><td class="r num">${zl0(s.cost)}</td><td class="r num"><span class="${z.x.diff>0?"d-up":z.x.diff<0?"d-down":"d-0"}">${sgn(z.x.diff)}</span></td><td class="r num">${calcBeShort(z.beC)}</td>${nbpCol?`<td class="r num">${calcBeShort(z.beN)}</td>`:""}<td>${z.x.swap?'<span class="pill p-ok">zamień</span>':'<span class="pill p-part">trzymaj</span>'}</td></tr>`}).join("")}
       <tr class="sum"><td><b>Razem</b></td><td class="r num">${rowsP.reduce((s,z)=>s+Math.floor(+z.o.n),0)}</td><td>${mShort(r.latestMaturity)}</td><td class="r num">${zl0(tot("valueBeforeFee"))}</td><td class="r num">${zl0(tot("cost"))}</td><td class="r num"><span class="${a.diffAll>0?"d-up":a.diffAll<0?"d-down":"d-0"}">${sgn(a.diffAll)}</span></td><td></td>${nbpCol?"<td></td>":""}<td>${pick?`<span class="small">wybrane: ${sgn(a.diffBest)}</span>`:""}</td></tr>
       </tbody></table></div></div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(paidC)}</p></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(paidC)}</p></div>
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>${esc(lab.keep.toLowerCase())}</span><span><i style="background:var(--accent)"></i>${esc(lab.swap.toLowerCase())} na ${esc(tgtCode)}</span></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(ms,H,events,lab)}
@@ -833,7 +839,7 @@ function calcRecomputePortfolio(out,c,now){
       ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, dziś ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
-      <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po 99,90 zł na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł liczone są osobno dla każdej serii (po połączeniu mogłoby wyjść kilka obligacji więcej).</li>
+      <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł liczone są osobno dla każdej serii (po połączeniu mogłoby wyjść kilka obligacji więcej).</li>
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${calcShareHtml}
@@ -848,8 +854,10 @@ function calcEvents(r,o,tt,oldCode,tgtCode){
   out.push({t:0,leg:"swap",short:"zerwanie i zakup",text:`zamieniam: zerwanie ${oldCode}, zakup ${sn.newCount} szt. ${tgtCode} po 100 zł`});
   for(const [leg,list] of [["keep",r.keepEvents],["swap",r.swapEvents]])for(const e of list){if(e.kind!=="wykup")continue;
     const ym=Zamiana.addMonths(now,e.t),from=e.t===0?oldCode:(leg==="keep"&&e.spec.purchase===o.p?oldCode:calcCodeFor(e.spec.type,e.spec.purchase));
-    const to=calcCodeFor(tt,ym);
-    out.push({t:e.t,leg,src:from,short:`wykup ${from}`,text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po 99,90 zł na ${e.newCount} szt. ${to}`});}
+    const to=calcCodeFor(tt,ym),own=leg==="keep"&&e.spec.purchase===o.p;
+    // odnawianie OTS co 3 miesiące pomijamy w tabeli i na wykresie (opisane w „Jak to policzono”)
+    if(e.spec.type==="OTS"&&!own&&e.t>0)continue;
+    out.push({t:e.t,leg,src:from,short:`wykup ${from}`,priceTxt:fmt(calcSwapPrice(tt)),text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po ${calcSwapTxt(tt)} na ${e.newCount} szt. ${to}`});}
   return out;
 }
 // kolory zdarzeń wykupu: każda wykupowana seria ma własny kolor (linia, etykieta, dymek, tabela)
@@ -900,7 +908,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases){
     ${histPath?`<path d="${histPath}" fill="none" stroke="var(--ink-2)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
     <path d="${line(P,n-1,"keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>
     <path d="${line(P,n-1,"swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>
-    ${evs.map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7;return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${D1}" style="stroke:${e.color};stroke-width:1.6;stroke-dasharray:3 3"/><text x="${right?xe-5:xe+5}" y="${M1-8-k*15}" text-anchor="${right?"end":"start"}" style="fill:${e.color};font-weight:700">↻ ${esc(e.short)} → zamiana po 99,90</text>`}).join("")}
+    ${evs.map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7;return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${D1}" style="stroke:${e.color};stroke-width:1.6;stroke-dasharray:3 3"/><text x="${right?xe-5:xe+5}" y="${M1-8-k*15}" text-anchor="${right?"end":"start"}" style="fill:${e.color};font-weight:700">↻ ${esc(e.short)} → zamiana po ${e.priceTxt||"99,90"}</text>`}).join("")}
     ${buys.map(z=>`<circle cx="${x(z.i)}" cy="${y(pts[z.i].keep)}" r="5" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:2.2"/>`).join("")}
     <line class="zhov" x1="0" x2="0" y1="${T}" y2="${D1}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
   el.querySelectorAll("button[data-range]").forEach(b=>b.addEventListener("click",()=>{state.calcRange=b.dataset.range;drawCalcChart(r,oldCode,tgtCode,events,lab,purchases)}));

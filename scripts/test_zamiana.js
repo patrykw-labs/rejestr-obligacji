@@ -297,5 +297,28 @@ eq("EDO → EDO: wynik nie zależy od stopy NBP", Z.breakEvenNbp(edoArgs).indepe
 const toRorBe = Z.breakEvenNbp(Object.assign({}, edoArgs, { target: { type: "ROR", rate1: 4, margin: 0, fee: 0.5 }, nbpHistory: nbpHist }));
 eq("EDO → ROR: stopa progowa liczbą albo brak zmiany znaku", typeof toRorBe === "number" || toRorBe.none === true, true);
 
+// ---------------------------------------------------------------------------
+// 8. OTS (list OTS0227): 3 miesiące, 2,00% → 0,50 zł odsetek przy wykupie; przy zerwaniu 100 zł bez odsetek;
+//    cena zamiany na OTS 100,00 zł
+// ---------------------------------------------------------------------------
+const otsA = Z.seriesFromArchive(months, "OTS0227");
+eq("OTS0227 z archiwum", [otsA.found, otsA.purchase, otsA.rate1], [true, "2026-11", 2]);
+const otsSpec = { type: "OTS", rate1: 2, margin: 0, fee: 0, purchase: "2026-09" };
+const otsR = Z.periodRates(otsSpec, () => 0);
+eq("OTS: jeden okres, stała stopa", otsR.map((r) => +(r * 100).toFixed(2)), [2]);
+eq("OTS: wykup 100,50 zł (odsetki 0,50 zł)", Z.bondValue(otsSpec, 3, otsR).gross, 100.5);
+const ov1 = Z.bondValue(otsSpec, 1, otsR);
+eq("OTS po miesiącu: narosło 0,17 zł, przy zerwaniu odsetki przepadają (100 zł)", [ov1.gross, ov1.net], [100.17, 100]);
+const otsHold = Z.compare({ now: "2026-11", old: Object.assign({ count: 100 }, otsSpec), target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 },
+  cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true });
+eq("OTS → EDO: zerwanie daje 10 000 zł, bez podatku", [otsHold.switchNow.proceeds, otsHold.switchNow.tax], [10000, 0]);
+const ow = otsHold.keepEvents.find((e) => e.kind === "wykup");
+eq("OTS → EDO: wykup za miesiąc, 10 050 zł − podatek 9,50 zł, zamiana na EDO po 99,90", [ow.t, ow.proceeds, ow.newCount], [1, 10040.5, Math.floor(10040.5 / 99.9)]);
+const toOts = Z.compare({ now: "2026-11", old: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 10 },
+  target: { type: "OTS", rate1: 2, margin: 0, fee: 0 }, cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true, horizonMonths: 12 });
+const tw = toOts.swapEvents.filter((e) => e.kind === "wykup");
+eq("EDO → OTS: OTS odnawiane co 3 miesiące", tw.map((e) => e.t), [3, 6, 9, 12]);
+eq("EDO → OTS: zamiana na OTS po 100,00 zł", tw[0].newCount, Math.floor((tw[0].proceeds + toOts.switchNow.cashRest) / 100));
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
