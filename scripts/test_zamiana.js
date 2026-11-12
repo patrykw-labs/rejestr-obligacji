@@ -150,7 +150,11 @@ eq("portfel: koszt zerwania wszystkiego = suma", pf.switchAll.cost, rA.switchNow
 eq("portfel: historia od najwcześniejszego zakupu", pf.past[0].ym, "2021-04");
 eq("portfel: historia do 04.2022 tylko COI", pf.past[11].value, rB.past[11].value);
 eq("COI w rocznicę: kupon w obu wariantach, różnica dziś = 0", rB.months[0].diff, 0);
-eq("COI: historia łączy się z „dziś” (bez wypłaconych kuponów)", rB.past[rB.past.length - 1].value, rB.months[0].keep);
+eq("COI: historia łączy się z „dziś” (z kuponami otrzymanymi do dziś)", rB.past[rB.past.length - 1].value, rB.months[0].keep);
+eq("COI: kupony otrzymane do dziś w obu wariantach", rB.months[0].swap - rB.switchNow.proceeds, rB.paidCoupons);
+eq("COI: kupony do dziś = 3 lata netto", rB.paidCoupons, rB.oldRates.slice(0, 3).reduce((a, r) => a + 100 * r, 0) * 30 * 0.81, 0.01);
+let mono = true; for (let i = 1; i < rB.past.length; i++) if (rB.past[i].value < rB.past[i - 1].value - 1e-9) mono = false;
+eq("COI: historia z kuponami nie spada w rocznice", mono, true);
 eq("portfel: historia łączy się z dziś", pf.past[pf.past.length - 1].value, pf.months[0].keep);
 const pf1 = Z.comparePortfolio(Object.assign({}, pfBase, { positions: [posA] }));
 eq("portfel z jedną serią = compare", pf1.atHorizon.diffAll, Z.compare(Object.assign({}, pfBase, { old: posA })).atHorizon.diff);

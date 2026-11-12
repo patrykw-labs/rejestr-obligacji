@@ -212,17 +212,23 @@
     if (age0 >= TYPES[oldSpec.type].term) throw new Error("Obligacje są już po terminie wykupu");
     const oldRates = periodRates(oldSpec, cpiAt);
 
-    // historia: wartość posiadanych obligacji od miesiąca zakupu do dziś (ta sama wycena co dalej)
+    // historia: wartość inwestycji od miesiąca zakupu do dziś (ta sama wycena co dalej) — obligacje po podatku
+    // od narosłych odsetek plus kupony COI wypłacone do danego miesiąca (netto, bez oprocentowania)
+    const histAt = (a) => {
+      const v = bondValue(oldSpec, a, oldRates, opts);
+      const gross = (opts.valuation === "liquidate" ? v.net : v.gross) * p.old.count;
+      const bonds = gross - (tax ? Math.max(0, gross - NOMINAL * p.old.count) * taxRate : 0);
+      const coupons = v.coupons.reduce((sum, c) => sum + c.amount, 0) * p.old.count * (tax ? 1 - taxRate : 1);
+      return { bonds, coupons };
+    };
     const past = [];
     for (let a = 0; a <= age0; a++) {
-      const v = bondValue(oldSpec, a, oldRates, opts);
-      const per = opts.valuation === "liquidate" ? v.net : v.gross;
-      const gross = per * p.old.count;
-      const gain = gross - NOMINAL * p.old.count;
-      // kupony COI wypłacone przed dziś są już u inwestora i nie zmieniają porównania — pomijamy je
-      // (tak samo jak prognoza od dziś), więc historia łączy się z wartością „dziś” bez skoku
-      past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: gross - (tax ? Math.max(0, gain) * taxRate : 0) });
+      const h = histAt(a);
+      past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: h.bonds + h.coupons });
     }
+    // kupony COI otrzymane do dziś (także w rocznicę przypadającą dziś) inwestor ma w obu wariantach:
+    // doliczamy je jako stałą kwotę do obu, więc wykres jest ciągły, a różnica się nie zmienia
+    const paidCoupons = histAt(age0).coupons;
 
     // A: trzymam
     const keep = simulateLeg({ spec: oldSpec, count: p.old.count, ageAt0: age0 }, ctx);
@@ -247,10 +253,11 @@
 
     const months = keep.series.map((k, t) => {
       const s = swap.series[t];
+      const kt = k.total + paidCoupons, st = s.total + paidCoupons;
       return {
         t, ym: k.ym,
-        keep: k.total, swap: s.total, diff: s.total - k.total,
-        keepReal: k.total / defl[t], swapReal: s.total / defl[t], diffReal: (s.total - k.total) / defl[t],
+        keep: kt, swap: st, diff: st - kt,
+        keepReal: kt / defl[t], swapReal: st / defl[t], diffReal: (st - kt) / defl[t],
         keepBond: k.spec, swapBond: s.spec,
       };
     });
@@ -268,7 +275,7 @@
         // co tracisz w momencie zamiany względem wartości brutto
         cost: v0.fee * p.old.count + tax0,
       },
-      months, past, keepEvents: keep.events, swapEvents: swap.events,
+      months, past, paidCoupons, keepEvents: keep.events, swapEvents: swap.events,
       atHorizon: { keep: last.keep, swap: last.swap, diff: last.diff, keepReal: last.keepReal, swapReal: last.swapReal, diffReal: last.diffReal },
       breakEvenMonth,
       oldRates, targetRates: periodRates(targetSpec, cpiAt),
