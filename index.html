@@ -201,6 +201,8 @@ td b{font-weight:700}
 .frow .wide{grid-column:span 2;min-width:150px}
 .field input[type=number],.field input[type=month]{font:inherit;font-weight:600;font-size:15px;color:var(--ink);background:var(--input);border:1px solid var(--line-strong);border-radius:10px;padding:9px 12px;width:100%;min-width:0}
 .field input:hover{border-color:var(--accent)}
+.field input:disabled,.field select:disabled{background:var(--surface-2);color:var(--ink-2);border-style:dashed;cursor:not-allowed;opacity:1;-webkit-text-fill-color:var(--ink-2)}
+.field input:disabled:hover,.field select:disabled:hover{border-color:var(--line-strong)}
 .field input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .field .sel,.field select{width:100%;min-width:0}
 .field .fnote{font-size:12px;color:var(--muted)}
@@ -500,23 +502,26 @@ function calcFromCode(code){const a=Zamiana.seriesFromArchive(state.raw,code);if
 function calcDefaults(){
   const opts=calcOptions();const now=calcNow();
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0];
-  return Object.assign({n:100,h:10,sc:"base",cpi:Array(12).fill(2.5),sv:4,ike:false},calcFromCode(pick)||{code:"",type:"EDO",p:Zamiana.addMonths(now,-24),r1:6,m:1.5,f:2},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
+  return Object.assign({n:100,h:10,sc:"base",tc:false,cpi:Array(12).fill(2.5),sv:4,ike:false},calcFromCode(pick)||{code:"",type:"EDO",p:Zamiana.addMonths(now,-24),r1:6,m:1.5,f:2},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
 }
 function calcFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="zamiana"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const c=calcDefaults();
-  if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(c,a);else c.code="";}
+  if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(c,a);else c.code="";}else c.code="";
   const num=(k,d)=>q[k]!=null&&q[k]!==""&&!isNaN(+q[k])?+q[k]:d;
-  if(q.t&&CALC_TYPES.includes(q.t))c.type=q.t;if(q.p&&/^\d{4}-\d{2}$/.test(q.p))c.p=q.p;
-  c.r1=num("r1",c.r1);c.m=num("m",c.m);c.f=num("f",c.f);c.n=num("n",c.n);
-  if(q.tt&&CALC_TYPES.includes(q.tt))Object.assign(c,calcTargetFromOffer(q.tt)||{tt:q.tt});
-  c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);c.h=num("h",c.h);c.sv=num("sv",c.sv);c.ike=q.ike==="1";
+  if(!c.code){if(q.t&&CALC_TYPES.includes(q.t))c.type=q.t;if(q.p&&/^\d{4}-\d{2}$/.test(q.p))c.p=q.p;
+    c.r1=num("r1",c.r1);c.m=num("m",c.m);c.f=num("f",c.f);}
+  c.n=num("n",c.n);c.tc=q.tc==="1";
+  if(q.tt&&CALC_TYPES.includes(q.tt)){const o=calcTargetFromOffer(q.tt);if(o&&!c.tc)Object.assign(c,o);else c.tt=q.tt;}
+  if(c.tc){c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);}
+  c.h=num("h",c.h);c.sv=num("sv",c.sv);c.ike=q.ike==="1";
   if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
   return c;
 }
 function calcHash(c){
-  const q={k:c.code||"",t:c.type,p:c.p,r1:c.r1,m:c.m,f:c.f,n:c.n,tt:c.tt,tr1:c.tr1,tm:c.tm,tf:c.tf,h:c.h,sv:c.sv,sc:c.sc,ike:c.ike?1:0};
+  const q=c.code?{k:c.code}:{t:c.type,p:c.p,r1:c.r1,m:c.m,f:c.f};Object.assign(q,{n:c.n,tt:c.tt});
+  if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:c.ike?1:0});
   if(c.sc==="custom")q.cpi=c.cpi.join(",");
   return "zamiana&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
 }
@@ -553,22 +558,23 @@ function renderCalc(main){
         <label class="field"><span class="flabel">Seria z archiwum</span><span class="sel"><select id="z-code"><option value=""${c.code?"":" selected"}>— inna, wpiszę ręcznie —</option>${codeOpts}</select></span><span class="fnote" id="z-code-note"></span></label>
         <div class="frow">
           <label class="field"><span class="flabel">Liczba sztuk</span><input id="z-n" type="number" min="1" step="1" inputmode="numeric" value="${esc(c.n)}"></label>
-          <label class="field"><span class="flabel">Typ</span><span class="sel"><select id="z-type">${selOpts(CALC_TYPES.map(t=>[t,t]),c.type)}</select></span></label>
-          <label class="field wide"><span class="flabel">Miesiąc zakupu</span><input id="z-p" type="month" min="2019-01" max="${Zamiana.addMonths(now,-1)}" value="${esc(c.p)}"></label>
+          <label class="field"><span class="flabel">Typ</span><span class="sel"><select id="z-type"${c.code?" disabled":""}>${selOpts(CALC_TYPES.map(t=>[t,t]),c.type)}</select></span></label>
+          <label class="field wide"><span class="flabel">Miesiąc zakupu</span><input id="z-p"${c.code?" disabled":""} type="month" min="2019-01" max="${Zamiana.addMonths(now,-1)}" value="${esc(c.p)}"></label>
         </div>
         <div class="frow">
-          <label class="field"><span class="flabel">1. rok, %</span><input id="z-r1" type="number" step="0.01" inputmode="decimal" value="${esc(c.r1)}"></label>
-          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-m" type="number" step="0.01" inputmode="decimal" value="${esc(c.m)}"></label>
-          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-f" type="number" step="0.1" inputmode="decimal" value="${esc(c.f)}"></label>
+          <label class="field"><span class="flabel">1. rok, %</span><input id="z-r1"${c.code?" disabled":""} type="number" step="0.01" inputmode="decimal" value="${esc(c.r1)}"></label>
+          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-m"${c.code?" disabled":""} type="number" step="0.01" inputmode="decimal" value="${esc(c.m)}"></label>
+          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-f"${c.code?" disabled":""} type="number" step="0.1" inputmode="decimal" value="${esc(c.f)}"></label>
         </div>
       </div>
       <div class="card">
         <h3>Na co zamieniasz <small>oferta ${esc(mLabel(now))}</small></h3>
-        <label class="field"><span class="flabel">Nowa seria</span><span class="sel"><select id="z-tt">${selOpts(targets,c.tt)}</select></span><span class="fnote">Po zerwaniu nowe obligacje kupujesz po 100 zł (cena zamiany 99,90 zł obowiązuje tylko przy wykupie w terminie).</span></label>
+        <label class="field"><span class="flabel">Nowa seria</span><span class="sel"><select id="z-tt">${selOpts(targets.concat([["custom","własne parametry (np. przyszła oferta)"]]),c.tc?"custom":c.tt)}</select></span><span class="fnote">Po zerwaniu nowe obligacje kupujesz po 100 zł (cena zamiany 99,90 zł obowiązuje tylko przy wykupie w terminie).</span></label>
         <div class="frow">
-          <label class="field"><span class="flabel">1. rok, %</span><input id="z-tr1" type="number" step="0.01" inputmode="decimal" value="${esc(c.tr1)}"></label>
-          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-tm" type="number" step="0.01" inputmode="decimal" value="${esc(c.tm)}"></label>
-          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-tf" type="number" step="0.1" inputmode="decimal" value="${esc(c.tf)}"></label>
+          ${c.tc?`<label class="field"><span class="flabel">Typ</span><span class="sel"><select id="z-ttype">${selOpts(CALC_TYPES.map(t=>[t,t]),c.tt)}</select></span></label>`:""}
+          <label class="field"><span class="flabel">1. rok, %</span><input id="z-tr1"${c.tc?"":" disabled"} type="number" step="0.01" inputmode="decimal" value="${esc(c.tr1)}"></label>
+          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-tm"${c.tc?"":" disabled"} type="number" step="0.01" inputmode="decimal" value="${esc(c.tm)}"></label>
+          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-tf"${c.tc?"":" disabled"} type="number" step="0.1" inputmode="decimal" value="${esc(c.tf)}"></label>
         </div>
       </div>
       <div class="card">
@@ -588,8 +594,9 @@ function renderCalc(main){
   </div>`;
   const bind=(id,key,cast)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;if(key==="type"&&c.code&&calcFromCode(c.code)?.type!==c.type){c.code="";$("#z-code").value=""}calcRecompute()})};
   [["z-n","n"],["z-type","type"],["z-p","p"],["z-r1","r1"],["z-m","m"],["z-f","f"],["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"],["z-ike","ike"]].forEach(([i,k])=>bind(i,k));
-  $("#z-code").addEventListener("change",e=>{const code=e.target.value;c.code=code;if(code){Object.assign(c,calcFromCode(code));renderCalc(main);}else calcRecompute()});
-  $("#z-tt").addEventListener("change",e=>{Object.assign(c,calcTargetFromOffer(e.target.value));renderCalc(main)});
+  $("#z-code").addEventListener("change",e=>{const code=e.target.value;c.code=code;if(code)Object.assign(c,calcFromCode(code));renderCalc(main)});
+  $("#z-tt").addEventListener("change",e=>{const v=e.target.value;if(v==="custom")c.tc=true;else{c.tc=false;Object.assign(c,calcTargetFromOffer(v))}renderCalc(main)});
+  if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;calcRecompute()});
   $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main)});
   main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>{if(b.dataset.sc==="custom"&&c.sc!=="custom"){const v=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(v)}c.sc=b.dataset.sc;renderCalc(main)}));
   main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;}calcRecompute()}));
@@ -597,7 +604,7 @@ function renderCalc(main){
 }
 function calcRecompute(){
   const out=$("#z-out");if(!out)return;const c=state.calc,now=calcNow();
-  const note=$("#z-code-note");if(note)note.textContent=c.code?`Parametry z listu emisyjnego ${c.code} — możesz je zmienić.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
+  const note=$("#z-code-note");if(note)note.textContent=c.code?`Parametry z listu emisyjnego ${c.code}. Aby je zmienić, wybierz „inna, wpiszę ręcznie”.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
   try{history.replaceState(null,"","#"+calcHash(c))}catch(e){}
   const errs=calcValidate(c);
   if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
@@ -609,13 +616,13 @@ function calcRecompute(){
   const beMonth=r.breakEvenMonth==null?"nie w tym horyzoncie":r.breakEvenMonth===0?"od razu":`po ${r.breakEvenMonth} mies. (${mShort(r.months[r.breakEvenMonth].ym)})`;
   const beInfl=typeof be==="number"?`${good?"poniżej":"powyżej"} ${fmt(be,1)}%`:"";
   const beInflTxt=typeof be==="number"?`Przy stałej inflacji ${fmt(be,1)}% oba scenariusze dają tyle samo.`:(be.sign>0?"Zamiana wygrywa przy każdej stałej inflacji od −2% do 25%.":"Trzymanie wygrywa przy każdej stałej inflacji od −2% do 25%.");
-  const oldCode=c.code||c.type, tgtCode=calcTargetFromOffer(c.tt)?.tcode||c.tt;
+  const oldCode=c.code||c.type, tgtCode=c.tc?c.tt+" (własne parametry)":(calcTargetFromOffer(c.tt)?.tcode||c.tt);
   const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
   const evAt=new Set(r.keepEvents.filter(e=>e.kind==="wykup").map(e=>e.t).concat(r.swapEvents.filter(e=>e.kind==="wykup").map(e=>e.t)));
   const rateTxt=(rates,purchase,spec)=>rates.map((x,i)=>`${i+1}. rok (od ${mShort(Zamiana.addMonths(purchase,i*12))}): <b>${fmt(x*100)}%</b>`).slice(0,Math.ceil(Zamiana.TYPES[spec].term/12));
   out.innerHTML=`<div class="vlist">
     <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} po ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} po ${yrsTxt}`}</div>
-      <div class="vs">${Math.floor(+c.n)} szt. ${esc(oldCode)} → ${sn.newCount} szt. ${esc(tgtCode)}. Realnie (w dzisiejszych złotych): ${sgn(a.diffReal)}. Wartości po wypłacie wszystkiego na koniec okresu, ${c.ike?"bez podatku (IKE/IKZE)":"po podatku Belki"}.</div></div>
+      <div class="vs">${Math.floor(+c.n)} szt. ${esc(oldCode)} warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (w dzisiejszych złotych): ${sgn(a.diffReal)}. Wartości po wypłacie wszystkiego na koniec okresu, ${c.ike?"bez podatku (IKE/IKZE)":"po podatku Belki"}.</div></div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}</span></div>
       <div class="stat t-green"><span class="k">Zamieniam</span><span class="v">${zl0(a.swap)}</span><span class="s">na koniec okresu; realnie ${zl0(a.swapReal)}</span></div>
