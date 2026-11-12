@@ -211,6 +211,18 @@
     if (age0 >= TYPES[oldSpec.type].term) throw new Error("Obligacje są już po terminie wykupu");
     const oldRates = periodRates(oldSpec, cpiAt);
 
+    // historia: wartość posiadanych obligacji od miesiąca zakupu do dziś (ta sama wycena co dalej)
+    const past = [];
+    for (let a = 0; a <= age0; a++) {
+      const v = bondValue(oldSpec, a, oldRates, opts);
+      const per = opts.valuation === "liquidate" ? v.net : v.gross;
+      const gross = per * p.old.count;
+      const gain = gross - NOMINAL * p.old.count;
+      // kupony COI wypłacone do tego miesiąca (netto) — w historii bez oprocentowania konta
+      const coupons = v.coupons.reduce((sum, c) => sum + c.amount, 0) * p.old.count * (tax ? 1 - taxRate : 1);
+      past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: gross - (tax ? Math.max(0, gain) * taxRate : 0) + coupons });
+    }
+
     // A: trzymam
     const keep = simulateLeg({ spec: oldSpec, count: p.old.count, ageAt0: age0 }, ctx);
 
@@ -255,7 +267,7 @@
         // co tracisz w momencie zamiany względem wartości brutto
         cost: v0.fee * p.old.count + tax0,
       },
-      months, keepEvents: keep.events, swapEvents: swap.events,
+      months, past, keepEvents: keep.events, swapEvents: swap.events,
       atHorizon: { keep: last.keep, swap: last.swap, diff: last.diff, keepReal: last.keepReal, swapReal: last.swapReal, diffReal: last.diffReal },
       breakEvenMonth,
       oldRates, targetRates: periodRates(targetSpec, cpiAt),

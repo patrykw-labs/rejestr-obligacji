@@ -61,6 +61,12 @@ eq("hold: różnica dziś = −opłata po podatku", hold.months[0].diff, -504 * 
 const keepAtMat = Z.compare(Object.assign({}, ref, { valuation: "liquidate", now: "2024-04", horizonMonths: 96 })).months[96].keep;
 eq("hold: w terminie wykupu wartość jak przy wypłacie", Math.abs(hold.months[96].keep - keepAtMat) < 50, true);
 
+// historia od zakupu: start = 100 zł/szt., ostatni punkt = wartość „trzymam” dziś
+eq("historia: miesiąc zakupu", hold.past[0].ym, "2022-04");
+eq("historia: wartość przy zakupie", hold.past[0].value, 25200);
+eq("historia: długość = wiek + 1", hold.past.length, 25);
+eq("historia łączy się z „dziś”", hold.past[hold.past.length - 1].value, hold.months[0].keep, 0.01);
+
 // ---------------------------------------------------------------------------
 // 2. Zasady z listów emisyjnych (domyślnie: zaokrąglenie do groszy na sztukę)
 // ---------------------------------------------------------------------------
