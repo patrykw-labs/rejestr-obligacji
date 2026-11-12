@@ -320,6 +320,24 @@ const tw = toOts.swapEvents.filter((e) => e.kind === "wykup");
 eq("EDO → OTS: OTS odnawiane co 3 miesiące", tw.map((e) => e.t), [3, 6, 9, 12]);
 eq("EDO → OTS: zamiana na OTS po 100,00 zł", tw[0].newCount, Math.floor((tw[0].proceeds + toOts.switchNow.cashRest) / 100));
 
+// ---------------------------------------------------------------------------
+// 9. Portfel: wspólne reszty przy zakupie dziś
+// ---------------------------------------------------------------------------
+const poolPf = { now: "2026-11", target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: hist, cpiFuture: [2.5], savingsRate: 4, tax: true,
+  positions: [{ type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 7 }, { type: "EDO", rate1: 5.6, margin: 2, fee: 2, purchase: "2025-03", count: 37 },
+    { type: "EDO", rate1: 6.55, margin: 2, fee: 3, purchase: "2024-11", count: 13 }] };
+const pP = Z.comparePortfolio(poolPf), pN = Z.comparePortfolio(Object.assign({}, poolPf, { poolRemainders: false }));
+const sumProc = pP.positions.reduce((a, x) => a + x.result.switchNow.proceeds, 0);
+const sumRest = pP.positions.reduce((a, x) => a + x.result.switchNow.cashRest, 0);
+eq("wspólne reszty: reszty 79,49 + 94,51 + 92,35 zł → 2 dodatkowe sztuki", [+sumRest.toFixed(2), pP.switchAll.pooledExtra], [266.35, 2]);
+eq("wspólne reszty: zakup za łączną kwotę (floor(Σ/100))", pP.switchAll.newCount, Math.floor(sumProc / 100 + 1e-9));
+eq("wspólne reszty: dodatkowe sztuki", pP.switchAll.pooledExtra, Math.floor(sumRest / 100 + 1e-9));
+eq("wspólne reszty: reszta po zakupie < 100 zł", pP.switchAll.cashRest < 100 && Math.abs(pP.switchAll.cashRest - (sumProc - pP.switchAll.newCount * 100)) < 1e-6, true);
+eq("bez łączenia: suma pozycji jak dotąd", pN.atHorizon.swapAll, pN.positions.reduce((a, x) => a + x.result.atHorizon.swap, 0), 1e-6);
+eq("wspólne reszty: dziś wartość bez zmian (pieniądze z konta → obligacje po 100 zł)", pP.months[0].swapAll, pN.months[0].swapAll, 1e-6);
+eq("wspólne reszty: EDO lepsze od konta → na koniec więcej", pP.atHorizon.swapAll > pN.atHorizon.swapAll, true);
+eq("trzymanie bez zmian", pP.atHorizon.keep, pN.atHorizon.keep, 1e-9);
+
 // wersja silnika w index.html (js/zamiana.js?v=… i CALC_ENGINE_V) musi się zgadzać z Z.VERSION
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 eq("index.html ładuje js/zamiana.js z aktualną wersją", (html.match(/js\/zamiana\.js\?v=([^"]+)"/) || [])[1], Z.VERSION);

@@ -35,7 +35,7 @@
   const NOMINAL = 100;
   // Wersja silnika: index.html ładuje js/zamiana.js?v=<VERSION> (omija starą kopię w pamięci przeglądarki).
   // Po każdej zmianie silnika podbij ją tutaj i w index.html — test_zamiana.js sprawdza zgodność.
-  const VERSION = "2026-11-12.1";
+  const VERSION = "2026-11-12.2";
 
   // ---------- daty "RRRR-MM" ----------
   const ymToIdx = (ym) => { const [y, m] = ym.split("-").map(Number); return y * 12 + (m - 1); };
@@ -268,13 +268,9 @@
    *            | "liquidate" (wycena jak przy wypłacie wszystkiego, z opłatą)
    * }
    */
-  function compare(p) {
+  /** Wspólny kontekst symulacji (stopy, podatek, wycena, cena zamiany) dla horyzontu H. */
+  function buildCtx(p, H) {
     const now = p.now;
-    const oldTerm = TYPES[p.old.type].term;
-    // wiek w dniu zerwania: z dniem zakupu (old.purchaseDay) i dniem zerwania (breakDay) — z ułamkiem miesiąca
-    const age0 = ageMonths(p.old.purchase, now, p.old.purchaseDay, p.breakDay);
-    const toMaturity = oldTerm - age0;
-    const H = Math.max(1, p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.ceil(toMaturity - 1e-9) : Math.round(p.horizonMonths));
     const taxRate = p.taxRate != null ? p.taxRate : 0.19;
     const tax = p.tax !== false;
     const buyPrice = p.buyPrice || NOMINAL;
@@ -290,8 +286,28 @@
       payoutFee: tax };
     const rollover = Object.assign({}, p.rollover || p.target);
     const ctx = { H, cpiAt, nbpAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
+    return { ctx, future, taxRate, tax, buyPrice, opts, cpiAt, nbpAt };
+  }
+  function deflator(future, H) {
+    const defl = [1];
+    for (let t = 1; t <= H; t++) {
+      const y = Math.min(Math.floor((t - 1) / 12), future.length - 1);
+      defl.push(defl[t - 1] * Math.pow(1 + future[y] / 100, 1 / 12));
+    }
+    return defl;
+  }
+
+  function compare(p) {
+    const now = p.now;
+    const oldTerm = TYPES[p.old.type].term;
+    // wiek w dniu zerwania: z dniem zakupu (old.purchaseDay) i dniem zerwania (breakDay) — z ułamkiem miesiąca
+    const age0 = ageMonths(p.old.purchase, now, p.old.purchaseDay, p.breakDay);
+    const toMaturity = oldTerm - age0;
+    const H = Math.max(1, p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.ceil(toMaturity - 1e-9) : Math.round(p.horizonMonths));
+    const { ctx, future, taxRate, tax, buyPrice, opts, cpiAt, nbpAt } = buildCtx(p, H);
 
     const oldSpec = Object.assign({}, p.old);
+
     if (age0 < 0) throw new Error("Data zakupu jest późniejsza niż data zamiany");
     if (age0 >= TYPES[oldSpec.type].term) throw new Error("Obligacje są już po terminie wykupu");
     const oldRates = periodRates(oldSpec, cpiAt, nbpAt);
@@ -330,11 +346,7 @@
     const swap = simulateLeg({ spec: targetSpec, count: newCount, ageAt0: 0, cash0: cashRest, costBasis: buyPrice }, ctx);
 
     // deflator (wartości realne, w dzisiejszych złotych)
-    const defl = [1];
-    for (let t = 1; t <= H; t++) {
-      const y = Math.min(Math.floor((t - 1) / 12), future.length - 1);
-      defl.push(defl[t - 1] * Math.pow(1 + future[y] / 100, 1 / 12));
-    }
+    const defl = deflator(future, H);
 
     const months = keep.series.map((k, t) => {
       const s = swap.series[t];
@@ -391,6 +403,21 @@
     const pick = results.map((r) => r.atHorizon.diff > 0);
     const anyPick = pick.some(Boolean);
 
+    // wspólne reszty: reszty poniżej 100 zł z zerwanych serii łączymy przy dzisiejszym zakupie — gdy razem
+    // starczą na kolejne obligacje, kupujemy je (pieniądze przechodzą z konta do nowej serii)
+    const { ctx, future, buyPrice } = buildCtx(p, H);
+    const defl = deflator(future, H), wk = 1 - (p.withdrawalTax || 0);
+    const pooled = (which) => {
+      const rest = results.reduce((s, r, i) => s + (which(i) ? r.switchNow.cashRest : 0), 0);
+      const extra = p.poolRemainders === false ? 0 : Math.floor(rest / buyPrice + 1e-9);
+      const series = extra > 0
+        ? simulateLeg({ spec: Object.assign({}, p.target, { purchase: now }), count: extra, ageAt0: 0, cash0: -extra * buyPrice, costBasis: buyPrice }, ctx)
+          .series.map((x) => x.total * wk)
+        : null;
+      return { extra, rest: rest - extra * buyPrice, series };
+    };
+    const poolAll = pooled(() => true), poolBest = pooled((i) => pick[i]);
+
     const months = [];
     for (let t = 0; t <= H; t++) {
       const m = { t, ym: results[0].months[t].ym, keep: 0, swapAll: 0, best: 0, keepReal: 0, swapAllReal: 0, bestReal: 0 };
@@ -399,6 +426,8 @@
         m.keep += x.keep; m.swapAll += x.swap; m.best += pick[i] ? x.swap : x.keep;
         m.keepReal += x.keepReal; m.swapAllReal += x.swapReal; m.bestReal += pick[i] ? x.swapReal : x.keepReal;
       });
+      if (poolAll.series) { m.swapAll += poolAll.series[t]; m.swapAllReal += poolAll.series[t] / defl[t]; }
+      if (anyPick && poolBest.series) { m.best += poolBest.series[t]; m.bestReal += poolBest.series[t] / defl[t]; }
       m.diffAll = m.swapAll - m.keep; m.diffAllReal = m.swapAllReal - m.keepReal;
       m.diffBest = m.best - m.keep; m.diffBestReal = m.bestReal - m.keepReal;
       months.push(m);
@@ -415,9 +444,10 @@
       past.push({ t: a - age, ym, value });
     }
 
-    const sumSwitch = (which) => {
+    const sumSwitch = (which, pool) => {
       const s = { valueBeforeFee: 0, fee: 0, tax: 0, proceeds: 0, newCount: 0, cashRest: 0, cost: 0 };
       results.forEach((r, i) => { if (!which(i)) return; for (const k in s) s[k] += r.switchNow[k]; });
+      s.newCount += pool.extra; s.cashRest = pool.rest; s.pooledExtra = pool.extra;
       return s;
     };
     const lastBE = (k) => { let b = null; for (let t = H; t >= 0; t--) { if (months[t][k] >= 0) b = t; else break; } return b; };
@@ -426,7 +456,7 @@
       now, horizonMonths: H, latestMaturity: results.map((r) => r.maturity).sort().pop(),
       positions: results.map((r, i) => ({ spec: pos[i], result: r, swap: pick[i], diff: r.atHorizon.diff, diffReal: r.atHorizon.diffReal })),
       anyPick, months, past,
-      switchAll: sumSwitch(() => true), switchBest: sumSwitch((i) => pick[i]),
+      switchAll: sumSwitch(() => true, poolAll), switchBest: sumSwitch((i) => pick[i], poolBest),
       atHorizon: { keep: last.keep, swapAll: last.swapAll, best: last.best, diffAll: last.diffAll, diffBest: last.diffBest,
         keepReal: last.keepReal, swapAllReal: last.swapAllReal, bestReal: last.bestReal, diffAllReal: last.diffAllReal, diffBestReal: last.diffBestReal },
       breakEvenMonthAll: lastBE("diffAll"), breakEvenMonthBest: anyPick ? lastBE("diffBest") : null,

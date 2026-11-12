@@ -333,7 +333,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
   </div>
 </footer>
 
-<script src="js/zamiana.js?v=2026-11-12.1"></script>
+<script src="js/zamiana.js?v=2026-11-12.2"></script>
 <script>
 const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};
@@ -363,7 +363,7 @@ function render(){
   if(!state.loaded)return;
   if(!state.months.length){main.innerHTML='<div class="empty"><strong>Archiwum jest puste</strong>Dodaj pierwszy miesiąc do data/months.json.</div>';return}
   if(!state.month||!state.months.find(m=>m.id===state.month))state.month=state.months[state.months.length-1].id;
-  const CALC_ENGINE_V="2026-11-12.1";
+  const CALC_ENGINE_V="2026-11-12.2";
   const reload='<button type="button" class="btn" onclick="location.reload()">Odśwież stronę</button>';
   if(state.view==="zamiana"&&(!window.Zamiana||Zamiana.VERSION!==CALC_ENGINE_V)){
     main.innerHTML=`<div class="empty"><strong>Kalkulator potrzebuje odświeżenia strony</strong>Przeglądarka ma w pamięci starszą wersję pliku kalkulatora. Odśwież stronę (na komputerze Ctrl+F5, na telefonie przeładuj kartę).<div class="row" style="margin-top:12px">${reload}</div></div>`;return}
@@ -833,7 +833,7 @@ function calcRecomputePortfolio(out,c,now){
   const detailHref=z=>"#"+calcHash(Object.assign({},c,{pos:[z.o]}));
   out.innerHTML=`<div class="vlist">
     <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): ${sgn(a.diffBest)} ${yrsTxt}`:`Zamień cały portfel: ${sgn(a.diffBest)} ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to ${sgn(a.diffAll)} ${yrsTxt}`}</div>
-      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (w dzisiejszych złotych): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby dziś ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":"jedyne zerwanie to zamiana dziś"}, ${calcTaxTxt(c)}.</div></div>
+      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł${sn.pooledExtra?` (w tym ${sn.pooledExtra} szt. z połączonych reszt)`:""} + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (w dzisiejszych złotych): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby dziś ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":"jedyne zerwanie to zamiana dziś"}, ${calcTaxTxt(c)}.</div></div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam wszystko</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(paidC)}</span></div>
       <div class="stat t-green"><span class="k">${esc(lab.swap)}</span><span class="v">${zl0(ms[H].swap)}</span><span class="s">na koniec okresu; realnie ${zl0(ms[H].swapReal)}${calcCouponTxt(paidC)}</span></div>
@@ -853,7 +853,7 @@ function calcRecomputePortfolio(out,c,now){
       ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, dziś ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
-      <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł liczone są osobno dla każdej serii (po połączeniu mogłoby wyjść kilka obligacji więcej).</li>
+      <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł z serii zrywanych dziś łączymy przy zakupie${(pick?r.switchBest:r.switchAll).pooledExtra?` — tu daje to ${(pick?r.switchBest:r.switchAll).pooledExtra} szt. więcej`:" (tu nie dają dodatkowej obligacji)"}; przy późniejszych wykupach w terminie reszta zostaje przy każdej serii osobno. Decyzja „zamień/trzymaj” dla serii jest liczona bez tego łączenia.</li>
       ${calcFutureBuysHtml(c,events)}
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
