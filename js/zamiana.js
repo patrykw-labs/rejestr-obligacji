@@ -427,6 +427,23 @@
   /** Stała przyszła inflacja, przy której różnica na koniec horyzontu = 0 (bisekcja). */
   function breakEvenInflation(p, lo = -2, hi = 25) {
     const f = (c) => compare(Object.assign({}, p, { cpiFuture: [c] })).atHorizon.diff;
+    if (Math.abs(f(lo) - f(hi)) < 0.005) return { independent: true, sign: Math.sign(f(lo)) };
+    return bisect(f, lo, hi);
+  }
+
+  /**
+   * Stała przyszła stopa referencyjna NBP (ROR/DOR), przy której różnica na koniec horyzontu = 0.
+   * Zwraca liczbę, {none, sign} gdy znak się nie zmienia w [lo, hi], albo {independent: true},
+   * gdy wynik nie zależy od stopy NBP (brak ROR/DOR w porównaniu).
+   */
+  function breakEvenNbp(p, lo = 0, hi = 15) {
+    const f = (r) => compare(Object.assign({}, p, { nbpFuture: r })).atHorizon.diff;
+    if (Math.abs(f(lo) - f(hi)) < 0.005) return { independent: true, sign: Math.sign(f(lo)) };
+    return bisect(f, lo, hi);
+  }
+
+  /** Bisekcja: x z [lo, hi], dla którego f(x) ≈ 0; {none, sign, low} gdy znak się nie zmienia. */
+  function bisect(f, lo, hi) {
     let flo = f(lo), fhi = f(hi);
     if (flo === 0) return lo;
     if (fhi === 0) return hi;
@@ -461,7 +478,7 @@
     });
   }
 
-  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation,
+  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation, breakEvenNbp,
     cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;

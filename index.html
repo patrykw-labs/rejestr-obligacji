@@ -716,6 +716,20 @@ function calcRateTxt(rates,purchase,type){
   const g=[];rates.forEach((x,i)=>{const last=g[g.length-1];if(last&&Math.abs(last.r-x)<1e-12)last.to=i;else g.push({r:x,from:i,to:i})});
   return g.map(z=>{const a=Zamiana.addMonths(purchase,z.from),b=Zamiana.addMonths(purchase,z.to);return `${a===b?mShort(a):mShort(a)+"–"+mShort(b)}: <b>${fmt(z.r*100)}%</b>`}).join(" · ");
 }
+// próg (inflacja albo stopa NBP): wartość i kierunek — czy zamiana wygrywa poniżej, czy powyżej progu
+function calcBe(p,kind){
+  const be=kind==="nbp"?Zamiana.breakEvenNbp(p):Zamiana.breakEvenInflation(p);
+  if(typeof be!=="number")return be;
+  const lo=kind==="nbp"?0:-2,dLo=Zamiana.compare(Object.assign({},p,kind==="nbp"?{nbpFuture:lo}:{cpiFuture:[lo]})).atHorizon.diff;
+  return {value:be,below:dLo>0};
+}
+const calcBeShort=b=>b.independent?"—":b.none?(b.sign>0?"zawsze":"nigdy"):(b.below?"poniżej ":"powyżej ")+fmt(b.value,1)+"%";
+function calcBeLong(b,kind){
+  const what=kind==="nbp"?"stopie referencyjnej NBP":"inflacji",rng=kind==="nbp"?"od 0% do 15%":"od −2% do 25%";
+  if(b.independent)return "";
+  if(b.none)return `${b.sign>0?"Zamiana":"Trzymanie"} wygrywa przy każdej stałej ${what} ${rng}.`;
+  return `Zamiana opłaca się przy stałej ${what} ${b.below?"poniżej":"powyżej"} ${fmt(b.value,1)}%.`;
+}
 const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.slice(0,4)}`};
 const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
 const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości dziś wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>
@@ -739,12 +753,12 @@ function calcRecompute(){
   const o=c.pos[0];
   let r,p;
   try{p=calcParams(c,o);r=Zamiana.compare(p)}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
-  const be=Zamiana.breakEvenInflation(p);
+  const beC=calcBe(p,"cpi"),beN=calcUsesNbp(c)?calcBe(p,"nbp"):{independent:true};
   const H=r.horizonMonths,a=r.atHorizon,good=a.diff>=0,yrsTxt=calcHorizonTxt(c,H,r.maturity,false)||`do wykupu ${o.code||o.type} (${mShort(r.maturity)})`;
   const liq=c.val==="liquidate";
   const sn=r.switchNow;
   const beMonth=r.breakEvenMonth==null?"nie w tym horyzoncie":r.breakEvenMonth===0?"od razu":`po ${r.breakEvenMonth} mies. (${mShort(r.months[r.breakEvenMonth].ym)})`;
-  const beInflTxt=typeof be==="number"?`Przy stałej inflacji ${fmt(be,1)}% oba scenariusze dają tyle samo.`:(be.sign>0?"Zamiana wygrywa przy każdej stałej inflacji od −2% do 25%.":"Trzymanie wygrywa przy każdej stałej inflacji od −2% do 25%.");
+  const beInflTxt=[calcBeLong(beC,"cpi"),calcBeLong(beN,"nbp")].filter(Boolean).join(" ")||"Wynik nie zależy od inflacji ani od stopy NBP.";
   const oldCode=o.code||o.type, tgtCode=calcTgtCode(c);
   const events=calcColorEvents(calcEvents(r,o,c.tt,oldCode,tgtCode));
   out.innerHTML=`<div class="vlist">
@@ -777,7 +791,7 @@ function calcRecomputePortfolio(out,c,now){
   try{p=calcParams(c);r=Zamiana.comparePortfolio(p)}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
   const H=r.horizonMonths,a=r.atHorizon,pick=r.anyPick,liq=c.val==="liquidate",tgtCode=calcTgtCode(c);
   const yrsTxt=calcHorizonTxt(c,H,r.latestMaturity,true);
-  const rowsP=r.positions.map((x,i)=>{const o=c.pos[i];return {x,o,i,code:calcPosCode(o),be:Zamiana.breakEvenInflation(Object.assign({},p,{old:p.positions[i],positions:undefined,horizonMonths:H}))}});
+  const rowsP=r.positions.map((x,i)=>{const o=c.pos[i];return {x,o,i,code:calcPosCode(o),pp:Object.assign({},p,{old:p.positions[i],positions:undefined,horizonMonths:H})}}).map(z=>Object.assign(z,{beC:calcBe(z.pp,"cpi"),beN:calcUsesNbp(c)?calcBe(z.pp,"nbp"):null}));
   const sel=rowsP.filter(z=>z.x.swap),kept=rowsP.filter(z=>!z.x.swap);
   const swapSet=new Set((pick?sel:rowsP).map(z=>z.i));
   const key=pick?"best":"swapAll",sn=pick?r.switchBest:r.switchAll,beM=pick?r.breakEvenMonthBest:r.breakEvenMonthAll;
@@ -793,7 +807,7 @@ function calcRecomputePortfolio(out,c,now){
   events.push({t:0,leg:"swap",short:"zerwanie i zakup",text:`zamieniam: zerwanie ${codes(pick?sel:rowsP)}, zakup ${sn.newCount} szt. ${tgtCode} po 100 zł`});
   events.sort((a,b)=>a.t-b.t);calcColorEvents(events);
   const beMonth=beM==null?"nie w tym horyzoncie":beM===0?"od razu":`po ${beM} mies. (${mShort(r.months[beM].ym)})`;
-  const beTxt=z=>typeof z.be==="number"?fmt(z.be,1)+"%":(z.be.sign>0?"zawsze zamiana":"zawsze trzymanie");
+  const nbpCol=calcUsesNbp(c);
   const tot=k=>rowsP.reduce((s,z)=>s+z.x.result.switchNow[k],0);
   const paidC=rowsP.reduce((t,z)=>t+z.x.result.paidCoupons,0);
   const detailHref=z=>"#"+calcHash(Object.assign({},c,{pos:[z.o]}));
@@ -806,10 +820,10 @@ function calcRecomputePortfolio(out,c,now){
       <div class="stat t-red"><span class="k">Koszt zerwania dziś</span><span class="v">${zl0(sn.cost)}</span><span class="s">${pick&&kept.length?"zrywane serie: ":""}opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)}</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${pick?"dla wybranych serii łącznie":"dla zamiany wszystkich serii"}</span></div>
     </div>
-    <div class="card table-card"><div class="tc-head"><h3>Serie w portfelu</h3><p class="desc">Różnica = zamiana minus trzymanie ${esc(yrsTxt)}. Inflacja progowa: stała inflacja, przy której dla danej serii oba warianty dają tyle samo.</p></div>
-      <div class="frame"><table><thead><tr><th>Seria</th><th class="r">Szt.</th><th>Wykup</th><th class="r">Wartość dziś</th><th class="r">Koszt zerwania</th><th class="r">Różnica</th><th class="r">Inflacja progowa</th><th>Decyzja</th></tr></thead><tbody>
-      ${rowsP.map(z=>{const s=z.x.result.switchNow;return `<tr><td><b>${esc(z.code)}</b> <a class="small" href="${esc(detailHref(z))}" target="_blank" rel="noopener" title="Otwórz wyliczenie tylko dla tej serii w nowej karcie">szczegóły ↗</a></td><td class="r num">${Math.floor(+z.o.n)}</td><td>${mShort(z.x.result.maturity)}</td><td class="r num">${zl0(s.valueBeforeFee)}</td><td class="r num">${zl0(s.cost)}</td><td class="r num"><span class="${z.x.diff>0?"d-up":z.x.diff<0?"d-down":"d-0"}">${sgn(z.x.diff)}</span></td><td class="r num">${beTxt(z)}</td><td>${z.x.swap?'<span class="pill p-ok">zamień</span>':'<span class="pill p-part">trzymaj</span>'}</td></tr>`}).join("")}
-      <tr class="sum"><td><b>Razem</b></td><td class="r num">${rowsP.reduce((s,z)=>s+Math.floor(+z.o.n),0)}</td><td>${mShort(r.latestMaturity)}</td><td class="r num">${zl0(tot("valueBeforeFee"))}</td><td class="r num">${zl0(tot("cost"))}</td><td class="r num"><span class="${a.diffAll>0?"d-up":a.diffAll<0?"d-down":"d-0"}">${sgn(a.diffAll)}</span></td><td></td><td>${pick?`<span class="small">wybrane: ${sgn(a.diffBest)}</span>`:""}</td></tr>
+    <div class="card table-card"><div class="tc-head"><h3>Serie w portfelu</h3><p class="desc">Różnica = zamiana minus trzymanie ${esc(yrsTxt)}. Kolumny „zamiana, gdy…”: przy jakiej stałej przyszłej inflacji${nbpCol?" albo stopie referencyjnej NBP (ROR, DOR)":""} zamiana tej serii się opłaca (próg, przy którym oba warianty dają tyle samo).</p></div>
+      <div class="frame"><table><thead><tr><th>Seria</th><th class="r">Szt.</th><th>Wykup</th><th class="r">Wartość dziś</th><th class="r">Koszt zerwania</th><th class="r">Różnica</th><th class="r">Zamiana, gdy inflacja</th>${nbpCol?'<th class="r">Zamiana, gdy stopa NBP</th>':""}<th>Decyzja</th></tr></thead><tbody>
+      ${rowsP.map(z=>{const s=z.x.result.switchNow;return `<tr><td><b>${esc(z.code)}</b> <a class="small" href="${esc(detailHref(z))}" target="_blank" rel="noopener" title="Otwórz wyliczenie tylko dla tej serii w nowej karcie">szczegóły ↗</a></td><td class="r num">${Math.floor(+z.o.n)}</td><td>${mShort(z.x.result.maturity)}</td><td class="r num">${zl0(s.valueBeforeFee)}</td><td class="r num">${zl0(s.cost)}</td><td class="r num"><span class="${z.x.diff>0?"d-up":z.x.diff<0?"d-down":"d-0"}">${sgn(z.x.diff)}</span></td><td class="r num">${calcBeShort(z.beC)}</td>${nbpCol?`<td class="r num">${calcBeShort(z.beN)}</td>`:""}<td>${z.x.swap?'<span class="pill p-ok">zamień</span>':'<span class="pill p-part">trzymaj</span>'}</td></tr>`}).join("")}
+      <tr class="sum"><td><b>Razem</b></td><td class="r num">${rowsP.reduce((s,z)=>s+Math.floor(+z.o.n),0)}</td><td>${mShort(r.latestMaturity)}</td><td class="r num">${zl0(tot("valueBeforeFee"))}</td><td class="r num">${zl0(tot("cost"))}</td><td class="r num"><span class="${a.diffAll>0?"d-up":a.diffAll<0?"d-down":"d-0"}">${sgn(a.diffAll)}</span></td><td></td>${nbpCol?"<td></td>":""}<td>${pick?`<span class="small">wybrane: ${sgn(a.diffBest)}</span>`:""}</td></tr>
       </tbody></table></div></div>
     <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(paidC)}</p></div>
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>${esc(lab.keep.toLowerCase())}</span><span><i style="background:var(--accent)"></i>${esc(lab.swap.toLowerCase())} na ${esc(tgtCode)}</span></div></div>

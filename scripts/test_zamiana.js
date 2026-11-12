@@ -283,5 +283,19 @@ eq("COI: opłata 2 zł/szt. (narosłe odsetki > 2 zł)", coiMid.switchNow.fee, 2
 const pfMid = Z.comparePortfolio(Object.assign({}, edoArgs, { breakDay: 16, positions: [Object.assign({}, edoArgs.old, { purchaseDay: 1 })] }));
 eq("portfel: dzień zerwania przekazany pozycjom", pfMid.atHorizon.diffAll, edoMid.atHorizon.diff, 1e-9);
 
+// ---------------------------------------------------------------------------
+// 7. Stopa progowa NBP (ROR/DOR): stała przyszła stopa referencyjna, przy której oba warianty są równe
+// ---------------------------------------------------------------------------
+const dorHold = { now: "2026-11", old: { type: "DOR", rate1: 5.4, margin: 0.15, fee: 0.7, purchase: "2025-06", count: 100 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: hist, nbpHistory: nbpHist, cpiFuture: [2.5], savingsRate: 4, tax: true };
+const beN = Z.breakEvenNbp(dorHold);
+eq("DOR → EDO: stopa progowa NBP jest liczbą z zakresu 0–15%", typeof beN === "number" && beN > 0 && beN < 15, true);
+// różnica zmienia się skokowo (kupony do grosza, pełne sztuki przy zamianie) — sprawdzamy zmianę znaku wokół progu
+const dN = (r) => Z.compare(Object.assign({}, dorHold, { nbpFuture: r })).atHorizon.diff;
+eq("DOR → EDO: poniżej progu wygrywa zamiana, powyżej trzymanie", [dN(beN - 0.05) > 0, dN(beN + 0.05) < 0], [true, true]);
+eq("EDO → EDO: wynik nie zależy od stopy NBP", Z.breakEvenNbp(edoArgs).independent, true);
+const toRorBe = Z.breakEvenNbp(Object.assign({}, edoArgs, { target: { type: "ROR", rate1: 4, margin: 0, fee: 0.5 }, nbpHistory: nbpHist }));
+eq("EDO → ROR: stopa progowa liczbą albo brak zmiany znaku", typeof toRorBe === "number" || toRorBe.none === true, true);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
