@@ -12792,7 +12792,7 @@
   "cpiNote": "GUS, Szybki szacunek wskaźnika cen towarów i usług konsumpcyjnych w październiku 2026 (publikacja 30.10.2026), publikacje.new.stat.gov.pl; odczyt finalny ok. połowy listopada",
   "cpiRefMonth": "2026-10",
   "macroVerify": false,
-  "nbpNote": "stopa referencyjna 3,75% od 5.03.2026 (archiwum stóp NBP, static.nbp.pl); posiedzenie RPP 3–4.11.2026 – ewentualna zmiana obowiązywałaby od 5.11, wynik niesprawdzony w tym przebiegu",
+  "nbpNote": "stopa referencyjna 3,75% od 5.03.2026, bez zmian w miesiącu oferty (archiwum stóp NBP, static.nbp.pl, stan na 12.11.2026: po posiedzeniu RPP 3–4.11.2026 brak nowej stopy)",
   "nbpRef": 3.75,
   "series": {
    "COI": {
@@ -12925,7 +12925,7 @@
    }
   },
   "status": "zweryfikowany",
-  "updatedAt": "2026-11-04",
+  "updatedAt": "2026-11-12",
   "verifyNote": null
  }
 }
