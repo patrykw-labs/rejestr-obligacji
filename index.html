@@ -495,6 +495,12 @@ function renderSeries(main){
 
 
 /* ===================== Kalkulator zamiany ===================== */
+const CALC_ACC=[["std","Zwykły (podatek Belki)"],["ike","IKE"],["ikze","IKZE"]];
+const CALC_ACC_NOTE={std:"Podatek 19% od zysku przy zerwaniu, wykupie i od odsetek.",
+  ike:"W IKE bez podatku Belki (przy wypłacie po 60. roku życia). Opłata za zerwanie w ramach konta zostaje.",
+  ikze:"W IKZE bez podatku Belki; przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty — wartości są po tym podatku. Opłata za zerwanie w ramach konta zostaje."};
+const calcTaxTxt=c=>({std:"po podatku Belki",ike:"bez podatku (IKE)",ikze:"w IKZE: bez podatku Belki, po 10% ryczałcie przy wypłacie"})[c.acc||"std"];
+const calcLiqTxt=c=>c.ike?`(wypłata z ${c.acc==="ikze"?"IKZE — bez opłaty za wykup, po 10% ryczałcie":"IKE — bez opłaty za wykup i bez podatku"})`:"(po opłacie i podatku)";
 const CALC_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR"];
 const calcIsNbp=t=>!!Zamiana.TYPES[t]?.nbp;
 const calcR1Label=t=>calcIsNbp(t)?"1. miesiąc":"1. rok";
@@ -521,7 +527,7 @@ function calcPosDefault(code){return Object.assign({n:100},calcFromCode(code)||{
 function calcDefaults(){
   const opts=calcOptions();const now=calcNow();
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0];
-  return Object.assign({pos:[calcPosDefault(pick)],h:"m",val:"hold",sc:"base",tc:false,cpi:Array(12).fill(2.5),sv:4,ike:false,nbp:calcNbpNow()},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
+  return Object.assign({pos:[calcPosDefault(pick)],h:"m",val:"hold",sc:"base",tc:false,cpi:Array(12).fill(2.5),sv:4,acc:"std",ike:false,nbp:calcNbpNow()},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
 }
 // propozycja kolejnej serii do portfela: najpierw typ, którego jeszcze nie ma, co najmniej rok po zakupie
 function calcNextCode(c){
@@ -551,7 +557,7 @@ function calcFromHash(){
   c.tc=q.tc==="1";
   if(q.tt&&CALC_TYPES.includes(q.tt)){const o=calcTargetFromOffer(q.tt);if(o&&!c.tc)Object.assign(c,o);else c.tt=q.tt;}
   if(c.tc){c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);}
-  c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.ike=q.ike==="1";c.nbp=num("nbp",c.nbp);
+  c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";c.ike=c.acc!=="std";c.nbp=num("nbp",c.nbp);
   if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
   return c;
@@ -561,7 +567,7 @@ function calcHash(c){
   if(c.pos.length>1)q.pf=c.pos.map(o=>o.code?o.code+"~"+o.n:[o.type,o.p,o.r1,o.m,o.f,o.n].join("~")).join(",");
   else{const o=c.pos[0];Object.assign(q,o.code?{k:o.code}:{t:o.type,p:o.p,r1:o.r1,m:o.m,f:o.f},{n:o.n});}
   q.tt=c.tt;
-  if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:c.ike?1:0});if(c.val==="liquidate")q.val="l";
+  if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:{std:0,ike:1,ikze:2}[c.acc]});if(c.val==="liquidate")q.val="l";
   if(c.sc==="custom")q.cpi=c.cpi.join(",");
   if(calcUsesNbp(c))q.nbp=c.nbp;
   return "zamiana&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v).replace(/%2C/g,",")).join("&");
@@ -572,7 +578,7 @@ function calcParams(c,o){
   return {now:calcNow(),horizonMonths:c.h==="m"?undefined:Math.round(c.h*12),valuation:c.val,
     old:o?calcSpec(o):undefined,positions:o?undefined:c.pos.map(calcSpec),
     target:{type:c.tt,rate1:+c.tr1,margin:+c.tm,fee:+c.tf},
-    cpiHistory:Zamiana.cpiHistoryFromMonths(state.raw),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,
+    cpiHistory:Zamiana.cpiHistoryFromMonths(state.raw),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,withdrawalTax:c.acc==="ikze"?0.1:0,
     nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:+c.nbp};
 }
 const calcMaturity=o=>/^\d{4}-\d{2}$/.test(o.p||"")?Zamiana.addMonths(o.p,Zamiana.TYPES[o.type].term):null;
@@ -645,8 +651,11 @@ function renderCalc(main){
           <div class="chips" role="group" aria-label="Scenariusz inflacji">${Object.entries(CPI_PRESETS).map(([k,v])=>`<button type="button" class="chip" data-sc="${k}" aria-pressed="${c.sc===k}">${v.label}</button>`).join("")}<button type="button" class="chip" data-sc="custom" aria-pressed="${c.sc==="custom"}">Własna, rok po roku</button></div>
         </div>
         ${c.sc==="custom"?`<div class="cpi-years">${Array.from({length:yrs},(_,i)=>`<label>rok ${i+1}<input type="number" step="0.1" data-cpi="${i}" value="${esc(c.cpi[i])}"></label>`).join("")}</div>`:""}
-        <label class="check"><input id="z-ike" type="checkbox"${c.ike?" checked":""}> IKE/IKZE (bez podatku Belki)</label>
-        <label class="check"><input id="z-val" type="checkbox"${c.val==="liquidate"?" checked":""}> Wyceniaj jak przy wypłacie wszystkiego, z opłatą za wykup</label>
+        <div class="field"><span class="flabel">Rachunek</span>
+          <div class="chips" role="group" aria-label="Rachunek">${CALC_ACC.map(([k,l])=>`<button type="button" class="chip" data-acc="${k}" aria-pressed="${c.acc===k}">${l}</button>`).join("")}</div>
+          <span class="fnote">${CALC_ACC_NOTE[c.acc]}</span>
+        </div>
+        <label class="check"><input id="z-val" type="checkbox"${c.val==="liquidate"?" checked":""}> Wyceniaj jak przy wypłacie wszystkiego${c.ike?"":", z opłatą za wykup"}</label>
       </div>
     </div>
     <div id="z-out"></div>
@@ -657,12 +666,13 @@ function renderCalc(main){
   main.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click",()=>{c.pos.splice(+b.dataset.del,1);renderCalc(main)}));
   $("#z-add").addEventListener("click",()=>{if(c.pos.length<CALC_MAXPOS){c.pos.push(calcPosDefault(calcNextCode(c)));renderCalc(main)}});
   const bind=(id,key)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;calcRecompute()})};
-  [["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"],["z-ike","ike"]].forEach(([i,k])=>bind(i,k));
+  [["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"]].forEach(([i,k])=>bind(i,k));
   $("#z-tt").addEventListener("change",e=>{const v=e.target.value;if(v==="custom")c.tc=true;else{c.tc=false;Object.assign(c,calcTargetFromOffer(v))}renderCalc(main)});
   if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;renderCalc(main)});
   if($("#z-nbp"))$("#z-nbp").addEventListener("input",e=>{c.nbp=e.target.value;calcRecompute()});
   $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main)});
   $("#z-val").addEventListener("change",e=>{c.val=e.target.checked?"liquidate":"hold";calcRecompute()});
+  main.querySelectorAll("button.chip[data-acc]").forEach(b=>b.addEventListener("click",()=>{c.acc=b.dataset.acc;c.ike=c.acc!=="std";renderCalc(main)}));
   main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>{if(b.dataset.sc==="custom"&&c.sc!=="custom"){const v=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(v)}c.sc=b.dataset.sc;renderCalc(main)}));
   main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;}calcRecompute()}));
   calcRecompute();
@@ -686,7 +696,7 @@ function calcRateTxt(rates,purchase,type){
 }
 const calcRulesHtml=c=>`<li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||calcNow())} z archiwum GUS, dalej Twój scenariusz.</li>
       ${calcUsesNbp(c)?`<li><b>ROR i DOR:</b> odsetki za każdy miesiąc (100 zł × stopa / 12, do grosza) trafiają na konto. Od 2. miesiąca stopa = stopa referencyjna NBP z 10. dnia roboczego przed miesiącem okresu + marża; do ${mShort(calcNow())} z archiwum NBP, dalej ${fmt(+c.nbp)}% (Twoje założenie). Przy zerwaniu od 2. miesiąca opłata jest stała (0,50 zł ROR, 0,70 zł DOR), także gdy przekracza narosłe odsetki — wtedy dostajesz mniej niż 100 zł za sztukę.</li>`:""}
-      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}. Podatek 19% od zysku${c.ike?" — tu pominięty (IKE/IKZE)":""}. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
+      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania dziś)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
 const calcCouponTxt=v=>v>0.005?`; w tym odsetki wypłacone do dziś: ${zl0(v)}`:"";
 const calcCouponDesc=v=>v>0.005?` Wartość obejmuje odsetki wypłacone do dziś (kupony COI, odsetki ROR/DOR: ${zl0(v)}, bez oprocentowania) — dostajesz je w obu wariantach, więc nie zmieniają różnicy.`:"";
 const calcShareHtml=`<div class="row"><button type="button" class="btn" id="z-share" data-goatcounter-click="kalkulator-link">Kopiuj link do tego wyliczenia</button><span class="small" id="z-share-msg"></span></div>`;
@@ -713,14 +723,14 @@ function calcRecompute(){
   const events=calcEvents(r,o,c.tt,oldCode,tgtCode);
   out.innerHTML=`<div class="vlist">
     <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} ${yrsTxt}`}</div>
-      <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (w dzisiejszych złotych): ${sgn(a.diffReal)}. ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":"Jedyne zerwanie to zamiana dziś; dalej oba warianty trzymają obligacje do wykupu"}, ${c.ike?"bez podatku (IKE/IKZE)":"po podatku Belki"}.</div></div>
+      <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (w dzisiejszych złotych): ${sgn(a.diffReal)}. ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":"Jedyne zerwanie to zamiana dziś; dalej oba warianty trzymają obligacje do wykupu"}, ${calcTaxTxt(c)}.</div></div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
       <div class="stat t-green"><span class="k">Zamieniam</span><span class="v">${zl0(a.swap)}</span><span class="s">na koniec okresu; realnie ${zl0(a.swapReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
       <div class="stat t-red"><span class="k">Koszt zerwania dziś</span><span class="v">${zl0(sn.cost)}</span><span class="s">opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. + ${zl2(sn.cashRest)} na konto</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${beInflTxt}</span></div>
     </div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie${c.ike?"":" i podatku"}), z resztą na koncie.`:`Wartość obligacji${c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(r.paidCoupons)}</p></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Wartość obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(r.paidCoupons)}</p></div>
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>trzymam ${esc(oldCode)}</span><span><i style="background:var(--accent)"></i>zamieniam na ${esc(tgtCode)}</span></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"})}
@@ -763,7 +773,7 @@ function calcRecomputePortfolio(out,c,now){
   const detailHref=z=>"#"+calcHash(Object.assign({},c,{pos:[z.o]}));
   out.innerHTML=`<div class="vlist">
     <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): ${sgn(a.diffBest)} ${yrsTxt}`:`Zamień cały portfel: ${sgn(a.diffBest)} ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to ${sgn(a.diffAll)} ${yrsTxt}`}</div>
-      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (w dzisiejszych złotych): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby dziś ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":"jedyne zerwanie to zamiana dziś"}, ${c.ike?"bez podatku (IKE/IKZE)":"po podatku Belki"}.</div></div>
+      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte dziś ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (w dzisiejszych złotych): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby dziś ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":"jedyne zerwanie to zamiana dziś"}, ${calcTaxTxt(c)}.</div></div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam wszystko</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(paidC)}</span></div>
       <div class="stat t-green"><span class="k">${esc(lab.swap)}</span><span class="v">${zl0(ms[H].swap)}</span><span class="s">na koniec okresu; realnie ${zl0(ms[H].swapReal)}${calcCouponTxt(paidC)}</span></div>
@@ -775,7 +785,7 @@ function calcRecomputePortfolio(out,c,now){
       ${rowsP.map(z=>{const s=z.x.result.switchNow;return `<tr><td><b>${esc(z.code)}</b> <a class="small" href="${esc(detailHref(z))}" target="_blank" rel="noopener" title="Otwórz wyliczenie tylko dla tej serii w nowej karcie">szczegóły ↗</a></td><td class="r num">${Math.floor(+z.o.n)}</td><td>${mShort(z.x.result.maturity)}</td><td class="r num">${zl0(s.valueBeforeFee)}</td><td class="r num">${zl0(s.cost)}</td><td class="r num"><span class="${z.x.diff>0?"d-up":z.x.diff<0?"d-down":"d-0"}">${sgn(z.x.diff)}</span></td><td class="r num">${beTxt(z)}</td><td>${z.x.swap?'<span class="pill p-ok">zamień</span>':'<span class="pill p-part">trzymaj</span>'}</td></tr>`}).join("")}
       <tr class="sum"><td><b>Razem</b></td><td class="r num">${rowsP.reduce((s,z)=>s+Math.floor(+z.o.n),0)}</td><td>${mShort(r.latestMaturity)}</td><td class="r num">${zl0(tot("valueBeforeFee"))}</td><td class="r num">${zl0(tot("cost"))}</td><td class="r num"><span class="${a.diffAll>0?"d-up":a.diffAll<0?"d-down":"d-0"}">${sgn(a.diffAll)}</span></td><td></td><td>${pick?`<span class="small">wybrane: ${sgn(a.diffBest)}</span>`:""}</td></tr>
       </tbody></table></div></div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie${c.ike?"":" i podatku"}), z resztą na koncie.`:`Suma wartości obligacji${c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(paidC)}</p></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po 99,90 zł.`}${calcCouponDesc(paidC)}</p></div>
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>${esc(lab.keep.toLowerCase())}</span><span><i style="background:var(--accent)"></i>${esc(lab.swap.toLowerCase())} na ${esc(tgtCode)}</span></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(ms,H,events,lab)}

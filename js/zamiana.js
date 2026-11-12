@@ -178,7 +178,7 @@
       //  "hold" (domyślnie) — trzymasz dalej: wartość po podatku od narosłych odsetek, bez opłaty za wykup;
       //  "liquidate" — wypłacasz wszystko: po opłacie i podatku.
       const v = bondValue(spec, age, rates, opts);
-      const gross = (opts.valuation === "liquidate" ? v.net : v.gross) * count;
+      const gross = (opts.valuation === "liquidate" && opts.payoutFee ? v.net : v.gross) * count;
       const gain = gross - costBasis * count;
       const taxDue = tax ? Math.max(0, gain) * taxRate : 0;
       out.push({ t, ym: addMonths(ctx.now, t), spec: spec.type, count, bonds: gross - taxDue, cash, total: gross - taxDue + cash });
@@ -229,6 +229,7 @@
    *   rollover: {type, rate1, margin, fee}   (domyślnie target),
    *   cpiHistory: {"RRRR-MM": %}, cpiFuture: [% rok 1, % rok 2, …],
    *   savingsRate: %, tax: true|false (false = IKE/IKZE), taxRate: 0.19,
+   *   withdrawalTax: 0 | 0.1 (IKZE: ryczałt od całej wypłaty — wartości w czasie pomniejszone o ten podatek),
    *   buyPrice: 100, swapPrice: 99.9, roundPerBond: true,
    *   valuation: "hold" (domyślnie: jedyne zerwanie to zamiana dziś, dalej obie strony trzymają obligacje
    *              do wykupu i zamieniają po 99,90; wycena bez opłaty za wykup)
@@ -249,7 +250,10 @@
     const nbpAt = makeNbpAt(p.nbpHistory || {}, p.nbpFuture, now);
     // taxBasisNominal: podatek od zysku liczony względem 100 zł także po zamianie po 99,90 (zgodność z arkuszem kontrolnym)
     const opts = { roundPerBond: p.roundPerBond !== false, taxBasisNominal: !!p.taxBasisNominal,
-      valuation: p.valuation === "liquidate" ? "liquidate" : "hold" };
+      valuation: p.valuation === "liquidate" ? "liquidate" : "hold",
+      // wypłata z IKE/IKZE: bez opłaty za przedterminowy wykup (listy emisyjne) — dotyczy wyceny „wypłata wszystkiego”;
+      // zerwanie dziś w celu zakupu nowych obligacji w ramach konta nie jest wypłatą, więc opłata zostaje
+      payoutFee: tax };
     const rollover = Object.assign({}, p.rollover || p.target);
     const ctx = { H, cpiAt, nbpAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
 
@@ -263,7 +267,7 @@
     // od narosłych odsetek plus kupony COI wypłacone do danego miesiąca (netto, bez oprocentowania)
     const histAt = (a) => {
       const v = bondValue(oldSpec, a, oldRates, opts);
-      const gross = (opts.valuation === "liquidate" ? v.net : v.gross) * p.old.count;
+      const gross = (opts.valuation === "liquidate" && opts.payoutFee ? v.net : v.gross) * p.old.count;
       const bonds = gross - (tax ? Math.max(0, gross - NOMINAL * p.old.count) * taxRate : 0);
       const coupons = v.coupons.reduce((sum, c) => sum + c.amount, 0) * p.old.count * (tax ? 1 - taxRate : 1);
       return { bonds, coupons };
@@ -308,6 +312,12 @@
         keepBond: k.spec, swapBond: s.spec,
       };
     });
+    // IKZE: zryczałtowany podatek (10%) od całej wypłaty po 65. roku życia — pomniejsza obie strony tak samo
+    const wk = 1 - (p.withdrawalTax || 0);
+    if (wk !== 1) {
+      for (const m of months) for (const k of ["keep", "swap", "diff", "keepReal", "swapReal", "diffReal"]) m[k] *= wk;
+      for (const e of past) e.value *= wk;
+    }
     const last = months[H];
 
     // od kiedy zamiana się opłaca (i opłaca do końca horyzontu)
@@ -322,7 +332,7 @@
         // co tracisz w momencie zamiany względem wartości brutto
         cost: v0.fee * p.old.count + tax0,
       },
-      months, past, paidCoupons, keepEvents: keep.events, swapEvents: swap.events,
+      months, past, paidCoupons: paidCoupons * wk, withdrawalTax: p.withdrawalTax || 0, keepEvents: keep.events, swapEvents: swap.events,
       atHorizon: { keep: last.keep, swap: last.swap, diff: last.diff, keepReal: last.keepReal, swapReal: last.swapReal, diffReal: last.diffReal },
       breakEvenMonth,
       oldRates, targetRates: periodRates(targetSpec, cpiAt, nbpAt),

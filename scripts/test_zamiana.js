@@ -115,6 +115,18 @@ const ike = Z.compare({ now: "2026-11", horizonMonths: 1,
 eq("IKE: podatek 0", ike.switchNow.tax, 0);
 eq("IKE: wpływ = (106 − 3) · 10", ike.switchNow.proceeds, 1030);
 eq("IKE: 10 nowych obligacji", ike.switchNow.newCount, 10);
+// IKZE: jak IKE, ale 10% ryczałtu od całej wypłaty pomniejsza obie strony (różnica × 0,9, decyzja bez zmian)
+const ikeArgs = { now: "2026-05", old: { type: "EDO", rate1: 6, margin: 1.5, fee: 3, purchase: "2025-11", count: 10 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiFuture: [3], savingsRate: 0, tax: false };
+const ikeR = Z.compare(ikeArgs), ikzeR = Z.compare(Object.assign({}, ikeArgs, { withdrawalTax: 0.1 }));
+eq("IKZE: trzymam × 0,9", ikzeR.atHorizon.keep, ikeR.atHorizon.keep * 0.9, 1e-9);
+eq("IKZE: różnica × 0,9", ikzeR.atHorizon.diff, ikeR.atHorizon.diff * 0.9, 1e-9);
+eq("IKZE: historia × 0,9", ikzeR.past[0].value, ikeR.past[0].value * 0.9, 1e-9);
+eq("IKZE: zerwanie dziś bez zmian (pieniądze zostają na koncie)", ikzeR.switchNow.proceeds, ikeR.switchNow.proceeds);
+// wycena „wypłata wszystkiego” w IKE: wypłata z IKE bez opłaty → jak wycena „trzymam”
+const ikeLiq = Z.compare(Object.assign({}, ikeArgs, { valuation: "liquidate" }));
+eq("IKE + wypłata wszystkiego: bez opłaty przy wypłacie", ikeLiq.atHorizon.keep, ikeR.atHorizon.keep, 1e-9);
+eq("IKE + wypłata wszystkiego: opłata przy zerwaniu dziś zostaje", ikeLiq.switchNow.fee, 30);
 
 // z podatkiem: zysk (103 − 100)·10 = 30 → podatek 5,70 → 1024,30 → 10 szt. + 24,30 zł
 const tx = Z.compare(Object.assign({}, { now: "2026-11", horizonMonths: 1,
