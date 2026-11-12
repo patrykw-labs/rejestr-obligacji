@@ -228,7 +228,7 @@ details.how ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:colu
 .btn:hover{border-color:var(--accent)}
 tr.ev td{background:var(--accent-soft)!important}
 .pos{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
-.pos-row{display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:10px;align-items:end}
+.pos-row{display:grid;grid-template-columns:minmax(0,1fr) 68px 58px;gap:8px;align-items:end}
 .pos .fnote{font-size:12.5px;color:var(--muted)}
 .pos-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px}
 .pos-del{font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);background:none;border:1px solid var(--line-strong);border-radius:8px;padding:3px 9px;cursor:pointer}
@@ -533,11 +533,15 @@ function calcFromCode(code){const a=Zamiana.seriesFromArchive(state.raw,code);
   const s=(calcPre().series||{})[String(code||"").toUpperCase()];
   return s?{code:String(code).toUpperCase(),type:s.type,p:s.purchase,r1:s.rate1,m:s.margin,f:s.fee}:null}
 const CALC_MAXPOS=8;
-function calcPosDefault(code){return Object.assign({n:100},calcFromCode(code)||{code:"",type:"EDO",p:Zamiana.addMonths(calcNow(),-24),r1:6,m:1.5,f:2})}
+// dzień zerwania domyślnie: dziś, jeśli archiwum ma rekord bieżącego miesiąca; inaczej ostatni dzień miesiąca „dziś”
+function calcDefaultBreakDay(){const d=new Date(),ym=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),now=calcNow();return ym===now?d.getDate():calcDaysIn(now)}
+const calcDaysIn=ym=>{const [y,m]=ym.split("-").map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate()};
+const calcDayOk=v=>Number.isInteger(+v)&&+v>=1&&+v<=31;
+function calcPosDefault(code){return Object.assign({n:100,pd:1},calcFromCode(code)||{code:"",type:"EDO",p:Zamiana.addMonths(calcNow(),-24),r1:6,m:1.5,f:2})}
 function calcDefaults(){
   const opts=calcOptions();const now=calcNow();
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0];
-  return Object.assign({pos:[calcPosDefault(pick)],h:"m",val:"hold",sc:"base",tc:false,cpi:Array(12).fill(2.5),sv:4,acc:"std",ike:false,nbp:calcNbpNow()},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
+  return Object.assign({pos:[calcPosDefault(pick)],h:"m",val:"hold",sc:"base",tc:false,cpi:Array(12).fill(2.5),sv:4,acc:"std",ike:false,nbp:calcNbpNow(),bd:calcDefaultBreakDay()},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
 }
 // propozycja kolejnej serii do portfela: najpierw typ, którego jeszcze nie ma, co najmniej rok po zakupie
 function calcNextCode(c){
@@ -554,42 +558,44 @@ function calcFromHash(){
     // portfel: pozycje po przecinku; KOD~sztuki albo TYP~RRRR-MM~1.rok~marża~opłata~sztuki
     const pos=[];
     for(const it of q.pf.split(",")){if(pos.length>=CALC_MAXPOS)break;const f=it.split("~"),n=+f[f.length-1];if(!(n>=1))continue;
-      if(f.length===2){const a=calcFromCode(f[0]);if(a)pos.push(Object.assign({n},a));}
-      else if(f.length===6&&CALC_TYPES.includes(f[0])&&/^\d{4}-\d{2}$/.test(f[1])&&f.slice(2,5).every(v=>v!==""&&!isNaN(+v)))pos.push({code:"",type:f[0],p:f[1],r1:+f[2],m:+f[3],f:+f[4],n});}
+      const pd=f.length===3||f.length===7?+f[f.length-1]:1,n2=f.length===3||f.length===7?+f[f.length-2]:n;
+      if(f.length===3||f.length===7){if(!(n2>=1)||!calcDayOk(pd))continue;f.pop();}
+      if(f.length===2){const a=calcFromCode(f[0]);if(a)pos.push(Object.assign({n:n2,pd},a));}
+      else if(f.length===6&&CALC_TYPES.includes(f[0])&&/^\d{4}-\d{2}$/.test(f[1])&&f.slice(2,5).every(v=>v!==""&&!isNaN(+v)))pos.push({code:"",type:f[0],p:f[1],r1:+f[2],m:+f[3],f:+f[4],n:n2,pd});}
     if(pos.length)c.pos=pos;
   }else{
     const o=c.pos[0];
     if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(o,a);else o.code="";}else o.code="";
     if(!o.code){if(q.t&&CALC_TYPES.includes(q.t))o.type=q.t;if(q.p&&/^\d{4}-\d{2}$/.test(q.p))o.p=q.p;
       o.r1=num("r1",o.r1);o.m=num("m",o.m);o.f=num("f",o.f);}
-    o.n=num("n",o.n);
+    o.n=num("n",o.n);if(calcDayOk(q.pd))o.pd=+q.pd;
   }
   c.tc=q.tc==="1";
   if(q.tt&&CALC_TYPES.includes(q.tt)){const o=calcTargetFromOffer(q.tt);if(o&&!c.tc)Object.assign(c,o);else c.tt=q.tt;}
   if(c.tc){c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);}
-  c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";c.ike=c.acc!=="std";c.nbp=num("nbp",c.nbp);
+  c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";c.ike=c.acc!=="std";c.nbp=num("nbp",c.nbp);if(calcDayOk(q.bd))c.bd=Math.min(+q.bd,calcDaysIn(calcNow()));
   if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
   return c;
 }
 function calcHash(c){
   const q={};
-  if(c.pos.length>1)q.pf=c.pos.map(o=>o.code?o.code+"~"+o.n:[o.type,o.p,o.r1,o.m,o.f,o.n].join("~")).join(",");
-  else{const o=c.pos[0];Object.assign(q,o.code?{k:o.code}:{t:o.type,p:o.p,r1:o.r1,m:o.m,f:o.f},{n:o.n});}
-  q.tt=c.tt;
+  if(c.pos.length>1)q.pf=c.pos.map(o=>(o.code?[o.code,o.n]:[o.type,o.p,o.r1,o.m,o.f,o.n]).concat(+o.pd!==1?[o.pd]:[]).join("~")).join(",");
+  else{const o=c.pos[0];Object.assign(q,o.code?{k:o.code}:{t:o.type,p:o.p,r1:o.r1,m:o.m,f:o.f},{n:o.n});if(+o.pd!==1)q.pd=o.pd;}
+  q.tt=c.tt;q.bd=c.bd;
   if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:{std:0,ike:1,ikze:2}[c.acc]});if(c.val==="liquidate")q.val="l";
   if(c.sc==="custom")q.cpi=c.cpi.join(",");
   if(calcUsesNbp(c))q.nbp=c.nbp;
   return "zamiana&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v).replace(/%2C/g,",")).join("&");
 }
 function calcCpiPath(c){return c.sc==="custom"?c.cpi.slice():[CPI_PRESETS[c.sc].v]}
-const calcSpec=o=>({type:o.type,rate1:+o.r1,margin:+o.m,fee:+o.f,purchase:o.p,count:Math.floor(+o.n)});
+const calcSpec=o=>({type:o.type,rate1:+o.r1,margin:+o.m,fee:+o.f,purchase:o.p,count:Math.floor(+o.n),purchaseDay:+o.pd||1});
 function calcParams(c,o){
   return {now:calcNow(),horizonMonths:c.h==="m"?undefined:Math.round(c.h*12),valuation:c.val,
     old:o?calcSpec(o):undefined,positions:o?undefined:c.pos.map(calcSpec),
     target:{type:c.tt,rate1:+c.tr1,margin:+c.tm,fee:+c.tf},
     cpiHistory:calcCpiHist(),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,withdrawalTax:c.acc==="ikze"?0.1:0,
-    nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:+c.nbp};
+    nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:+c.nbp,breakDay:+c.bd};
 }
 const calcMaturity=o=>/^\d{4}-\d{2}$/.test(o.p||"")?Zamiana.addMonths(o.p,Zamiana.TYPES[o.type].term):null;
 const calcPosCode=o=>o.code||o.type+" z "+mShort(o.p);
@@ -597,6 +603,7 @@ function calcValidate(c){
   const now=calcNow();const errs=[];const multi=c.pos.length>1;
   c.pos.forEach((o,i)=>{const pre=multi?`Seria ${i+1}${o.code?" ("+o.code+")":""}: `:"";const e=[];
     if(!(Math.floor(+o.n)>=1))e.push("Podaj liczbę obligacji (co najmniej 1).");
+    if(!calcDayOk(o.pd))e.push("Dzień zakupu: liczba od 1 do 31.");
     if(!/^\d{4}-\d{2}$/.test(o.p||""))e.push("Podaj miesiąc zakupu.");
     else{const age=Zamiana.monthsBetween(o.p,now);if(age<1)e.push("Miesiąc zakupu musi być wcześniejszy niż "+mLabel(now)+".");
       else if(age>=Zamiana.TYPES[o.type].term)e.push("Te obligacje są już po terminie wykupu — nie ma czego zrywać.");
@@ -605,6 +612,7 @@ function calcValidate(c){
     e.forEach(x=>errs.push(pre+x));});
   for(const [k,l] of [["tr1","oprocentowanie nowej serii"],["tf","opłatę nowej serii"],["sv","oprocentowanie konta"]])if(c[k]===""||isNaN(+c[k]))errs.push("Uzupełnij "+l+".");
   if(c.h!=="m"&&!(+c.h>=1&&+c.h<=30))errs.push("Horyzont: od 1 do 30 lat.");
+  if(!(calcDayOk(c.bd)&&+c.bd<=calcDaysIn(now)))errs.push("Dzień zerwania: od 1 do "+calcDaysIn(now)+".");
   if(calcUsesNbp(c)&&(c.nbp===""||isNaN(+c.nbp)))errs.push("Uzupełnij przyszłą stopę NBP.");
   return errs;
 }
@@ -621,19 +629,20 @@ function renderCalc(main){
     const lock=o.code?" disabled":"",a=`data-pi="${i}"`;
     const sel=`<label class="field"><span class="flabel">Seria z archiwum</span><span class="sel"><select ${a} data-pk="code"><option value=""${o.code?"":" selected"}>— inna, wpiszę ręcznie —</option>${codeOpts(o.code)}</select></span>${multi?"":'<span class="fnote" id="z-code-note"></span>'}</label>`;
     const nF=`<label class="field"><span class="flabel">Liczba sztuk</span><input ${a} data-pk="n" type="number" min="1" step="1" inputmode="numeric" value="${esc(o.n)}"></label>`;
+    const dF=`<label class="field"><span class="flabel">Dzień zakupu</span><input ${a} data-pk="pd" type="number" min="1" max="31" step="1" inputmode="numeric" value="${esc(o.pd)}"></label>`;
     const typeF=`<label class="field"><span class="flabel">Typ</span><span class="sel"><select ${a} data-pk="type"${lock}>${selOpts(CALC_TYPES.map(t=>[t,t]),o.type)}</select></span></label>`;
     const pF=`<label class="field wide"><span class="flabel">Miesiąc zakupu</span><input ${a} data-pk="p"${lock} type="month" min="${calcMinPurchase()}" max="${Zamiana.addMonths(now,-1)}" value="${esc(o.p)}"></label>`;
     const parF=`<div class="frow"><label class="field"><span class="flabel">${calcR1Label(o.type)}, %</span><input ${a} data-pk="r1"${lock} type="number" step="0.01" inputmode="decimal" value="${esc(o.r1)}"></label>
           <label class="field"><span class="flabel">Marża, p.p.</span><input ${a} data-pk="m"${lock} type="number" step="0.01" inputmode="decimal" value="${esc(o.m)}"></label>
           <label class="field"><span class="flabel">Opłata, zł/szt.</span><input ${a} data-pk="f"${lock} type="number" step="0.1" inputmode="decimal" value="${esc(o.f)}"></label></div>`;
-    if(!multi)return `${sel}<div class="frow">${nF}${typeF}${pF}</div>${parF}`;
+    if(!multi)return `${sel}<div class="frow">${nF}${typeF}${pF}${dF}</div>${parF}`;
     const mat=calcMaturity(o);
     return `<div class="pos"><div class="pos-head"><b>${i+1}. ${esc(o.code||"seria wpisana ręcznie")}</b><button type="button" class="pos-del" data-del="${i}" aria-label="Usuń serię ${i+1} z portfela">usuń</button></div>
-      <div class="pos-row">${sel}${nF}</div>
+      <div class="pos-row">${sel}${nF.replace("Liczba sztuk","Szt.")}${dF.replace("Dzień zakupu","Dzień")}</div>
       ${o.code?`<span class="fnote">zakup ${mShort(o.p)} · wykup ${mat?mShort(mat):"–"} · ${calcR1Label(o.type)} ${fmt(o.r1)}% · marża ${fmt(o.m)} p.p. · opłata ${fmt(o.f)} zł/szt. (z listu emisyjnego)</span>`:`<div class="frow">${typeF}${pF}</div>${parF}`}</div>`;
   };
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je dziś</b> (${mLabel(now)}) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii do dziś liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je dziś</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii do dziś liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div></div>
     <div class="calc-grid">
       <div class="card">
         <h3>Twoje obligacje${multi?` <small>portfel · ${c.pos.length} serii</small>`:""}</h3>
@@ -654,6 +663,7 @@ function renderCalc(main){
         <h3>Założenia na przyszłość</h3>
         <div class="frow">
           <label class="field wide"><span class="flabel">Porównaj</span><span class="sel"><select id="z-h">${selOpts([["m",(multi?"do wykupu ostatniej serii":"do wykupu starej serii")+(matYm?" ("+mShort(matYm)+")":"")]].concat([1,2,3,4,5,6,7,8,9,10,12,15,20].map(y=>[y,"po "+y+(y===1?" roku":" latach")])),c.h)}</select></span></label>
+          <label class="field"><span class="flabel">Dzień zerwania (${mShort(now)})</span><input id="z-bd" type="number" min="1" max="${calcDaysIn(now)}" step="1" inputmode="numeric" value="${esc(c.bd)}"></label>
           <label class="field"><span class="flabel">Konto na resztę, %</span><input id="z-sv" type="number" step="0.1" inputmode="decimal" value="${esc(c.sv)}"></label>
           ${calcUsesNbp(c)?`<label class="field"><span class="flabel">Stopa NBP dalej, %</span><input id="z-nbp" type="number" step="0.25" min="0" inputmode="decimal" value="${esc(c.nbp)}"></label>`:""}
         </div>
@@ -676,7 +686,7 @@ function renderCalc(main){
   main.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click",()=>{c.pos.splice(+b.dataset.del,1);renderCalc(main)}));
   $("#z-add").addEventListener("click",()=>{if(c.pos.length<CALC_MAXPOS){c.pos.push(calcPosDefault(calcNextCode(c)));renderCalc(main)}});
   const bind=(id,key)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;calcRecompute()})};
-  [["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"]].forEach(([i,k])=>bind(i,k));
+  [["z-bd","bd"],["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"]].forEach(([i,k])=>bind(i,k));
   $("#z-tt").addEventListener("change",e=>{const v=e.target.value;if(v==="custom")c.tc=true;else{c.tc=false;Object.assign(c,calcTargetFromOffer(v))}renderCalc(main)});
   if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;renderCalc(main)});
   if($("#z-nbp"))$("#z-nbp").addEventListener("input",e=>{c.nbp=e.target.value;calcRecompute()});
@@ -704,7 +714,10 @@ function calcRateTxt(rates,purchase,type){
   const g=[];rates.forEach((x,i)=>{const last=g[g.length-1];if(last&&Math.abs(last.r-x)<1e-12)last.to=i;else g.push({r:x,from:i,to:i})});
   return g.map(z=>{const a=Zamiana.addMonths(purchase,z.from),b=Zamiana.addMonths(purchase,z.to);return `${a===b?mShort(a):mShort(a)+"–"+mShort(b)}: <b>${fmt(z.r*100)}%</b>`}).join(" · ");
 }
-const calcRulesHtml=c=>`<li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||calcNow())} z archiwum GUS, dalej Twój scenariusz.</li>
+const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.slice(0,4)}`};
+const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
+const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości dziś wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>
+      <li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||calcNow())} z archiwum GUS, dalej Twój scenariusz.</li>
       ${calcUsesNbp(c)?`<li><b>ROR i DOR:</b> odsetki za każdy miesiąc (100 zł × stopa / 12, do grosza) trafiają na konto. Od 2. miesiąca stopa = stopa referencyjna NBP z 10. dnia roboczego przed miesiącem okresu + marża; do ${mShort(calcNow())} z archiwum NBP, dalej ${fmt(+c.nbp)}% (Twoje założenie). Przy zerwaniu od 2. miesiąca opłata jest stała (0,50 zł ROR, 0,70 zł DOR), także gdy przekracza narosłe odsetki — wtedy dostajesz mniej niż 100 zł za sztukę.</li>`:""}
       <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania dziś)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
 const calcCouponTxt=v=>v>0.005?`; w tym odsetki wypłacone do dziś: ${zl0(v)}`:"";
@@ -717,6 +730,7 @@ function calcRecompute(){
   const out=$("#z-out");if(!out)return;const c=state.calc,now=calcNow();
   const note=$("#z-code-note");if(note)note.textContent=c.pos[0].code?`Parametry z listu emisyjnego ${c.pos[0].code}. Aby je zmienić, wybierz „inna, wpiszę ręcznie”.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
   try{history.replaceState(null,"","#"+calcHash(c))}catch(e){}
+  const bdEl=$("#z-bdate");if(bdEl&&calcDayOk(c.bd))bdEl.textContent=calcBreakDate(c);
   const errs=calcValidate(c);
   if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
   if(c.pos.length>1)return calcRecomputePortfolio(out,c,now);
@@ -745,7 +759,7 @@ function calcRecompute(){
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"})}
     <details class="how"><summary>Jak to policzono</summary><ul>
-      <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, dziś ${r.ageNow} mies.): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
+      <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, dziś ${calcAgeTxt(r.ageNow)}): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
       <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po 99,90 zł na nową serię ${esc(tgtCode)} na dzisiejszych warunkach. <b>Zamieniam:</b> zrywasz dziś (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
@@ -800,7 +814,7 @@ function calcRecomputePortfolio(out,c,now){
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(ms,H,events,lab)}
     <details class="how"><summary>Jak to policzono</summary><ul>
-      ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, dziś ${z.x.result.ageNow} mies.): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
+      ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, dziś ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
       <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po 99,90 zł na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł liczone są osobno dla każdej serii (po połączeniu mogłoby wyjść kilka obligacji więcej).</li>
@@ -853,7 +867,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab){
     <line class="zhov" x1="0" x2="0" y1="${T}" y2="${H-B}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
   const svg=el.querySelector("svg"),tip=el.querySelector(".tip"),hov=el.querySelector(".zhov"),dots=el.querySelector(".zpts");
   const docked=!!(window.matchMedia&&matchMedia("(max-width: 720px), (hover: none) and (pointer: coarse)").matches);tip.classList.toggle("docked",docked);
-  const when=m=>m.t<0?`${-m.t} mies. temu`:m.t===0?"dziś":`za ${m.t} mies.`;
+  const when=m=>m.t<0?`${Math.round(-m.t)} mies. temu`:m.t===0?"dziś":`za ${m.t} mies.`;
   const show=i=>{const m=pts[i];hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
     const hint=docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':"";
     if(m.swap==null){

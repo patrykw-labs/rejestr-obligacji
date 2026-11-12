@@ -38,6 +38,26 @@
   const monthsBetween = (a, b) => ymToIdx(b) - ymToIdx(a);
   const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
+  const daysIn = (ym) => { const [y, m] = ym.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); };
+  /**
+   * Wiek obligacji w miesiącach (z ułamkiem) w dniu zerwania: pełne miesiące od zakupu + część bieżącego
+   * miesięcznego okresu (od „miesięcznicy” zakupu do następnej). Bez dni (pd/bd puste) — pełne miesiące jak dotąd.
+   * Dni powyżej długości miesiąca przyjmujemy jako ostatni dzień miesiąca (jak w tabelach okresów odsetkowych).
+   */
+  function ageMonths(purchase, now, purchaseDay, breakDay) {
+    const whole = monthsBetween(purchase, now);
+    if (!purchaseDay || !breakDay) return whole;
+    const clamp = (ym, d) => Math.min(Math.max(1, Math.round(d)), daysIn(ym));
+    const pdNow = clamp(now, purchaseDay), b = clamp(now, breakDay);
+    if (b >= pdNow) {
+      const len = daysIn(now) - pdNow + clamp(addMonths(now, 1), purchaseDay);
+      return whole + (b - pdNow) / len;
+    }
+    const prev = addMonths(now, -1), pdPrev = clamp(prev, purchaseDay);
+    const len = daysIn(prev) - pdPrev + pdNow;
+    return whole - 1 + (daysIn(prev) - pdPrev + b) / len;
+  }
+
   /** Kod serii, np. EDO0434 → wykup 2034-04, zakup = wykup − okres. */
   function parseCode(code) {
     const m = /^([A-Z]{3})(\d{2})(\d{2})$/.exec(String(code || "").toUpperCase().trim());
@@ -133,33 +153,35 @@
     const mSav = monthlySavings(savingsRate, tax, taxRate);
     let spec = leg.spec;
     let count = leg.count;
-    let ageAt0 = leg.ageAt0;       // wiek obligacji w t = 0
-    let startT = 0;                // t, w którym bieżąca obligacja ma wiek ageAt0
+    // chwila zakupu bieżącej obligacji na osi t (t = 0 to dzień zerwania; wiek może mieć ułamek miesiąca)
+    let boughtAt = -leg.ageAt0;
     let rates = periodRates(spec, cpiAt, nbpAt);
     let costBasis = leg.costBasis != null ? leg.costBasis : NOMINAL; // koszt nabycia 1 szt. (podatek)
     let cash = leg.cash0 || 0;
-    let paidCoupons = new Set();
+    // kupony wypłacone przed dniem zerwania (także w rocznicę przypadającą dziś) są poza porównaniem
+    let paidUpTo = Math.floor(leg.ageAt0 / periodOf(spec.type) + 1e-9);
     const out = [];
     const events = [];
 
     for (let t = 0; t <= H; t++) {
       if (t > 0) cash *= 1 + mSav;
-      let age = ageAt0 + (t - startT);
+      let age = t - boughtAt;
       const term = TYPES[spec.type].term;
 
-      // kupony COI wypłacone w tym miesiącu (kupon z rocznicy przypadającej dziś, t = 0, inwestor dostaje
-      // w obu wariantach — tak jak wcześniejsze kupony nie wchodzi do porównania)
+      // kupony (COI, ROR, DOR) za okresy zakończone od poprzedniego kroku
       const P = periodOf(spec.type);
-      if (TYPES[spec.type].coupon && t > 0 && age > 0 && age % P === 0 && age <= term && !paidCoupons.has(age)) {
-        paidCoupons.add(age);
-        const c = couponAmount(spec.type, rates[age / P - 1], opts.roundPerBond) * count;
-        const cNet = c * (tax ? 1 - taxRate : 1);
-        cash += cNet;
-        events.push({ t, kind: "kupon", amount: cNet });
+      if (TYPES[spec.type].coupon) {
+        while ((paidUpTo + 1) * P <= Math.min(age, term) + 1e-9) {
+          paidUpTo++;
+          const c = couponAmount(spec.type, rates[paidUpTo - 1], opts.roundPerBond) * count;
+          const cNet = c * (tax ? 1 - taxRate : 1);
+          cash += cNet;
+          events.push({ t, kind: "kupon", amount: cNet });
+        }
       }
 
       // wykup w terminie → zamiana na rollover
-      if (age >= term && t <= H) {
+      if (age >= term - 1e-9 && t <= H) {
         const v = bondValue(spec, term, rates, opts);
         const gross = v.gross * count;
         const gain = gross - costBasis * count;
@@ -169,9 +191,10 @@
         const n = Math.floor((proceeds + cash) / swapPrice);
         events.push({ t, kind: "wykup", spec, count, proceeds, newCount: n });
         cash = proceeds + cash - n * swapPrice;
-        spec = roll; count = n; ageAt0 = 0; startT = t; rates = periodRates(spec, cpiAt, nbpAt);
-        costBasis = opts.taxBasisNominal ? NOMINAL : swapPrice; paidCoupons = new Set();
-        age = 0;
+        // nowa seria kupiona w dniu wykupu (przy zerwaniu w środku miesiąca — ułamek miesiąca przed krokiem t)
+        boughtAt = boughtAt + term; age = Math.max(0, t - boughtAt);
+        spec = roll; count = n; rates = periodRates(spec, cpiAt, nbpAt);
+        costBasis = opts.taxBasisNominal ? NOMINAL : swapPrice; paidUpTo = 0;
       }
 
       // wycena z końcem miesiąca t:
@@ -239,8 +262,10 @@
   function compare(p) {
     const now = p.now;
     const oldTerm = TYPES[p.old.type].term;
-    const toMaturity = oldTerm - monthsBetween(p.old.purchase, p.now);
-    const H = Math.max(1, Math.round(p.horizonMonths == null || p.horizonMonths === "maturity" ? toMaturity : p.horizonMonths));
+    // wiek w dniu zerwania: z dniem zakupu (old.purchaseDay) i dniem zerwania (breakDay) — z ułamkiem miesiąca
+    const age0 = ageMonths(p.old.purchase, now, p.old.purchaseDay, p.breakDay);
+    const toMaturity = oldTerm - age0;
+    const H = Math.max(1, p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.ceil(toMaturity - 1e-9) : Math.round(p.horizonMonths));
     const taxRate = p.taxRate != null ? p.taxRate : 0.19;
     const tax = p.tax !== false;
     const buyPrice = p.buyPrice || NOMINAL;
@@ -258,7 +283,6 @@
     const ctx = { H, cpiAt, nbpAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
 
     const oldSpec = Object.assign({}, p.old);
-    const age0 = monthsBetween(oldSpec.purchase, now);
     if (age0 < 0) throw new Error("Data zakupu jest późniejsza niż data zamiany");
     if (age0 >= TYPES[oldSpec.type].term) throw new Error("Obligacje są już po terminie wykupu");
     const oldRates = periodRates(oldSpec, cpiAt, nbpAt);
@@ -273,10 +297,11 @@
       return { bonds, coupons };
     };
     const past = [];
-    for (let a = 0; a <= age0; a++) {
+    for (let a = 0; a <= age0 + 1e-9; a++) {
       const h = histAt(a);
       past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: h.bonds + h.coupons });
     }
+    if (age0 % 1 > 1e-9) { const h = histAt(age0); past.push({ t: 0, ym: now, value: h.bonds + h.coupons }); }
     // kupony COI otrzymane do dziś (także w rocznicę przypadającą dziś) inwestor ma w obu wariantach:
     // doliczamy je jako stałą kwotę do obu, więc wykres jest ciągły, a różnica się nie zmienia
     const paidCoupons = histAt(age0).coupons;
@@ -351,8 +376,8 @@
     const pos = p.positions || [];
     if (!pos.length) throw new Error("Portfel jest pusty");
     const now = p.now;
-    const toMat = pos.map((o) => TYPES[o.type].term - monthsBetween(o.purchase, now));
-    const H = Math.max(1, Math.round(p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.max(...toMat) : p.horizonMonths));
+    const toMat = pos.map((o) => TYPES[o.type].term - ageMonths(o.purchase, now, o.purchaseDay, p.breakDay));
+    const H = Math.max(1, p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.ceil(Math.max(...toMat) - 1e-9) : Math.round(p.horizonMonths));
     const results = pos.map((o) => compare(Object.assign({}, p, { old: o, horizonMonths: H })));
     const pick = results.map((r) => r.atHorizon.diff > 0);
     const anyPick = pick.some(Boolean);
@@ -437,7 +462,7 @@
   }
 
   const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation,
-    cpiHistoryFromMonths, nbpHistoryFromMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
+    cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

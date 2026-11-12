@@ -255,5 +255,33 @@ eq("EDO z 10–12.2018 z listów 68, 76, 84/2018", ["EDO1028", "EDO1128", "EDO12
   [["2018-10", 2.7, 1.5, 2], ["2018-11", 2.7, 1.5, 2], ["2018-12", 2.7, 1.5, 2]]);
 eq("ROD sprzed 2019: tylko beneficjenci 500+", pre.series.ROD1028.availability, "tylko beneficjenci 500+");
 
+// ---------------------------------------------------------------------------
+// 6. Zerwanie w środku miesiąca: dzień zakupu i dzień zerwania (wiek z ułamkiem miesiąca)
+// ---------------------------------------------------------------------------
+eq("wiek: zakup 1., zerwanie 16.11.2026 → 31,5 mies.", Z.ageMonths("2024-04", "2026-11", 1, 16), 31.5, 1e-12);
+eq("wiek: zakup 20., zerwanie 12. → 30 + 23/31", Z.ageMonths("2024-04", "2026-11", 20, 12), 30 + 23 / 31, 1e-12);
+eq("wiek: ten sam dzień → pełne miesiące", Z.ageMonths("2024-04", "2026-11", 12, 12), 31);
+eq("wiek: bez dni → pełne miesiące", Z.ageMonths("2024-04", "2026-11"), 31);
+eq("wiek: dzień 31 w 30-dniowym miesiącu = ostatni dzień", Z.ageMonths("2024-05", "2026-11", 31, 30), 30);
+const rorMid = Z.compare(Object.assign({}, rorBase, { old: Object.assign({}, rorBase.old, { purchaseDay: 1 }), breakDay: 16 }));
+eq("ROR w połowie miesiąca: narosłe odsetki pokrywają część opłaty (100,15 − 0,50 = 99,65 zł)", rorMid.switchNow.proceeds, 9965);
+eq("ROR w połowie miesiąca: horyzont do wykupu = 6 mies.", rorMid.horizonMonths, 6);
+eq("ROR w połowie miesiąca: kolejny kupon po miesiącu", rorMid.keepEvents.filter((e) => e.kind === "kupon")[0].t, 1);
+eq("ROR w połowie miesiąca: historia łączy się z dziś", rorMid.past[rorMid.past.length - 1].value, rorMid.months[0].keep, 1e-9);
+const edoArgs = { now: "2026-11", old: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 100 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: hist, cpiFuture: [2.5], savingsRate: 4, tax: true };
+const edoEnd = Z.compare(edoArgs), edoMid = Z.compare(Object.assign({}, edoArgs, { old: Object.assign({}, edoArgs.old, { purchaseDay: 1 }), breakDay: 16 }));
+eq("EDO w połowie miesiąca: wartość dziś wyższa o pół miesiąca odsetek", edoMid.switchNow.valueBeforeFee > edoEnd.switchNow.valueBeforeFee, true);
+eq("EDO w połowie miesiąca: wiek 31,5 mies.", edoMid.ageNow, 31.5);
+eq("EDO w połowie miesiąca: wykup w terminie w 90. kroku (88,5 mies. → do pełnego kroku)", [edoMid.horizonMonths, edoMid.keepEvents.find((e) => e.kind === "wykup").t], [89, 89]);
+eq("EDO w połowie miesiąca: historia łączy się z dziś", edoMid.past[edoMid.past.length - 1].value, edoMid.months[0].keep, 1e-9);
+const coiMid = Z.compare({ now: "2026-11", old: { type: "COI", rate1: 5.25, margin: 1.5, fee: 2, purchase: "2025-11", count: 10, purchaseDay: 20 }, breakDay: 12,
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true });
+eq("COI kupione 20.11.2025, zerwanie 12.11.2026: kupon jeszcze niewypłacony", coiMid.paidCoupons, 0);
+eq("COI: pierwszy kupon w wariancie „trzymam” po miesiącu", coiMid.keepEvents.find((e) => e.kind === "kupon").t, 1);
+eq("COI: opłata 2 zł/szt. (narosłe odsetki > 2 zł)", coiMid.switchNow.fee, 20);
+const pfMid = Z.comparePortfolio(Object.assign({}, edoArgs, { breakDay: 16, positions: [Object.assign({}, edoArgs.old, { purchaseDay: 1 })] }));
+eq("portfel: dzień zerwania przekazany pozycjom", pfMid.atHorizon.diffAll, edoMid.atHorizon.diff, 1e-9);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
