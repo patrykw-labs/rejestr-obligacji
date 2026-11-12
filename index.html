@@ -189,6 +189,8 @@ td b{font-weight:700}
 .tip.docked .tr{margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tip.docked .tr .td{display:none}
 .tip.docked .tr .dot{margin-right:6px}
+.tip .tr.evrow{color:var(--accent-ink);font-weight:600;max-width:280px;white-space:normal}
+.tip.docked .tr.evrow{grid-column:1/-1;max-width:none}
 .tip.docked .tt{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 10px}
 .tip.docked>.td{grid-column:1/-1;margin-left:0}
 .notes{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line-strong);margin-top:16px;padding-top:14px}
@@ -225,6 +227,7 @@ details.how ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:colu
 .btn{font:inherit;font-weight:700;font-size:14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer}
 .btn:hover{border-color:var(--accent)}
 tr.ev td{background:var(--accent-soft)!important}
+.evt{display:block;font-size:12px;font-weight:600;color:var(--accent-ink);white-space:normal;max-width:300px}
 .t-short{display:none}
 
 .small{font-size:13px;color:var(--muted);margin:0}
@@ -622,8 +625,9 @@ function calcRecompute(){
   const beInfl=typeof be==="number"?`${good?"poniżej":"powyżej"} ${fmt(be,1)}%`:"";
   const beInflTxt=typeof be==="number"?`Przy stałej inflacji ${fmt(be,1)}% oba scenariusze dają tyle samo.`:(be.sign>0?"Zamiana wygrywa przy każdej stałej inflacji od −2% do 25%.":"Trzymanie wygrywa przy każdej stałej inflacji od −2% do 25%.");
   const oldCode=c.code||c.type, tgtCode=c.tc?c.tt+" (własne parametry)":(calcTargetFromOffer(c.tt)?.tcode||c.tt);
+  const events=calcEvents(r,c,oldCode,tgtCode);
   const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
-  const evAt=new Set(r.keepEvents.filter(e=>e.kind==="wykup").map(e=>e.t).concat(r.swapEvents.filter(e=>e.kind==="wykup").map(e=>e.t)));
+  for(const e of events)if(!rows.includes(e.t))rows.push(e.t);rows.sort((a,b)=>a-b);
   const rateTxt=(rates,purchase,spec)=>rates.map((x,i)=>`${i+1}. rok (od ${mShort(Zamiana.addMonths(purchase,i*12))}): <b>${fmt(x*100)}%</b>`).slice(0,Math.ceil(Zamiana.TYPES[spec].term/12));
   out.innerHTML=`<div class="vlist">
     <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} ${yrsTxt}`}</div>
@@ -638,7 +642,7 @@ function calcRecompute(){
       <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do dziś</span><span><i style="background:var(--muted)"></i>trzymam ${esc(oldCode)}</span><span><i style="background:var(--accent)"></i>zamieniam na ${esc(tgtCode)}</span></div></div>
       <div class="chart" id="z-chart"></div></div>
     <div class="card table-card"><div class="frame"><table><thead><tr><th>Po</th><th>Miesiąc</th><th class="r">Trzymam</th><th class="r">Zamieniam</th><th class="r">Różnica</th><th class="r">Różnica realnie</th></tr></thead><tbody>
-      ${rows.map(t=>{const m=r.months[t];const ev=[...evAt].some(x=>x<=t&&x>t-12&&x>0);return `<tr${ev?' class="ev"':""}><td>${t===0?"dziś":(t%12?fmt(t/12,1)+" roku":t/12+(t===12?" rok":[2,3,4].includes((t/12)%10)&&!(t/12>=12&&t/12<=14)?" lata":" lat"))}</td><td>${mShort(m.ym)}</td><td class="r num">${zl0(m.keep)}</td><td class="r num">${zl0(m.swap)}</td><td class="r num"><span class="${m.diff>0?"d-up":m.diff<0?"d-down":"d-0"}">${sgn(m.diff)}</span></td><td class="r num">${sgn(m.diffReal)}</td></tr>`}).join("")}
+      ${rows.map(t=>{const m=r.months[t];const evs=events.filter(e=>e.t===t);return `<tr${evs.length?' class="ev"':""}><td>${t===0?"dziś":(t%12?fmt(t/12,1)+" roku":t/12+(t===12?" rok":[2,3,4].includes((t/12)%10)&&!(t/12>=12&&t/12<=14)?" lata":" lat"))}${evs.map(e=>`<span class="evt">↻ ${esc(e.text)}</span>`).join("")}</td><td>${mShort(m.ym)}</td><td class="r num">${zl0(m.keep)}</td><td class="r num">${zl0(m.swap)}</td><td class="r num"><span class="${m.diff>0?"d-up":m.diff<0?"d-down":"d-0"}">${sgn(m.diff)}</span></td><td class="r num">${sgn(m.diffReal)}</td></tr>`}).join("")}
     </tbody></table></div></div>
     <details class="how"><summary>Jak to policzono</summary><ul>
       <li><b>${esc(oldCode)}</b> (zakup ${mShort(c.p)}, dziś ${r.ageNow} mies.): ${rateTxt(r.oldRates,c.p,c.type).join(" · ")}</li>
@@ -650,10 +654,22 @@ function calcRecompute(){
     </ul></details>
     <div class="row"><button type="button" class="btn" id="z-share" data-goatcounter-click="kalkulator-link">Kopiuj link do tego wyliczenia</button><span class="small" id="z-share-msg"></span></div>
   </div>`;
-  drawCalcChart(r,oldCode,tgtCode);
+  drawCalcChart(r,oldCode,tgtCode,events);
   $("#z-share").addEventListener("click",async()=>{const url=location.href;try{await navigator.clipboard.writeText(url);$("#z-share-msg").textContent="Skopiowano."}catch(e){$("#z-share-msg").textContent=url}});
 }
-function drawCalcChart(r,oldCode,tgtCode){
+// kod serii kupionej w danym miesiącu: typ + MMRR terminu wykupu (np. EDO z 04.2034 → EDO0444)
+function calcCodeFor(type,purchase){const m=Zamiana.addMonths(purchase,Zamiana.TYPES[type].term);return type+m.slice(5)+m.slice(2,4)}
+function calcEvents(r,c,oldCode,tgtCode){
+  const now=calcNow(),out=[],sn=r.switchNow;
+  out.push({t:0,leg:"swap",short:"zerwanie i zakup",text:`zamieniam: zerwanie ${oldCode}, zakup ${sn.newCount} szt. ${tgtCode} po 100 zł`});
+  for(const [leg,list] of [["keep",r.keepEvents],["swap",r.swapEvents]])for(const e of list){if(e.kind!=="wykup")continue;
+    const ym=Zamiana.addMonths(now,e.t),from=e.t===0?oldCode:(leg==="keep"&&e.spec.purchase===c.p?oldCode:calcCodeFor(e.spec.type,e.spec.purchase));
+    const to=calcCodeFor(c.tt,ym);
+    out.push({t:e.t,leg,short:`wykup ${from}`,text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po 99,90 zł na ${e.newCount} szt. ${to}`});}
+  return out;
+}
+function drawCalcChart(r,oldCode,tgtCode,events){
+  events=events||[];
   const el=$("#z-chart");if(!el)return;
   // punkty: historia od zakupu (wspólna) + przyszłość (dwa warianty); indeks k = 0..N, dziś = P
   const past=r.past||[],P=Math.max(0,past.length-1),fut=r.months;
@@ -679,6 +695,7 @@ function drawCalcChart(r,oldCode,tgtCode){
     <path d="${line(P,n-1,"keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>
     <path d="${line(P,n-1,"swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>
     <circle cx="${x(0)}" cy="${y(pts[0].keep)}" r="3.5" fill="var(--ink-2)"/>
+    ${events.filter(e=>e.t>0).map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7,col=e.leg==="keep"?"var(--muted)":"var(--accent)";return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${H-B}" style="stroke:${col};stroke-width:1.2;stroke-dasharray:2 3"/><text x="${right?xe-5:xe+5}" y="${H-B-8-k*14}" text-anchor="${right?"end":"start"}" style="fill:${col};font-weight:700">↻ ${esc(e.short)} → zamiana po 99,90</text>`}).join("")}
     <line class="zhov" x1="0" x2="0" y1="${T}" y2="${H-B}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
   const svg=el.querySelector("svg"),tip=el.querySelector(".tip"),hov=el.querySelector(".zhov"),dots=el.querySelector(".zpts");
   const docked=!!(window.matchMedia&&matchMedia("(max-width: 720px), (hover: none) and (pointer: coarse)").matches);tip.classList.toggle("docked",docked);
@@ -690,7 +707,8 @@ function drawCalcChart(r,oldCode,tgtCode){
       tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div><div class="tr"><span class="dot" style="background:var(--ink-2)"></span><b>${esc(oldCode)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr" style="color:var(--muted)">przed decyzją — wartość posiadanych obligacji</div>`;
     }else{
       dots.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--muted)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${y(m.swap)}" r="4" fill="var(--accent)" style="stroke:var(--surface);stroke-width:1.5"/>`;
-      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div><div class="tr"><span class="dot" style="background:var(--muted)"></span><b>Trzymam</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>Zamieniam</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>`;
+      const evs=events.filter(e=>P+e.t===i).map(e=>`<div class="tr evrow">↻ ${esc(e.text)}</div>`).join("");
+      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${evs}<div class="tr"><span class="dot" style="background:var(--muted)"></span><b>Trzymam</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>Zamieniam</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>`;
     }
     tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top="10px"};
   const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};
