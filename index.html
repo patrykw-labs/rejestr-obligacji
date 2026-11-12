@@ -740,6 +740,14 @@ function calcBeLong(b,kind){
   if(b.none)return `${b.sign>0?"Zamiana":"Trzymanie"} wygrywa przy każdej stałej ${what} ${rng}.`;
   return `Zamiana opłaca się przy stałej ${what} ${b.below?"poniżej":"powyżej"} ${fmt(b.value,1)}%.`;
 }
+// założenie o przyszłych zakupach (przy wykupie w terminie): dzisiejsze warunki serii docelowej
+function calcFutureBuysHtml(c,events){
+  const terms=c.tc?`na parametrach, które podałeś dla ${esc(c.tt)}`:`na dzisiejszych warunkach ${esc(calcTgtCode(c))} z oferty ${mShort(calcNow())}`;
+  const det=`${calcR1Label(c.tt).toLowerCase()} ${fmt(+c.tr1)}%${c.tt==="OTS"?"":`, marża ${fmt(+c.tm)} p.p.`}, ${c.tt==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(+c.tf)} zł`}`;
+  const fut=events.filter(e=>e.t>0&&e.to).sort((a,b)=>a.t-b.t);
+  const list=fut.length?` W tym wyliczeniu: ${fut.map(e=>`${mShort(e.ym)} — ${e.newCount} szt. ${esc(e.to)} (${e.leg==="keep"?(e.text.startsWith("oba")?"oba warianty":"trzymam"):"zamieniam"})`).join("; ")}${c.tt==="OTS"?"; do tego odnawianie OTS co 3 miesiące":""}.`:" W tym okresie nie ma takich zakupów — liczą się tylko obecne obligacje i zakup dziś.";
+  return `<li><b>Założenie o przyszłych zakupach:</b> obligacje kupowane w przyszłości (po wykupie w terminie, w obu wariantach, po ${calcSwapTxt(c.tt)}) liczymy ${terms}: ${det}${c.tt==="OTS"?"":`, dalej Twój scenariusz ${calcIsNbp(c.tt)?"stopy NBP":"inflacji"}`}.${list} Prawdziwa oferta w tych miesiącach może być inna — inne warunki sprawdzisz, wybierając w „Na co zamieniasz” opcję „własne parametry”.</li>`;
+}
 const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.slice(0,4)}`};
 const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
 const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości dziś wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>
@@ -790,6 +798,7 @@ function calcRecompute(){
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
       <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po ${calcSwapTxt(c.tt)} na nową serię ${esc(tgtCode)} na dzisiejszych warunkach. <b>Zamieniam:</b> zrywasz dziś (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
+      ${calcFutureBuysHtml(c,events)}
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${calcShareHtml}
@@ -845,6 +854,7 @@ function calcRecomputePortfolio(out,c,now){
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
       ${calcRulesHtml(c)}
       <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz dziś i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł liczone są osobno dla każdej serii (po połączeniu mogłoby wyjść kilka obligacji więcej).</li>
+      ${calcFutureBuysHtml(c,events)}
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${calcShareHtml}
@@ -858,11 +868,13 @@ function calcEvents(r,o,tt,oldCode,tgtCode){
   const now=calcNow(),out=[],sn=r.switchNow;
   out.push({t:0,leg:"swap",short:"zerwanie i zakup",text:`zamieniam: zerwanie ${oldCode}, zakup ${sn.newCount} szt. ${tgtCode} po 100 zł`});
   for(const [leg,list] of [["keep",r.keepEvents],["swap",r.swapEvents]])for(const e of list){if(e.kind!=="wykup")continue;
-    const ym=Zamiana.addMonths(now,e.t),from=e.t===0?oldCode:(leg==="keep"&&e.spec.purchase===o.p?oldCode:calcCodeFor(e.spec.type,e.spec.purchase));
-    const to=calcCodeFor(tt,ym),own=leg==="keep"&&e.spec.purchase===o.p;
+    const own=leg==="keep"&&e.spec.purchase===o.p,from=e.t===0||own?oldCode:calcCodeFor(e.spec.type,e.spec.purchase);
+    // miesiąc wykupu: dla posiadanej serii faktyczny (zakup + okres), dla kolejnych — krok osi czasu
+    const ym=own?Zamiana.addMonths(o.p,Zamiana.TYPES[o.type].term):Zamiana.addMonths(now,e.t);
+    const to=calcCodeFor(tt,ym);
     // odnawianie OTS co 3 miesiące pomijamy w tabeli i na wykresie (opisane w „Jak to policzono”)
     if(e.spec.type==="OTS"&&!own&&e.t>0)continue;
-    out.push({t:e.t,leg,src:from,short:`wykup ${from}`,priceTxt:fmt(calcSwapPrice(tt)),text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po ${calcSwapTxt(tt)} na ${e.newCount} szt. ${to}`});}
+    out.push({t:e.t,leg,src:from,ym,to,newCount:e.newCount,short:`wykup ${from}`,priceTxt:fmt(calcSwapPrice(tt)),text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po ${calcSwapTxt(tt)} na ${e.newCount} szt. ${to}`});}
   return out;
 }
 // kolory zdarzeń wykupu: każda wykupowana seria ma własny kolor (linia, etykieta, dymek, tabela)
