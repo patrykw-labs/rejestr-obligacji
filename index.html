@@ -591,6 +591,7 @@ function calcFromHash(){
   c.tc=q.tc==="1";
   if(q.tt&&CALC_TYPES.includes(q.tt)){const o=calcTargetFromOffer(q.tt,c.dm);if(o&&!c.tc)Object.assign(c,o);else c.tt=q.tt;}
   if(c.tc){c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);}
+  if(q.rr1!=null&&q.rr1!==""&&!isNaN(+q.rr1))c.rr1=+q.rr1;
   c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";c.ike=c.acc!=="std";c.nbp=num("nbp",c.nbp);if(calcDayOk(q.bd))c.bd=Math.min(+q.bd,calcDaysIn(calcNow()));
   if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
@@ -601,7 +602,7 @@ function calcHash(c){
   if(c.pos.length>1)q.pf=c.pos.map(o=>(o.code?[o.code,o.n]:[o.type,o.p,o.r1,o.m,o.f,o.n]).concat(+o.pd!==1?[o.pd]:[]).join("~")).join(",");
   else{const o=c.pos[0];Object.assign(q,o.code?{k:o.code}:{t:o.type,p:o.p,r1:o.r1,m:o.m,f:o.f},{n:o.n});if(+o.pd!==1)q.pd=o.pd;}
   q.tt=c.tt;q.bd=c.bd;if(c.dm&&c.dm!==calcArchiveNow()){q.dm=c.dm;if(c.cm==="s"&&c.dm<calcArchiveNow())q.cm="s"}
-  if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:{std:0,ike:1,ikze:2}[c.acc]});if(c.val==="liquidate")q.val="l";
+  if(c.tc)Object.assign(q,{tc:1,tr1:c.tr1,tm:c.tm,tf:c.tf});if(calcRollR1Set(c))q.rr1=c.rr1;Object.assign(q,{h:c.h,sv:c.sv,sc:c.sc,ike:{std:0,ike:1,ikze:2}[c.acc]});if(c.val==="liquidate")q.val="l";
   if(c.sc==="custom")q.cpi=c.cpi.join(",");
   if(calcUsesNbp(c))q.nbp=c.nbp;
   return "zamiana&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v).replace(/%2C/g,",")).join("&");
@@ -610,10 +611,14 @@ function calcCpiPath(c){return c.sc==="custom"?c.cpi.slice():[CPI_PRESETS[c.sc].
 // tryb „tylko scenariusz” dla zerwania w przeszłości: odczyty znane w dniu decyzji (CPI do M−1, stopa NBP do M)
 function calcHistKnown(h,c,lag){if(c.cm!=="s"||calcIsToday())return h;const lim=Zamiana.addMonths(calcNow(),lag);return Object.fromEntries(Object.entries(h).filter(([k])=>k<=lim))}
 const calcSpec=o=>({type:o.type,rate1:+o.r1,margin:+o.m,fee:+o.f,purchase:o.p,count:Math.floor(+o.n),purchaseDay:+o.pd||1});
+// oprocentowanie 1. okresu obligacji kupowanych w przyszłości (przy wykupie w terminie); puste = jak seria docelowa
+const calcRollR1Set=c=>c.tt!=="OTS"&&c.rr1!=null&&c.rr1!==""&&!isNaN(+c.rr1);
+const calcRollR1=c=>calcRollR1Set(c)?+c.rr1:+c.tr1;
 function calcParams(c,o){
   return {now:calcNow(),horizonMonths:c.h==="m"?undefined:Math.round(c.h*12),valuation:c.val,
     old:o?calcSpec(o):undefined,positions:o?undefined:c.pos.map(calcSpec),
     target:{type:c.tt,rate1:+c.tr1,margin:+c.tm,fee:+c.tf},
+    rollover:{type:c.tt,rate1:calcRollR1(c),margin:+c.tm,fee:+c.tf},
     cpiHistory:calcHistKnown(calcCpiHist(),c,-1),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,withdrawalTax:c.acc==="ikze"?0.1:0,
     nbpHistory:calcHistKnown(Zamiana.nbpHistoryFromMonths(state.raw),c,0),nbpFuture:+c.nbp,breakDay:+c.bd};
 }
@@ -679,6 +684,7 @@ function renderCalc(main){
           <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-tm"${c.tc?"":" disabled"} type="number" step="0.01" inputmode="decimal" value="${esc(c.tm)}"></label>
           <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-tf"${c.tc?"":" disabled"} type="number" step="0.1" inputmode="decimal" value="${esc(c.tf)}"></label>
         </div>
+        ${c.tt==="OTS"?"":`<label class="field"><span class="flabel">${calcR1Label(c.tt)} przy przyszłych zakupach, %</span><input id="z-rr1" type="number" step="0.01" inputmode="decimal" placeholder="jak wyżej: ${esc(fmt(+c.tr1))}" value="${esc(c.rr1??"")}"><span class="fnote">Dotyczy obligacji kupowanych później, przy wykupie w terminie (w obu wariantach). Puste = jak nowa seria; oferta za kilka lat może być inna.</span></label>`}
       </div>
       <div class="card">
         <h3>Założenia na przyszłość</h3>
@@ -709,6 +715,7 @@ function renderCalc(main){
   main.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click",()=>{c.pos.splice(+b.dataset.del,1);renderCalc(main)}));
   $("#z-add").addEventListener("click",()=>{if(c.pos.length<CALC_MAXPOS){c.pos.push(calcPosDefault(calcNextCode(c)));renderCalc(main)}});
   const bind=(id,key)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;calcRecompute()})};
+  if($("#z-rr1"))$("#z-rr1").addEventListener("input",e=>{c.rr1=e.target.value;calcRecompute()});
   [["z-bd","bd"],["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"]].forEach(([i,k])=>bind(i,k));
   $("#z-tt").addEventListener("change",e=>{const v=e.target.value;if(v==="custom")c.tc=true;else{c.tc=false;Object.assign(c,calcTargetFromOffer(v))}renderCalc(main)});
   if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;renderCalc(main)});
@@ -759,7 +766,7 @@ function calcBeLong(b,kind){
 // założenie o przyszłych zakupach (przy wykupie w terminie): dzisiejsze warunki serii docelowej
 function calcFutureBuysHtml(c,events){
   const terms=c.tc?`na parametrach, które podałeś dla ${esc(c.tt)}`:`na ${calcIsToday()?"dzisiejszych ":""}warunkach ${esc(calcTgtCode(c))} z oferty ${mShort(calcOfferRec(calcNow()).id)}`;
-  const det=`${calcR1Label(c.tt).toLowerCase()} ${fmt(+c.tr1)}%${c.tt==="OTS"?"":`, marża ${fmt(+c.tm)} p.p.`}, ${c.tt==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(+c.tf)} zł`}`;
+  const det=`${calcR1Label(c.tt).toLowerCase()} ${fmt(calcRollR1(c))}%${calcRollR1Set(c)?" (Twoje założenie)":""}${c.tt==="OTS"?"":`, marża ${fmt(+c.tm)} p.p.`}, ${c.tt==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(+c.tf)} zł`}`;
   const fut=events.filter(e=>e.t>0&&e.to).sort((a,b)=>a.t-b.t);
   const list=fut.length?` W tym wyliczeniu: ${fut.map(e=>`${mShort(e.ym)} — ${e.newCount} szt. ${esc(e.to)} (${e.leg==="keep"?(e.text.startsWith("oba")?"oba warianty":"trzymam"):"zamieniam"})`).join("; ")}${c.tt==="OTS"?"; do tego odnawianie OTS co 3 miesiące":""}.`:" W tym okresie nie ma takich zakupów — liczą się tylko obecne obligacje i zakup dziś.";
   return `<li><b>Założenie o przyszłych zakupach:</b> obligacje kupowane w przyszłości (po wykupie w terminie, w obu wariantach, po ${calcSwapTxt(c.tt)}) liczymy ${terms}: ${det}${c.tt==="OTS"?"":`, dalej Twój scenariusz ${calcIsNbp(c.tt)?"stopy NBP":"inflacji"}`}.${list} Prawdziwa oferta w tych miesiącach może być inna — inne warunki sprawdzisz, wybierając w „Na co zamieniasz” opcję „własne parametry”.</li>`;

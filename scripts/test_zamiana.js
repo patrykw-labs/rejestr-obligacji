@@ -338,6 +338,35 @@ eq("wspólne reszty: dziś wartość bez zmian (pieniądze z konta → obligacje
 eq("wspólne reszty: EDO lepsze od konta → na koniec więcej", pP.atHorizon.swapAll > pN.atHorizon.swapAll, true);
 eq("trzymanie bez zmian", pP.atHorizon.keep, pN.atHorizon.keep, 1e-9);
 
+// ---------------------------------------------------------------------------
+// 10. Scenariusze z wpisu o zamianie EDO (10 szt. EDO z 04.2022 → EDO z 04.2024), liczone jak na stronie:
+//     seria i oferta z archiwum, decyzja 1.04.2024, CPI znane w dniu decyzji (do 03.2024), wycena „wypłata wszystkiego”
+// ---------------------------------------------------------------------------
+const e0432 = Z.seriesFromArchive(months, "EDO0432"), e0434 = months["2024-04"].series.EDO;
+eq("blog: EDO0432 z archiwum (2,70% / 1,25 / 2 zł)", [e0432.rate1, e0432.margin, e0432.fee], [2.7, 1.25, 2]);
+eq("blog: oferta 04.2024 = EDO0434 (6,80% / 1,50 / 2 zł)", [e0434.code, e0434.rate1, e0434.margin, e0434.fee], ["EDO0434", 6.8, 1.5, 2]);
+const known = Object.fromEntries(Object.entries(hist).filter(([k]) => k <= "2024-03"));
+const blogBase = { now: "2024-04", breakDay: 1, valuation: "liquidate", tax: true, cpiHistory: known,
+  old: { type: "EDO", rate1: e0432.rate1, margin: e0432.margin, fee: e0432.fee, purchase: "2022-04", count: 10, purchaseDay: 1 },
+  target: { type: "EDO", rate1: e0434.rate1, margin: e0434.margin, fee: e0434.fee } };
+// scenariusz 1: inflacja 2,5%, konto 4% — wpis: „+5 zł po roku, +6 zł po 2 latach”; tabela zgodna do 7. roku
+const sc1 = Z.compare(Object.assign({}, blogBase, { cpiFuture: [2.5], savingsRate: 4, horizonMonths: 144 }));
+eq("blog, scenariusz 1: różnica po 1–7 latach (zł)", [12, 24, 36, 48, 60, 72, 84].map((t) => Math.round(sc1.months[t].diff)), [5, 6, 8, 10, 12, 14, 17]);
+eq("blog, scenariusz 1: w roku wykupu starej serii przewaga prawie znika", Math.abs(sc1.months[96].diff) < 5, true);
+// od 8. roku wynik zależy od warunków EDO kupowanego przy wykupie EDO0432 (04.2032): w arkuszu z wpisu 1. rok 3,00%
+const sc1r = Z.compare(Object.assign({}, blogBase, { cpiFuture: [2.5], savingsRate: 4, horizonMonths: 144, rollover: { type: "EDO", rate1: 3, margin: 1.5, fee: 2 } }));
+eq("blog, scenariusz 1: do 8. roku warunki przyszłych zakupów bez znaczenia", [12, 24, 36, 48, 60, 72, 84, 96].every((t) => Math.abs(sc1r.months[t].diff - sc1.months[t].diff) < 1e-9), true);
+eq("blog, scenariusz 1 z założeniem 3,00% dla zakupów w 2032: 9. i 10. rok", [Math.round(sc1r.months[108].diff), Math.round(sc1r.months[120].diff)], [42, 65]);
+// scenariusz 2: inflacja 10% co roku, konto 8% — wpis: im później, tym lepiej wypada stara seria
+const sc2 = Z.compare(Object.assign({}, blogBase, { cpiFuture: [10], savingsRate: 8 }));
+const d2 = [12, 24, 36, 48, 60, 72, 84, 96].map((t) => sc2.months[t].diff);
+eq("blog, scenariusz 2: po roku zamiana prowadzi", d2[0] > 0, true);
+eq("blog, scenariusz 2: przewaga zamiany maleje z każdym rokiem", d2.every((v, i) => i === 0 || v < d2[i - 1]), true);
+eq("blog, scenariusz 2: do wykupu wygrywa stara seria", d2[7] < 0, true);
+// konto autora wpisu: „po 8 latach zaledwie 101 zł do przodu” (scenariusz 1) — rząd wielkości dla ok. 370 szt.
+const sc3 = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4 }));
+eq("blog: kilkaset sztuk → po 8 latach ok. 100 zł", sc3.atHorizon.diff > 80 && sc3.atHorizon.diff < 120, true);
+
 // wersja silnika w index.html (js/zamiana.js?v=… i CALC_ENGINE_V) musi się zgadzać z Z.VERSION
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 eq("index.html ładuje js/zamiana.js z aktualną wersją", (html.match(/js\/zamiana\.js\?v=([^"]+)"/) || [])[1], Z.VERSION);
