@@ -10,11 +10,12 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych od stycznia 2019 
 
 **Strona:** https://patrykw-labs.github.io/rejestr-obligacji/
 
-Na stronie są trzy widoki:
+Na stronie są cztery widoki:
 
 - **Oferta miesiąca**: wszystkie serie z wybranego miesiąca, zmiany względem poprzedniego miesiąca, CPI i stopa NBP.
 - **Wykres w czasie**: oprocentowanie 1. okresu, marże albo orientacyjne oprocentowanie kolejnych okresów dla wybranych serii na tle CPI i NBP.
 - **Historia serii**: jedna seria miesiąc po miesiącu, z różnicą m/m i realnym oprocentowaniem (1. okres − CPI).
+- **Kalkulator zamiany**: czy opłaca się zerwać posiadane obligacje (EDO, COI, TOS, ROS, ROD) i kupić nowe z bieżącej oferty. Wybierasz swoją serię z archiwum (parametry z listu emisyjnego uzupełniają się same, a oprocentowanie do dziś liczone jest z prawdziwych odczytów CPI), liczbę sztuk, horyzont, scenariusz inflacji, oprocentowanie konta i IKE/IKZE. Wynik: werdykt, koszt zerwania (opłata i podatek), od kiedy zamiana się opłaca, inflacja progowa, wykres i tabela rok po roku. Wyliczenie można udostępnić linkiem.
 
 > Projekt jest nieoficjalny. Nie jest powiązany z Ministerstwem Finansów, PKO BP ani serwisem obligacjeskarbowe.pl i nie jest rekomendacją inwestycyjną. Dane pochodzą z publicznych źródeł: listów emisyjnych, [obligacjeskarbowe.pl](https://www.obligacjeskarbowe.pl), komunikatów MF, [GUS](https://stat.gov.pl) i [NBP](https://nbp.pl). Wiążące są listy emisyjne.
 
@@ -23,6 +24,7 @@ Na stronie są trzy widoki:
 - `index.html`: strona (czysty HTML + JS, bez kroku budowania)
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`CLAUDE.md`](CLAUDE.md).
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji
+- `js/zamiana.js`: silnik kalkulatora zamiany; `scripts/test_zamiana.js`: jego testy (m.in. zgodność z niezależnym arkuszem kontrolnym i z zasadami z listów emisyjnych), uruchamiane w GitHub Actions
 - `.github/workflows/validate.yml`: uruchamia walidację po każdej zmianie danych
 - `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP, a 20. dnia sprawdza też, czy szybki szacunek CPI zastąpiono odczytem finalnym GUS; przy rozbieżności przebieg kończy się błędem
 - `assets/`: grafiki (baner)

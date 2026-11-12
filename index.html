@@ -192,6 +192,38 @@ td b{font-weight:700}
 .tip.docked .tt{grid-column:1/-1;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 10px}
 .tip.docked>.td{grid-column:1/-1;margin-left:0}
 .notes{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line-strong);margin-top:16px;padding-top:14px}
+/* Kalkulator zamiany */
+.calc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}
+.calc-grid .card{display:flex;flex-direction:column;gap:12px}
+.card h3{font-size:16px;font-weight:800;letter-spacing:-.01em;margin:0}
+.card h3 small{font-weight:500;color:var(--muted);font-size:12.5px;margin-left:4px}
+.frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.frow .wide{grid-column:span 2;min-width:150px}
+.field input[type=number],.field input[type=month]{font:inherit;font-weight:600;font-size:15px;color:var(--ink);background:var(--input);border:1px solid var(--line-strong);border-radius:10px;padding:9px 12px;width:100%;min-width:0}
+.field input:hover{border-color:var(--accent)}
+.field input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.field .sel,.field select{width:100%;min-width:0}
+.field .fnote{font-size:12px;color:var(--muted)}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.cpi-years{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px}
+.cpi-years label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);font-weight:600}
+.cpi-years input{font:inherit;font-size:14px;font-weight:600;color:var(--ink);background:var(--input);border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;width:100%}
+.verdict{border-radius:var(--r);padding:16px 20px;border:1px solid var(--line);border-left:5px solid var(--muted);background:var(--surface)}
+.verdict.good{border-left-color:var(--ok);background:color-mix(in srgb,var(--ok-soft) 55%,var(--surface))}
+.verdict.bad{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad-soft) 55%,var(--surface))}
+.verdict .vt{font-size:clamp(18px,2.4vw,22px);font-weight:800;letter-spacing:-.02em;line-height:1.25}
+.verdict .vs{color:var(--ink-2);font-size:14px;margin-top:4px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;font-weight:600;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px}
+details.how{font-size:13.5px;color:var(--ink-2)}
+details.how summary{cursor:pointer;font-weight:700;color:var(--accent-ink)}
+details.how ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.btn{font:inherit;font-weight:700;font-size:14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+tr.ev td{background:var(--accent-soft)!important}
+.t-short{display:none}
 
 .small{font-size:13px;color:var(--muted);margin:0}
 .empty{background:var(--surface);border:1px dashed var(--line-strong);border-radius:var(--r);padding:26px;color:var(--ink-2)}
@@ -221,6 +253,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
   .table-card{padding:0}
   .tabs button{padding:11px 10px 9px;font-size:14px;gap:6px}
   .tabs button svg{display:none}
+  .t-long{display:none} .t-short{display:inline}
   .stat{border-right:0;margin-right:0}
   .coffee-btn span{display:none}
   .coffee-btn{padding:0 11px}
@@ -254,9 +287,10 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
   </section>
 
   <nav class="tabs" role="tablist" aria-label="Widoki">
-    <button role="tab" id="tab-oferta" data-view="oferta" aria-selected="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Oferta miesiąca</button>
-    <button role="tab" id="tab-wykres" data-view="wykres" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>Wykres w czasie</button>
-    <button role="tab" id="tab-seria" data-view="seria" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v4M8 10v4M8 16v4"/></svg>Historia serii</button>
+    <button role="tab" id="tab-oferta" data-view="oferta" aria-selected="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="t-long">Oferta miesiąca</span><span class="t-short">Oferta</span></button>
+    <button role="tab" id="tab-wykres" data-view="wykres" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="t-long">Wykres w czasie</span><span class="t-short">Wykres</span></button>
+    <button role="tab" id="tab-seria" data-view="seria" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 4v4M8 10v4M8 16v4"/></svg><span class="t-long">Historia serii</span><span class="t-short">Historia</span></button>
+    <button role="tab" id="tab-zamiana" data-view="zamiana" aria-selected="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg><span class="t-long">Kalkulator zamiany</span><span class="t-short">Zamiana</span></button>
   </nav>
 
   <main id="main">
@@ -283,6 +317,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
   </div>
 </footer>
 
+<script src="js/zamiana.js"></script>
 <script>
 const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};
@@ -303,7 +338,7 @@ function ruleText(s){if(!s)return"–";const r=s.rule||"";if(r==="stałe")return
 function prevOf(id){const i=state.months.findIndex(m=>m.id===id);return i>0?state.months[i-1]:null}
 function delta(a,b){if(a==null||b==null)return'<span class="d-0">–</span>';const d=Math.round((a-b)*100)/100;if(d===0)return'<span class="d-0">0,00</span>';return d>0?'<span class="d-up">+'+fmt(d)+'</span>':'<span class="d-down">−'+fmt(-d)+'</span>'}
 
-function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));try{history.replaceState(null,"","#"+v)}catch(e){}render()}
+function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v))}catch(e){}render()}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 
 function render(){
@@ -312,7 +347,7 @@ function render(){
   if(!state.loaded)return;
   if(!state.months.length){main.innerHTML='<div class="empty"><strong>Archiwum jest puste</strong>Dodaj pierwszy miesiąc do data/months.json.</div>';return}
   if(!state.month||!state.months.find(m=>m.id===state.month))state.month=state.months[state.months.length-1].id;
-  ({oferta:renderOffer,wykres:renderChart,seria:renderSeries}[state.view]||renderOffer)(main);
+  ({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc}[state.view]||renderOffer)(main);
 }
 
 function monthSelect(id){return `<label class="field"><span class="flabel">Miesiąc oferty</span><span class="sel"><select id="sel-month">${[...state.months].reverse().map(m=>`<option value="${m.id}"${m.id===id?" selected":""}>${mLabel(m.id)}</option>`).join("")}</select></span></label>`}
@@ -444,14 +479,204 @@ function renderSeries(main){
   main.querySelectorAll("button.chip[data-s]").forEach(b=>b.addEventListener("click",()=>{state.serie=b.dataset.s;render()}));
 }
 
-(function(){const h=(location.hash||"").slice(1);if(["oferta","wykres","seria"].includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
-let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(state.view==="wykres")drawChart()},150)});
+
+/* ===================== Kalkulator zamiany ===================== */
+const CALC_TYPES=["EDO","COI","TOS","ROS","ROD"];
+const CPI_PRESETS={base:{label:"Bazowy 2,5%",v:2.5},high:{label:"Wysoka inflacja 5%",v:5},low:{label:"Niska inflacja 1,5%",v:1.5}};
+const zl0=v=>v==null||isNaN(v)?"–":Math.round(v).toLocaleString("pl-PL")+" zł";
+const zl2=v=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł";
+const sgn=(v,f=zl0)=>(v>0?"+":v<0?"−":"")+f(Math.abs(v));
+const calcNow=()=>state.months[state.months.length-1].id;
+function calcOptions(){
+  const now=calcNow(),out={};
+  for(const m of state.months)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
+    const info=Zamiana.parseCode(s.code);if(!info)continue;const age=Zamiana.monthsBetween(info.purchase,now);
+    if(age<1||age>=Zamiana.TYPES[t].term)continue;(out[t]=out[t]||[]).push(s.code)}
+  for(const t in out)out[t].reverse();
+  return out;
+}
+function calcTargetFromOffer(t){const s=state.months[state.months.length-1].series?.[t];return s?{tt:t,tr1:s.rate1,tm:s.margin??0,tf:typeof s.fee==="number"?s.fee:0,tcode:s.code}:null}
+function calcFromCode(code){const a=Zamiana.seriesFromArchive(state.raw,code);if(!a||!a.found)return null;return {code,type:a.type,p:a.purchase,r1:a.rate1,m:a.margin,f:a.fee}}
+function calcDefaults(){
+  const opts=calcOptions();const now=calcNow();
+  const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0];
+  return Object.assign({n:100,h:10,sc:"base",cpi:Array(12).fill(2.5),sv:4,ike:false},calcFromCode(pick)||{code:"",type:"EDO",p:Zamiana.addMonths(now,-24),r1:6,m:1.5,f:2},calcTargetFromOffer("EDO")||{tt:"EDO",tr1:5,tm:2,tf:3});
+}
+function calcFromHash(){
+  const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="zamiana"||parts.length<2)return null;
+  const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const c=calcDefaults();
+  if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(c,a);else c.code="";}
+  const num=(k,d)=>q[k]!=null&&q[k]!==""&&!isNaN(+q[k])?+q[k]:d;
+  if(q.t&&CALC_TYPES.includes(q.t))c.type=q.t;if(q.p&&/^\d{4}-\d{2}$/.test(q.p))c.p=q.p;
+  c.r1=num("r1",c.r1);c.m=num("m",c.m);c.f=num("f",c.f);c.n=num("n",c.n);
+  if(q.tt&&CALC_TYPES.includes(q.tt))Object.assign(c,calcTargetFromOffer(q.tt)||{tt:q.tt});
+  c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);c.h=num("h",c.h);c.sv=num("sv",c.sv);c.ike=q.ike==="1";
+  if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
+  if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
+  return c;
+}
+function calcHash(c){
+  const q={k:c.code||"",t:c.type,p:c.p,r1:c.r1,m:c.m,f:c.f,n:c.n,tt:c.tt,tr1:c.tr1,tm:c.tm,tf:c.tf,h:c.h,sv:c.sv,sc:c.sc,ike:c.ike?1:0};
+  if(c.sc==="custom")q.cpi=c.cpi.join(",");
+  return "zamiana&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v)).join("&");
+}
+function calcCpiPath(c){return c.sc==="custom"?c.cpi.slice():[CPI_PRESETS[c.sc].v]}
+function calcParams(c){
+  return {now:calcNow(),horizonMonths:Math.round(c.h*12),
+    old:{type:c.type,rate1:+c.r1,margin:+c.m,fee:+c.f,purchase:c.p,count:Math.floor(+c.n)},
+    target:{type:c.tt,rate1:+c.tr1,margin:+c.tm,fee:+c.tf},
+    cpiHistory:Zamiana.cpiHistoryFromMonths(state.raw),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike};
+}
+function calcValidate(c){
+  const now=calcNow();const errs=[];
+  if(!(Math.floor(+c.n)>=1))errs.push("Podaj liczbę obligacji (co najmniej 1).");
+  if(!/^\d{4}-\d{2}$/.test(c.p||""))errs.push("Podaj miesiąc zakupu.");
+  else{const age=Zamiana.monthsBetween(c.p,now);if(age<1)errs.push("Miesiąc zakupu musi być wcześniejszy niż "+mLabel(now)+".");
+    else if(age>=Zamiana.TYPES[c.type].term)errs.push("Te obligacje są już po terminie wykupu — nie ma czego zrywać.");
+    else if(c.p<"2019-01")errs.push("Archiwum inflacji zaczyna się od 2019 r. — kalkulator obsługuje obligacje kupione od stycznia 2019.");}
+  for(const [k,l] of [["r1","oprocentowanie 1. roku"],["f","opłatę za wykup"],["tr1","oprocentowanie nowej serii"],["tf","opłatę nowej serii"],["h","horyzont"],["sv","oprocentowanie konta"]])if(c[k]===""||isNaN(+c[k]))errs.push("Uzupełnij "+l+".");
+  if(+c.h<1||+c.h>30)errs.push("Horyzont: od 1 do 30 lat.");
+  return errs;
+}
+function selOpts(list,cur){return list.map(([v,l])=>`<option value="${esc(v)}"${String(v)===String(cur)?" selected":""}>${esc(l)}</option>`).join("")}
+function renderCalc(main){
+  if(!state.calc)state.calc=calcFromHash()||calcDefaults();
+  const c=state.calc,now=calcNow(),opts=calcOptions(),offer=state.months[state.months.length-1];
+  const codeOpts=CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),c.code)}</optgroup>`).join("");
+  const targets=CALC_TYPES.filter(t=>offer.series?.[t]).map(t=>[t,offer.series[t].code+" · "+Zamiana.TYPES[t].label]);
+  const yrs=Math.min(12,Math.max(1,Math.ceil(+c.h||1)));
+  main.innerHTML=`<div class="vlist">
+    <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je dziś</b> (${mLabel(now)}) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii do dziś liczymy z prawdziwych odczytów CPI z archiwum, a dalej z Twoich założeń.</p></div></div>
+    <div class="calc-grid">
+      <div class="card">
+        <h3>Twoje obligacje</h3>
+        <label class="field"><span class="flabel">Seria z archiwum</span><span class="sel"><select id="z-code"><option value=""${c.code?"":" selected"}>— inna, wpiszę ręcznie —</option>${codeOpts}</select></span><span class="fnote" id="z-code-note"></span></label>
+        <div class="frow">
+          <label class="field"><span class="flabel">Liczba sztuk</span><input id="z-n" type="number" min="1" step="1" inputmode="numeric" value="${esc(c.n)}"></label>
+          <label class="field"><span class="flabel">Typ</span><span class="sel"><select id="z-type">${selOpts(CALC_TYPES.map(t=>[t,t]),c.type)}</select></span></label>
+          <label class="field wide"><span class="flabel">Miesiąc zakupu</span><input id="z-p" type="month" min="2019-01" max="${Zamiana.addMonths(now,-1)}" value="${esc(c.p)}"></label>
+        </div>
+        <div class="frow">
+          <label class="field"><span class="flabel">1. rok, %</span><input id="z-r1" type="number" step="0.01" inputmode="decimal" value="${esc(c.r1)}"></label>
+          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-m" type="number" step="0.01" inputmode="decimal" value="${esc(c.m)}"></label>
+          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-f" type="number" step="0.1" inputmode="decimal" value="${esc(c.f)}"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Na co zamieniasz <small>oferta ${esc(mLabel(now))}</small></h3>
+        <label class="field"><span class="flabel">Nowa seria</span><span class="sel"><select id="z-tt">${selOpts(targets,c.tt)}</select></span><span class="fnote">Po zerwaniu nowe obligacje kupujesz po 100 zł (cena zamiany 99,90 zł obowiązuje tylko przy wykupie w terminie).</span></label>
+        <div class="frow">
+          <label class="field"><span class="flabel">1. rok, %</span><input id="z-tr1" type="number" step="0.01" inputmode="decimal" value="${esc(c.tr1)}"></label>
+          <label class="field"><span class="flabel">Marża, p.p.</span><input id="z-tm" type="number" step="0.01" inputmode="decimal" value="${esc(c.tm)}"></label>
+          <label class="field"><span class="flabel">Opłata, zł/szt.</span><input id="z-tf" type="number" step="0.1" inputmode="decimal" value="${esc(c.tf)}"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Założenia na przyszłość</h3>
+        <div class="frow">
+          <label class="field"><span class="flabel">Horyzont, lata</span><input id="z-h" type="number" min="1" max="30" step="1" inputmode="numeric" value="${esc(c.h)}"></label>
+          <label class="field"><span class="flabel">Konto na resztę, %</span><input id="z-sv" type="number" step="0.1" inputmode="decimal" value="${esc(c.sv)}"></label>
+        </div>
+        <div class="field"><span class="flabel">Inflacja (CPI r/r)</span>
+          <div class="chips" role="group" aria-label="Scenariusz inflacji">${Object.entries(CPI_PRESETS).map(([k,v])=>`<button type="button" class="chip" data-sc="${k}" aria-pressed="${c.sc===k}">${v.label}</button>`).join("")}<button type="button" class="chip" data-sc="custom" aria-pressed="${c.sc==="custom"}">Własna, rok po roku</button></div>
+        </div>
+        ${c.sc==="custom"?`<div class="cpi-years">${Array.from({length:yrs},(_,i)=>`<label>rok ${i+1}<input type="number" step="0.1" data-cpi="${i}" value="${esc(c.cpi[i])}"></label>`).join("")}</div>`:""}
+        <label class="check"><input id="z-ike" type="checkbox"${c.ike?" checked":""}> IKE/IKZE (bez podatku Belki)</label>
+      </div>
+    </div>
+    <div id="z-out"></div>
+  </div>`;
+  const bind=(id,key,cast)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;if(key==="type"&&c.code&&calcFromCode(c.code)?.type!==c.type){c.code="";$("#z-code").value=""}calcRecompute()})};
+  [["z-n","n"],["z-type","type"],["z-p","p"],["z-r1","r1"],["z-m","m"],["z-f","f"],["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"],["z-ike","ike"]].forEach(([i,k])=>bind(i,k));
+  $("#z-code").addEventListener("change",e=>{const code=e.target.value;c.code=code;if(code){Object.assign(c,calcFromCode(code));renderCalc(main);}else calcRecompute()});
+  $("#z-tt").addEventListener("change",e=>{Object.assign(c,calcTargetFromOffer(e.target.value));renderCalc(main)});
+  $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main)});
+  main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>{if(b.dataset.sc==="custom"&&c.sc!=="custom"){const v=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(v)}c.sc=b.dataset.sc;renderCalc(main)}));
+  main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;}calcRecompute()}));
+  calcRecompute();
+}
+function calcRecompute(){
+  const out=$("#z-out");if(!out)return;const c=state.calc,now=calcNow();
+  const note=$("#z-code-note");if(note)note.textContent=c.code?`Parametry z listu emisyjnego ${c.code} — możesz je zmienić.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
+  try{history.replaceState(null,"","#"+calcHash(c))}catch(e){}
+  const errs=calcValidate(c);
+  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
+  let r,p;
+  try{p=calcParams(c);r=Zamiana.compare(p)}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
+  const be=Zamiana.breakEvenInflation(p);
+  const H=r.horizonMonths,a=r.atHorizon,good=a.diff>=0,yrsTxt=(H%12?fmt(H/12,1):String(H/12))+(H===12?" roku":" latach");
+  const sn=r.switchNow;
+  const beMonth=r.breakEvenMonth==null?"nie w tym horyzoncie":r.breakEvenMonth===0?"od razu":`po ${r.breakEvenMonth} mies. (${mShort(r.months[r.breakEvenMonth].ym)})`;
+  const beInfl=typeof be==="number"?`${good?"poniżej":"powyżej"} ${fmt(be,1)}%`:"";
+  const beInflTxt=typeof be==="number"?`Przy stałej inflacji ${fmt(be,1)}% oba scenariusze dają tyle samo.`:(be.sign>0?"Zamiana wygrywa przy każdej stałej inflacji od −2% do 25%.":"Trzymanie wygrywa przy każdej stałej inflacji od −2% do 25%.");
+  const oldCode=c.code||c.type, tgtCode=calcTargetFromOffer(c.tt)?.tcode||c.tt;
+  const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
+  const evAt=new Set(r.keepEvents.filter(e=>e.kind==="wykup").map(e=>e.t).concat(r.swapEvents.filter(e=>e.kind==="wykup").map(e=>e.t)));
+  const rateTxt=(rates,purchase,spec)=>rates.map((x,i)=>`${i+1}. rok (od ${mShort(Zamiana.addMonths(purchase,i*12))}): <b>${fmt(x*100)}%</b>`).slice(0,Math.ceil(Zamiana.TYPES[spec].term/12));
+  out.innerHTML=`<div class="vlist">
+    <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} po ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} po ${yrsTxt}`}</div>
+      <div class="vs">${Math.floor(+c.n)} szt. ${esc(oldCode)} → ${sn.newCount} szt. ${esc(tgtCode)}. Realnie (w dzisiejszych złotych): ${sgn(a.diffReal)}. Wartości po wypłacie wszystkiego na koniec okresu, ${c.ike?"bez podatku (IKE/IKZE)":"po podatku Belki"}.</div></div>
+    <div class="stats">
+      <div class="stat t-acc"><span class="k">Trzymam</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}</span></div>
+      <div class="stat t-green"><span class="k">Zamieniam</span><span class="v">${zl0(a.swap)}</span><span class="s">na koniec okresu; realnie ${zl0(a.swapReal)}</span></div>
+      <div class="stat t-red"><span class="k">Koszt zerwania dziś</span><span class="v">${zl0(sn.cost)}</span><span class="s">opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. + ${zl2(sn.cashRest)} na konto</span></div>
+      <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${beInflTxt}</span></div>
+    </div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość netto w czasie</h3><p class="desc">Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie${c.ike?"":" i podatku"}), z resztą na koncie.</p></div>
+      <div class="legend"><span><i style="background:var(--muted)"></i>trzymam ${esc(oldCode)}</span><span><i style="background:var(--accent)"></i>zamieniam na ${esc(tgtCode)}</span></div></div>
+      <div class="chart" id="z-chart"></div></div>
+    <div class="card table-card"><div class="frame"><table><thead><tr><th>Po</th><th>Miesiąc</th><th class="r">Trzymam</th><th class="r">Zamieniam</th><th class="r">Różnica</th><th class="r">Różnica realnie</th></tr></thead><tbody>
+      ${rows.map(t=>{const m=r.months[t];const ev=[...evAt].some(x=>x<=t&&x>t-12&&x>0);return `<tr${ev?' class="ev"':""}><td>${t===0?"dziś":(t%12?fmt(t/12,1):t/12)+(t===12?" rok":t<60&&t>12?" lata":t===0?"":" lat")}</td><td>${mShort(m.ym)}</td><td class="r num">${zl0(m.keep)}</td><td class="r num">${zl0(m.swap)}</td><td class="r num"><span class="${m.diff>0?"d-up":m.diff<0?"d-down":"d-0"}">${sgn(m.diff)}</span></td><td class="r num">${sgn(m.diffReal)}</td></tr>`}).join("")}
+    </tbody></table></div></div>
+    <details class="how"><summary>Jak to policzono</summary><ul>
+      <li><b>${esc(oldCode)}</b> (zakup ${mShort(c.p)}, dziś ${r.ageNow} mies.): ${rateTxt(r.oldRates,c.p,c.type).join(" · ")}</li>
+      <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${rateTxt(r.targetRates,now,c.tt).join(" · ")}</li>
+      <li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||now)} z archiwum GUS, dalej Twój scenariusz.</li>
+      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę. Podatek 19% od zysku${c.ike?" — tu pominięty (IKE/IKZE)":""}. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>
+      <li>Gdy obligacje dojdą do terminu wykupu przed końcem okresu, zakładamy zamianę po 99,90 zł na nową serię ${esc(tgtCode)} na dzisiejszych warunkach (wiersze wyróżnione w tabeli).</li>
+      <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
+    </ul></details>
+    <div class="row"><button type="button" class="btn" id="z-share" data-goatcounter-click="kalkulator-link">Kopiuj link do tego wyliczenia</button><span class="small" id="z-share-msg"></span></div>
+  </div>`;
+  drawCalcChart(r,oldCode,tgtCode);
+  $("#z-share").addEventListener("click",async()=>{const url=location.href;try{await navigator.clipboard.writeText(url);$("#z-share-msg").textContent="Skopiowano."}catch(e){$("#z-share-msg").textContent=url}});
+}
+function drawCalcChart(r,oldCode,tgtCode){
+  const el=$("#z-chart");if(!el)return;
+  const ms=r.months,n=ms.length;const W=Math.max(640,el.clientWidth||900),H=320,L=64,R=14,T=14,B=34;
+  const vals=ms.flatMap(m=>[m.keep,m.swap]);let min=Math.min(...vals),max=Math.max(...vals);
+  const span=max-min||max*0.1||1;const raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw)));const step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);
+  min=Math.floor(min/step)*step;max=Math.ceil(max/step)*step;if(max===min)max=min+step;
+  const x=i=>L+(n<=1?0:(W-L-R)*i/(n-1)),y=v=>T+(H-T-B)*(1-(v-min)/(max-min));
+  const fk=v=>v>=10000?(Math.round(v/100)/10).toLocaleString("pl-PL")+" tys.":Math.round(v).toLocaleString("pl-PL");
+  let g="";for(let v=min;v<=max+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--line-strong)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fk(v)}</text>`;
+  let xt="";const yrs=Math.ceil((n-1)/12),every=yrs>15?2:1;for(let t=0;t<n;t+=12*every)xt+=`<line x1="${x(t)}" x2="${x(t)}" y1="${H-B}" y2="${H-B+4}" style="stroke:var(--muted)"/><text x="${x(t)}" y="${H-B+17}" text-anchor="middle">${t===0?"dziś":ms[t].ym.slice(0,4)}</text>`;
+  const path=k=>ms.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(m[k]).toFixed(1)).join(" ");
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wartość netto: trzymam kontra zamieniam">${g}<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" style="stroke:var(--line-strong)"/>${xt}
+    <path d="${path("keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="${path("swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>
+    <line class="zhov" x1="0" x2="0" y1="${T}" y2="${H-B}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
+  const svg=el.querySelector("svg"),tip=el.querySelector(".tip"),hov=el.querySelector(".zhov"),pts=el.querySelector(".zpts");
+  const docked=!!(window.matchMedia&&matchMedia("(max-width: 720px), (hover: none) and (pointer: coarse)").matches);tip.classList.toggle("docked",docked);
+  const show=i=>{const m=ms[i];hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
+    pts.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--muted)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${y(m.swap)}" r="4" fill="var(--accent)" style="stroke:var(--surface);stroke-width:1.5"/>`;
+    tip.innerHTML=`<div class="tt">${i===0?"dziś":"po "+i+" mies."} · ${mLabel(m.ym)}${docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':""}</div><div class="tr"><span class="dot" style="background:var(--muted)"></span><b>Trzymam</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>Zamieniam</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>`;
+    tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top="10px"};
+  const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};
+  svg.addEventListener("mousemove",e=>show(idx(e.clientX)));svg.addEventListener("mouseleave",()=>{if(docked)return;tip.hidden=true;hov.style.visibility="hidden";pts.innerHTML=""});
+  svg.addEventListener("touchstart",e=>show(idx(e.touches[0].clientX)),{passive:true});svg.addEventListener("touchmove",e=>show(idx(e.touches[0].clientX)),{passive:true});
+  if(docked)show(n-1);
+}
+
+(function(){const h=(location.hash||"").slice(1).split("&")[0];if(["oferta","wykres","seria","zamiana"].includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(state.view==="wykres")drawChart();if(state.view==="zamiana")calcRecompute()},150)});
 
 (async()=>{
   try{
     const r=await fetch("data/months.json",{cache:"no-cache"});
     if(!r.ok)throw new Error(r.status);
     const data=await r.json();
+    state.raw=data;
     state.months=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>a.id<b.id?-1:1);
     state.loaded=true;
     const last=state.months[state.months.length-1];
