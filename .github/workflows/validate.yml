@@ -1,9 +1,9 @@
 name: Walidacja danych
 on:
   push:
-    paths: ["data/**", "scripts/**", "js/**"]
+    paths: ["data/**", "scripts/**", "js/**", "index.html"]
   pull_request:
-    paths: ["data/**", "scripts/**", "js/**"]
+    paths: ["data/**", "scripts/**", "js/**", "index.html"]
 jobs:
   validate:
     runs-on: ubuntu-latest

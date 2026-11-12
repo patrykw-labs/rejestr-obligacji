@@ -320,5 +320,10 @@ const tw = toOts.swapEvents.filter((e) => e.kind === "wykup");
 eq("EDO → OTS: OTS odnawiane co 3 miesiące", tw.map((e) => e.t), [3, 6, 9, 12]);
 eq("EDO → OTS: zamiana na OTS po 100,00 zł", tw[0].newCount, Math.floor((tw[0].proceeds + toOts.switchNow.cashRest) / 100));
 
+// wersja silnika w index.html (js/zamiana.js?v=… i CALC_ENGINE_V) musi się zgadzać z Z.VERSION
+const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+eq("index.html ładuje js/zamiana.js z aktualną wersją", (html.match(/js\/zamiana\.js\?v=([^"]+)"/) || [])[1], Z.VERSION);
+eq("index.html sprawdza aktualną wersję silnika", (html.match(/CALC_ENGINE_V="([^"]+)"/) || [])[1], Z.VERSION);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);

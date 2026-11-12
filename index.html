@@ -333,7 +333,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,.chip:focus-within{out
   </div>
 </footer>
 
-<script src="js/zamiana.js"></script>
+<script src="js/zamiana.js?v=2026-11-12.1"></script>
 <script>
 const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};
@@ -363,7 +363,12 @@ function render(){
   if(!state.loaded)return;
   if(!state.months.length){main.innerHTML='<div class="empty"><strong>Archiwum jest puste</strong>Dodaj pierwszy miesiąc do data/months.json.</div>';return}
   if(!state.month||!state.months.find(m=>m.id===state.month))state.month=state.months[state.months.length-1].id;
-  ({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc}[state.view]||renderOffer)(main);
+  const CALC_ENGINE_V="2026-11-12.1";
+  const reload='<button type="button" class="btn" onclick="location.reload()">Odśwież stronę</button>';
+  if(state.view==="zamiana"&&(!window.Zamiana||Zamiana.VERSION!==CALC_ENGINE_V)){
+    main.innerHTML=`<div class="empty"><strong>Kalkulator potrzebuje odświeżenia strony</strong>Przeglądarka ma w pamięci starszą wersję pliku kalkulatora. Odśwież stronę (na komputerze Ctrl+F5, na telefonie przeładuj kartę).<div class="row" style="margin-top:12px">${reload}</div></div>`;return}
+  try{({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc}[state.view]||renderOffer)(main)}
+  catch(e){console.error(e);main.innerHTML=`<div class="empty"><strong>Nie udało się wyświetlić tego widoku</strong>Spróbuj odświeżyć stronę (Ctrl+F5). Jeśli błąd się powtarza, zgłoś go na GitHubie i podaj adres strony. <span class="small">(${esc(e.message)})</span><div class="row" style="margin-top:12px">${reload}</div></div>`}
 }
 
 function monthSelect(id){return `<label class="field"><span class="flabel">Miesiąc oferty</span><span class="sel"><select id="sel-month">${[...state.months].reverse().map(m=>`<option value="${m.id}"${m.id===id?" selected":""}>${mLabel(m.id)}</option>`).join("")}</select></span></label>`}
