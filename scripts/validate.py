@@ -43,6 +43,27 @@ def nxt(i):
 for a, b in zip(ids, ids[1:]):
     if nxt(a) != b: warnings.append(f"luka w archiwum między {a} a {b}")
 
+# data/przed-2019.json — serie i CPI sprzed archiwum, tylko dla kalkulatora zamiany
+PRE = PATH.parent / "przed-2019.json"
+if PRE.exists():
+    pre = json.loads(PRE.read_text(encoding="utf-8"))
+    TERMS = {"EDO": 120, "ROD": 144}
+    for ym, v in (pre.get("cpi", {}).get("values") or {}).items():
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", ym) or ym >= ids[0]:
+            errors.append(f"przed-2019/cpi: miesiąc {ym!r} poza zakresem (przed {ids[0]})")
+        if not isinstance(v, (int, float)): errors.append(f"przed-2019/cpi/{ym}: wartość {v!r}")
+    for code, s in (pre.get("series") or {}).items():
+        t = s.get("type")
+        if t not in TERMS or not code.startswith(t) or not re.fullmatch(r"[A-Z]{3}\d{4}", code):
+            errors.append(f"przed-2019/{code}: zły kod lub typ {t!r}"); continue
+        y, mo = map(int, s.get("purchase", "0-0").split("-")); i = y * 12 + mo - 1 + TERMS[t]
+        if f"{i % 12 + 1:02d}{(i // 12) % 100:02d}" != code[3:]:
+            errors.append(f"przed-2019/{code}: miesiąc zakupu {s.get('purchase')} nie pasuje do kodu")
+        if s.get("purchase", "") >= ids[0]: errors.append(f"przed-2019/{code}: zakup w okresie archiwum miesięcy")
+        for k in ("rate1", "margin", "fee"):
+            if not isinstance(s.get(k), (int, float)): errors.append(f"przed-2019/{code}: brak {k}")
+        if not s.get("source") or not s.get("verifiedAt"): errors.append(f"przed-2019/{code}: brak source lub verifiedAt")
+
 for w in warnings: print("UWAGA:", w)
 for e in errors: print("BŁĄD:", e)
 print(f"{len(ids)} miesięcy ({ids[0]}–{ids[-1]}), błędów: {len(errors)}, uwag: {len(warnings)}")

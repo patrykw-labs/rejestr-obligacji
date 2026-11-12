@@ -235,5 +235,23 @@ const toRor = Z.compare(Object.assign({}, rorBase, { old: { type: "EDO", rate1: 
 eq("cel ROR: okres w miesiącu z archiwum — NBP z archiwum", +(toRor.targetRates[2] * 100).toFixed(2), 3.75);
 eq("cel ROR: okres po archiwum (12.2026) — NBP ze scenariusza", +(toRor.targetRates[7] * 100).toFixed(2), 2);
 
+// ---------------------------------------------------------------------------
+// 5. Serie sprzed 2019 r. (data/przed-2019.json): CPI z GUS i parametry z listów emisyjnych
+// ---------------------------------------------------------------------------
+const pre = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "przed-2019.json"), "utf8"));
+const histAll = Object.assign({}, pre.cpi.values, hist);
+eq("CPI GUS 11.2017 i 11.2018", [histAll["2017-11"], histAll["2018-11"]], [2.5, 1.3]);
+eq("CPI sprzed 2019 łączy się z archiwum (12.2018 z archiwum)", histAll["2018-12"], 1.1);
+const e0127 = pre.series.EDO0127;
+eq("EDO0127 z listu 71/2016", [e0127.purchase, e0127.rate1, e0127.margin, e0127.fee], ["2017-01", 2.7, 1.5, 2]);
+const e0127r = Z.periodRates({ type: "EDO", rate1: e0127.rate1, margin: e0127.margin, purchase: e0127.purchase }, (ym) => histAll[ym]);
+eq("EDO0127: 2. rok = CPI 11.2017 (2,5%) + 1,5", +(e0127r[1] * 100).toFixed(2), 4);
+eq("EDO0127: 3. rok = CPI 11.2018 (1,3%) + 1,5", +(e0127r[2] * 100).toFixed(2), 2.8);
+const e0127c = Z.compare({ now: "2026-11", old: { type: "EDO", rate1: 2.7, margin: 1.5, fee: 2, purchase: "2017-01", count: 10 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: histAll, cpiFuture: [2.5], savingsRate: 4, tax: true });
+eq("EDO0127: do wykupu 2 miesiące", e0127c.horizonMonths, 2);
+eq("EDO0127: historia od 01.2017", [e0127c.past[0].ym, e0127c.past.length], ["2017-01", 119]);
+eq("ROD sprzed 2019: tylko beneficjenci 500+", pre.series.ROD1028.availability, "tylko beneficjenci 500+");
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);

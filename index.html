@@ -512,16 +512,26 @@ const zl0=v=>v==null||isNaN(v)?"–":Math.round(v).toLocaleString("pl-PL")+" zł
 const zl2=v=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł";
 const sgn=(v,f=zl0)=>(v>0?"+":v<0?"−":"")+f(Math.abs(v));
 const calcNow=()=>state.months[state.months.length-1].id;
+const calcPre=()=>state.pre||{cpi:{values:{}},series:{}};
+// historia CPI: odczyty sprzed 2019 r. (data/przed-2019.json) + archiwum miesięcy (ma pierwszeństwo)
+function calcCpiHist(){return Object.assign({},calcPre().cpi?.values||{},Zamiana.cpiHistoryFromMonths(state.raw))}
+// najwcześniejszy miesiąc zakupu, dla którego mamy CPI do wszystkich okresów (odczyt za P−2 od 2. roku)
+function calcMinPurchase(){const k=Object.keys(calcCpiHist()).sort()[0]||"2018-12";return k<"2019-01"?Zamiana.addMonths(k,-10):"2019-01"}
 function calcOptions(){
   const now=calcNow(),out={};
-  for(const m of state.months)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
+  const pre=Object.entries(calcPre().series||{}).sort((a,b)=>a[1].purchase<b[1].purchase?-1:1);
+  const rows=pre.map(([code,s])=>({id:s.purchase,series:{[s.type]:Object.assign({code},s)}})).concat(state.months);
+  for(const m of rows)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
     const info=Zamiana.parseCode(s.code);if(!info)continue;const age=Zamiana.monthsBetween(info.purchase,now);
     if(age<1||age>=Zamiana.TYPES[t].term)continue;(out[t]=out[t]||[]).push(s.code)}
   for(const t in out)out[t].reverse();
   return out;
 }
 function calcTargetFromOffer(t){const s=state.months[state.months.length-1].series?.[t];return s?{tt:t,tr1:s.rate1,tm:s.margin??0,tf:typeof s.fee==="number"?s.fee:0,tcode:s.code}:null}
-function calcFromCode(code){const a=Zamiana.seriesFromArchive(state.raw,code);if(!a||!a.found)return null;return {code,type:a.type,p:a.purchase,r1:a.rate1,m:a.margin,f:a.fee}}
+function calcFromCode(code){const a=Zamiana.seriesFromArchive(state.raw,code);
+  if(a&&a.found)return {code,type:a.type,p:a.purchase,r1:a.rate1,m:a.margin,f:a.fee};
+  const s=(calcPre().series||{})[String(code||"").toUpperCase()];
+  return s?{code:String(code).toUpperCase(),type:s.type,p:s.purchase,r1:s.rate1,m:s.margin,f:s.fee}:null}
 const CALC_MAXPOS=8;
 function calcPosDefault(code){return Object.assign({n:100},calcFromCode(code)||{code:"",type:"EDO",p:Zamiana.addMonths(calcNow(),-24),r1:6,m:1.5,f:2})}
 function calcDefaults(){
@@ -578,7 +588,7 @@ function calcParams(c,o){
   return {now:calcNow(),horizonMonths:c.h==="m"?undefined:Math.round(c.h*12),valuation:c.val,
     old:o?calcSpec(o):undefined,positions:o?undefined:c.pos.map(calcSpec),
     target:{type:c.tt,rate1:+c.tr1,margin:+c.tm,fee:+c.tf},
-    cpiHistory:Zamiana.cpiHistoryFromMonths(state.raw),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,withdrawalTax:c.acc==="ikze"?0.1:0,
+    cpiHistory:calcCpiHist(),cpiFuture:calcCpiPath(c),savingsRate:+c.sv,tax:!c.ike,withdrawalTax:c.acc==="ikze"?0.1:0,
     nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:+c.nbp};
 }
 const calcMaturity=o=>/^\d{4}-\d{2}$/.test(o.p||"")?Zamiana.addMonths(o.p,Zamiana.TYPES[o.type].term):null;
@@ -590,7 +600,7 @@ function calcValidate(c){
     if(!/^\d{4}-\d{2}$/.test(o.p||""))e.push("Podaj miesiąc zakupu.");
     else{const age=Zamiana.monthsBetween(o.p,now);if(age<1)e.push("Miesiąc zakupu musi być wcześniejszy niż "+mLabel(now)+".");
       else if(age>=Zamiana.TYPES[o.type].term)e.push("Te obligacje są już po terminie wykupu — nie ma czego zrywać.");
-      else if(o.p<"2019-01")e.push("Archiwum inflacji zaczyna się od 2019 r. — kalkulator obsługuje obligacje kupione od stycznia 2019.");}
+      else if(o.p<calcMinPurchase())e.push("Historia inflacji GUS w kalkulatorze pozwala liczyć obligacje kupione od "+mLabel(calcMinPurchase())+".");}
     for(const [k,l] of [["r1","oprocentowanie "+(calcIsNbp(o.type)?"1. miesiąca":"1. roku")],["f","opłatę za wykup"]])if(o[k]===""||isNaN(+o[k]))e.push("Uzupełnij "+l+".");
     e.forEach(x=>errs.push(pre+x));});
   for(const [k,l] of [["tr1","oprocentowanie nowej serii"],["tf","opłatę nowej serii"],["sv","oprocentowanie konta"]])if(c[k]===""||isNaN(+c[k]))errs.push("Uzupełnij "+l+".");
@@ -612,7 +622,7 @@ function renderCalc(main){
     const sel=`<label class="field"><span class="flabel">Seria z archiwum</span><span class="sel"><select ${a} data-pk="code"><option value=""${o.code?"":" selected"}>— inna, wpiszę ręcznie —</option>${codeOpts(o.code)}</select></span>${multi?"":'<span class="fnote" id="z-code-note"></span>'}</label>`;
     const nF=`<label class="field"><span class="flabel">Liczba sztuk</span><input ${a} data-pk="n" type="number" min="1" step="1" inputmode="numeric" value="${esc(o.n)}"></label>`;
     const typeF=`<label class="field"><span class="flabel">Typ</span><span class="sel"><select ${a} data-pk="type"${lock}>${selOpts(CALC_TYPES.map(t=>[t,t]),o.type)}</select></span></label>`;
-    const pF=`<label class="field wide"><span class="flabel">Miesiąc zakupu</span><input ${a} data-pk="p"${lock} type="month" min="2019-01" max="${Zamiana.addMonths(now,-1)}" value="${esc(o.p)}"></label>`;
+    const pF=`<label class="field wide"><span class="flabel">Miesiąc zakupu</span><input ${a} data-pk="p"${lock} type="month" min="${calcMinPurchase()}" max="${Zamiana.addMonths(now,-1)}" value="${esc(o.p)}"></label>`;
     const parF=`<div class="frow"><label class="field"><span class="flabel">${calcR1Label(o.type)}, %</span><input ${a} data-pk="r1"${lock} type="number" step="0.01" inputmode="decimal" value="${esc(o.r1)}"></label>
           <label class="field"><span class="flabel">Marża, p.p.</span><input ${a} data-pk="m"${lock} type="number" step="0.01" inputmode="decimal" value="${esc(o.m)}"></label>
           <label class="field"><span class="flabel">Opłata, zł/szt.</span><input ${a} data-pk="f"${lock} type="number" step="0.1" inputmode="decimal" value="${esc(o.f)}"></label></div>`;
@@ -870,6 +880,8 @@ let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>
     if(!r.ok)throw new Error(r.status);
     const data=await r.json();
     state.raw=data;
+    // serie i inflacja sprzed 2019 r. — tylko dla kalkulatora zamiany (brak pliku nie blokuje strony)
+    try{const r2=await fetch("data/przed-2019.json",{cache:"no-cache"});if(r2.ok)state.pre=await r2.json()}catch(e){}
     state.months=Object.entries(data).map(([id,v])=>({id,...v})).sort((a,b)=>a.id<b.id?-1:1);
     state.loaded=true;
     const last=state.months[state.months.length-1];
