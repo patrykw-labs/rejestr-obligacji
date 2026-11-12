@@ -1,0 +1,37 @@
+name: Wydanie
+
+# Po wypchnięciu tagu vX.Y.Z tworzy wydanie na GitHubie z notatkami z .github/release-notes/vX.Y.Z.md
+# (bez pliku — z notatkami wygenerowanymi z listy commitów). Przed wydaniem uruchamia walidację i testy.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Walidacja danych
+        run: python3 scripts/validate.py
+      - name: Testy kalkulatora zamiany
+        run: node scripts/test_zamiana.js
+      - name: Utwórz wydanie
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          NOTES=".github/release-notes/${TAG}.md"
+          if [ -f "$NOTES" ]; then
+            gh release create "$TAG" --verify-tag --title "${TAG} – Rejestr ofert obligacji" --notes-file "$NOTES"
+          else
+            gh release create "$TAG" --verify-tag --title "${TAG} – Rejestr ofert obligacji" --generate-notes
+          fi
