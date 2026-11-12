@@ -1,10 +1,16 @@
 name: Wydanie
 
-# Po wypchnięciu tagu vX.Y.Z tworzy wydanie na GitHubie z notatkami z .github/release-notes/vX.Y.Z.md
-# (bez pliku — z notatkami wygenerowanymi z listy commitów). Przed wydaniem uruchamia walidację i testy.
+# Tworzy wydanie na GitHubie z notatkami z .github/release-notes/vX.Y.Z.md (bez pliku — z notatkami
+# wygenerowanymi z listy commitów). Uruchomienie: wypchnięcie tagu vX.Y.Z albo ręcznie (Actions → Wydanie →
+# Run workflow, pole „tag”) — wtedy tag powstaje na bieżącym commicie gałęzi main. Najpierw walidacja i testy.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Wersja, np. v1.0.0"
+        required: true
 
 permissions:
   contents: write
@@ -27,11 +33,10 @@ jobs:
       - name: Utwórz wydanie
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "Zła wersja: $TAG (oczekiwano vX.Y.Z)"; exit 1;; esac
           NOTES=".github/release-notes/${TAG}.md"
-          if [ -f "$NOTES" ]; then
-            gh release create "$TAG" --verify-tag --title "${TAG} – Rejestr ofert obligacji" --notes-file "$NOTES"
-          else
-            gh release create "$TAG" --verify-tag --title "${TAG} – Rejestr ofert obligacji" --generate-notes
-          fi
+          if [ -f "$NOTES" ]; then SRC=(--notes-file "$NOTES"); else SRC=(--generate-notes); fi
+          if [ "${{ github.event_name }}" = "push" ]; then WHERE=(--verify-tag); else WHERE=(--target "$GITHUB_SHA"); fi
+          gh release create "$TAG" "${WHERE[@]}" --title "${TAG} – Rejestr ofert obligacji" "${SRC[@]}"
