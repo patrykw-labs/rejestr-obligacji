@@ -151,9 +151,11 @@
         age = 0;
       }
 
-      // wartość likwidacyjna netto, gdyby wszystko wypłacić z końcem miesiąca t
+      // wycena z końcem miesiąca t:
+      //  "hold" (domyślnie) — trzymasz dalej: wartość po podatku od narosłych odsetek, bez opłaty za wykup;
+      //  "liquidate" — wypłacasz wszystko: po opłacie i podatku.
       const v = bondValue(spec, age, rates, opts);
-      const gross = v.net * count;            // po opłacie
+      const gross = (opts.valuation === "liquidate" ? v.net : v.gross) * count;
       const gain = gross - costBasis * count;
       const taxDue = tax ? Math.max(0, gain) * taxRate : 0;
       out.push({ t, ym: addMonths(ctx.now, t), spec: spec.type, count, bonds: gross - taxDue, cash, total: gross - taxDue + cash });
@@ -180,12 +182,17 @@
    *   rollover: {type, rate1, margin, fee}   (domyślnie target),
    *   cpiHistory: {"RRRR-MM": %}, cpiFuture: [% rok 1, % rok 2, …],
    *   savingsRate: %, tax: true|false (false = IKE/IKZE), taxRate: 0.19,
-   *   buyPrice: 100, swapPrice: 99.9, roundPerBond: true
+   *   buyPrice: 100, swapPrice: 99.9, roundPerBond: true,
+   *   valuation: "hold" (domyślnie: jedyne zerwanie to zamiana dziś, dalej obie strony trzymają obligacje
+   *              do wykupu i zamieniają po 99,90; wycena bez opłaty za wykup)
+   *            | "liquidate" (wycena jak przy wypłacie wszystkiego, z opłatą)
    * }
    */
   function compare(p) {
     const now = p.now;
-    const H = Math.max(1, Math.round(p.horizonMonths));
+    const oldTerm = TYPES[p.old.type].term;
+    const toMaturity = oldTerm - monthsBetween(p.old.purchase, p.now);
+    const H = Math.max(1, Math.round(p.horizonMonths == null || p.horizonMonths === "maturity" ? toMaturity : p.horizonMonths));
     const taxRate = p.taxRate != null ? p.taxRate : 0.19;
     const tax = p.tax !== false;
     const buyPrice = p.buyPrice || NOMINAL;
@@ -193,7 +200,8 @@
     const future = (p.cpiFuture && p.cpiFuture.length) ? p.cpiFuture : [2.5];
     const cpiAt = makeCpiAt(p.cpiHistory || {}, future, now);
     // taxBasisNominal: podatek od zysku liczony względem 100 zł także po zamianie po 99,90 (zgodność z arkuszem kontrolnym)
-    const opts = { roundPerBond: p.roundPerBond !== false, taxBasisNominal: !!p.taxBasisNominal };
+    const opts = { roundPerBond: p.roundPerBond !== false, taxBasisNominal: !!p.taxBasisNominal,
+      valuation: p.valuation === "liquidate" ? "liquidate" : "hold" };
     const rollover = Object.assign({}, p.rollover || p.target);
     const ctx = { H, cpiAt, tax, taxRate, savingsRate: p.savingsRate || 0, swapPrice, rollover, now, opts };
 
@@ -240,7 +248,7 @@
     for (let t = H; t >= 0; t--) { if (months[t].diff >= 0) breakEvenMonth = t; else break; }
 
     return {
-      now, horizonMonths: H, ageNow: age0,
+      now, horizonMonths: H, ageNow: age0, monthsToMaturity: toMaturity, maturity: addMonths(oldSpec.purchase, oldTerm),
       switchNow: {
         valueBeforeFee: v0.gross * p.old.count, fee: v0.fee * p.old.count, tax: tax0,
         proceeds, newCount, cashRest,

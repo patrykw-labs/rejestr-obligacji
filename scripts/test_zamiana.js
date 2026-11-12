@@ -23,7 +23,7 @@ const ref = {
   rollover: { type: "EDO", rate1: 3.0, margin: 1.5, fee: 2 },
   cpiHistory: { "2023-02": 18.4, "2024-02": 2.8 },
   cpiFuture: [2.5], savingsRate: 4, tax: true,
-  roundPerBond: false, taxBasisNominal: true,
+  roundPerBond: false, taxBasisNominal: true, valuation: "liquidate",
 };
 // wartość „trzymam” (kolumna AB) według wieku starego EDO
 const keepFromStart = Z.compare(Object.assign({}, ref, { now: "2022-04", horizonMonths: 122 })).months;
@@ -41,6 +41,25 @@ const expSwap = { 1: 29462.3056382, 2: 29462.4738635, 12: 30607.2533006, 13: 306
 for (const [t, v] of Object.entries(expSwap)) eq(`arkusz: zamiana, miesiąc ${t}`, sw.months[+t].swap, v);
 eq("arkusz: trzymam w tym samym czasie (wiek 50)", sw.months[26].keep, 31625.8878084);
 eq("arkusz: różnica po 26 mies.", sw.months[26].diff, 31803.3943814 - 31625.8878084);
+
+// Scenariusz kontrolny (10 szt., CPI 2,5%, konto 4%): „po pierwszym roku zamiany 5 zł zysku,
+// po kolejnym 6 zł”, a w roku wykupu starej serii przewaga znika.
+const scen = Z.compare(Object.assign({}, ref, { old: Object.assign({}, ref.old, { count: 10 }), now: "2024-04", horizonMonths: 96 }));
+eq("scen: +5 zł po roku", Math.round(scen.months[12].diff), 5, 0);
+eq("scen: +6 zł po 2 latach", Math.round(scen.months[24].diff), 6, 0);
+eq("scen: w roku wykupu starej serii przewaga znika", Math.abs(scen.months[96].diff) < 5, true);
+
+// ---------------------------------------------------------------------------
+// 1b. Wycena „trzymam” (domyślna): jedyne zerwanie to zamiana dziś, bez przyszłych opłat
+// ---------------------------------------------------------------------------
+const hold = Z.compare(Object.assign({}, ref, { valuation: "hold", now: "2024-04", horizonMonths: undefined }));
+eq("hold: domyślny horyzont = do wykupu starej serii", hold.horizonMonths, 96);
+eq("hold: wykup starej serii", hold.maturity, "2032-04");
+// dziś: różnica = −opłata·(1 − 19%) — opłata pomniejsza też zysk do opodatkowania
+eq("hold: różnica dziś = −opłata po podatku", hold.months[0].diff, -504 * 0.81, 0.01);
+// w miesiącu wykupu „trzymam” = kwota na rękę z wykupu (bez opłaty), zamieniona po 99,90 + reszta
+const keepAtMat = Z.compare(Object.assign({}, ref, { valuation: "liquidate", now: "2024-04", horizonMonths: 96 })).months[96].keep;
+eq("hold: w terminie wykupu wartość jak przy wypłacie", Math.abs(hold.months[96].keep - keepAtMat) < 50, true);
 
 // ---------------------------------------------------------------------------
 // 2. Zasady z listów emisyjnych (domyślnie: zaokrąglenie do groszy na sztukę)
@@ -71,11 +90,16 @@ const coi = Z.compare({
   now: "2026-11", horizonMonths: 13,
   old: { type: "COI", rate1: 6, margin: 1.5, fee: 2, purchase: "2026-11", count: 10 },
   target: { type: "COI", rate1: 6, margin: 1.5, fee: 2 },
-  cpiFuture: [0], savingsRate: 0, tax: true,
+  cpiFuture: [0], savingsRate: 0, tax: true, valuation: "liquidate",
 });
 eq("COI kupon po 12 mies. (netto)", coi.months[12].keep, 10 * 100 + 10 * 6 * 0.81, 0.02);
 // miesiąc 13: 100·(1+0,015/12)=100,13 → opłata 0,13 → 100; + kupon 48,60
 eq("COI po 13 mies.", coi.months[13].keep, 1000 + 48.6, 0.02);
+// „trzymam”: narosłe odsetki 0,125 zł/szt. (zaokrąglone do 100,13 zł/szt.) bez opłaty, po podatku
+const coiH = Z.compare(Object.assign({}, { now: "2026-11", horizonMonths: 13,
+  old: { type: "COI", rate1: 6, margin: 1.5, fee: 2, purchase: "2026-11", count: 10 },
+  target: { type: "COI", rate1: 6, margin: 1.5, fee: 2 }, cpiFuture: [0], savingsRate: 0, tax: true }));
+eq("COI po 13 mies. (trzymam)", coiH.months[13].keep, 1001.3 - 1.3 * 0.19 + 48.6, 0.005);
 
 // IKE/IKZE: bez podatku, opłata zostaje
 const ike = Z.compare({ now: "2026-11", horizonMonths: 1,
