@@ -251,6 +251,8 @@ const e0127c = Z.compare({ now: "2026-11", old: { type: "EDO", rate1: 2.7, margi
   target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiHistory: histAll, cpiFuture: [2.5], savingsRate: 4, tax: true });
 eq("EDO0127: do wykupu 2 miesiące", e0127c.horizonMonths, 2);
 eq("EDO0127: historia od 01.2017", [e0127c.past[0].ym, e0127c.past.length], ["2017-01", 119]);
+eq("EDO z 10–12.2018 z listów 68, 76, 84/2018", ["EDO1028", "EDO1128", "EDO1228"].map((c) => [pre.series[c].purchase, pre.series[c].rate1, pre.series[c].margin, pre.series[c].fee]),
+  [["2018-10", 2.7, 1.5, 2], ["2018-11", 2.7, 1.5, 2], ["2018-12", 2.7, 1.5, 2]]);
 eq("ROD sprzed 2019: tylko beneficjenci 500+", pre.series.ROD1028.availability, "tylko beneficjenci 500+");
 
 console.log(`${pass} OK, ${fail} błędów`);

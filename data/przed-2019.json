@@ -283,6 +283,18 @@
    "verifiedAt": "2026-11-12",
    "verifyNote": "list emisyjny nr 59/2017 z 22.09.2017; opłata = narosłe odsetki, nie więcej niż 2,00 zł"
   },
+  "EDO1028": {
+   "availability": "wszyscy",
+   "fee": 2.0,
+   "margin": 1.5,
+   "purchase": "2018-10",
+   "rate1": 2.7,
+   "source": "https://patrykw-labs.github.io/rejestr-obligacji/data/listy/EDO1028.pdf",
+   "swapPrice": 99.5,
+   "type": "EDO",
+   "verifiedAt": "2026-11-12",
+   "verifyNote": "list emisyjny nr 68/2018 z 21.09.2018; opłata = narosłe odsetki, nie więcej niż 2,00 zł; listu nie ma na obligacjeskarbowe.pl — kopia w repozytorium (data/listy/EDO1028.pdf); cena zamiany 99,50 zł dotyczyła zakupu tej serii w drodze zamiany w 2018 r."
+  },
   "EDO1127": {
    "availability": "wszyscy",
    "fee": 2.0,
@@ -294,6 +306,18 @@
    "type": "EDO",
    "verifiedAt": "2026-11-12",
    "verifyNote": "list emisyjny nr 67/2017 z 24.10.2017; opłata = narosłe odsetki, nie więcej niż 2,00 zł"
+  },
+  "EDO1128": {
+   "availability": "wszyscy",
+   "fee": 2.0,
+   "margin": 1.5,
+   "purchase": "2018-11",
+   "rate1": 2.7,
+   "source": "https://patrykw-labs.github.io/rejestr-obligacji/data/listy/EDO1128.pdf",
+   "swapPrice": 99.9,
+   "type": "EDO",
+   "verifiedAt": "2026-11-12",
+   "verifyNote": "list emisyjny nr 76/2018 z 23.10.2018; opłata = narosłe odsetki, nie więcej niż 2,00 zł; listu nie ma na obligacjeskarbowe.pl — kopia w repozytorium (data/listy/EDO1128.pdf)"
   },
   "EDO1226": {
    "availability": "wszyscy",
@@ -318,6 +342,18 @@
    "type": "EDO",
    "verifiedAt": "2026-11-12",
    "verifyNote": "list emisyjny nr 76/2017 z 23.11.2017; opłata = narosłe odsetki, nie więcej niż 2,00 zł"
+  },
+  "EDO1228": {
+   "availability": "wszyscy",
+   "fee": 2.0,
+   "margin": 1.5,
+   "purchase": "2018-12",
+   "rate1": 2.7,
+   "source": "https://patrykw-labs.github.io/rejestr-obligacji/data/listy/EDO1228.pdf",
+   "swapPrice": 99.9,
+   "type": "EDO",
+   "verifiedAt": "2026-11-12",
+   "verifyNote": "list emisyjny nr 84/2018 z 26.11.2018; opłata = narosłe odsetki, nie więcej niż 2,00 zł; listu nie ma na obligacjeskarbowe.pl — kopia w repozytorium (data/listy/EDO1228.pdf)"
   },
   "ROD0129": {
    "availability": "tylko beneficjenci 500+",
