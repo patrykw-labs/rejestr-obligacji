@@ -126,8 +126,9 @@
       let age = ageAt0 + (t - startT);
       const term = TYPES[spec.type].term;
 
-      // kupony COI wypłacone w tym miesiącu
-      if (TYPES[spec.type].coupon && age > 0 && age % 12 === 0 && age <= term && !paidCoupons.has(age)) {
+      // kupony COI wypłacone w tym miesiącu (kupon z rocznicy przypadającej dziś, t = 0, inwestor dostaje
+      // w obu wariantach — tak jak wcześniejsze kupony nie wchodzi do porównania)
+      if (TYPES[spec.type].coupon && t > 0 && age > 0 && age % 12 === 0 && age <= term && !paidCoupons.has(age)) {
         paidCoupons.add(age);
         const c = NOMINAL * rates[age / 12 - 1] * count;
         const cNet = c * (tax ? 1 - taxRate : 1);
@@ -218,9 +219,9 @@
       const per = opts.valuation === "liquidate" ? v.net : v.gross;
       const gross = per * p.old.count;
       const gain = gross - NOMINAL * p.old.count;
-      // kupony COI wypłacone do tego miesiąca (netto) — w historii bez oprocentowania konta
-      const coupons = v.coupons.reduce((sum, c) => sum + c.amount, 0) * p.old.count * (tax ? 1 - taxRate : 1);
-      past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: gross - (tax ? Math.max(0, gain) * taxRate : 0) + coupons });
+      // kupony COI wypłacone przed dziś są już u inwestora i nie zmieniają porównania — pomijamy je
+      // (tak samo jak prognoza od dziś), więc historia łączy się z wartością „dziś” bez skoku
+      past.push({ t: a - age0, ym: addMonths(oldSpec.purchase, a), value: gross - (tax ? Math.max(0, gain) * taxRate : 0) });
     }
 
     // A: trzymam
@@ -274,6 +275,66 @@
     };
   }
 
+  /**
+   * Portfel kilku serii: każda pozycja liczona osobno funkcją compare (te same założenia i ta sama seria docelowa,
+   * wspólny horyzont), wyniki sumowane miesiąc po miesiącu.
+   * p = jak w compare, ale zamiast old: positions: [{type, rate1, margin, fee, purchase, count}, …].
+   * Domyślny horyzont = wykup najpóźniej zapadającej serii.
+   * Zamiana opłaca się dla pozycji, której różnica na koniec horyzontu jest dodatnia; wariant „best” = zamiana
+   * tylko takich pozycji (reszta trzymana), „all” = zamiana wszystkich.
+   */
+  function comparePortfolio(p) {
+    const pos = p.positions || [];
+    if (!pos.length) throw new Error("Portfel jest pusty");
+    const now = p.now;
+    const toMat = pos.map((o) => TYPES[o.type].term - monthsBetween(o.purchase, now));
+    const H = Math.max(1, Math.round(p.horizonMonths == null || p.horizonMonths === "maturity" ? Math.max(...toMat) : p.horizonMonths));
+    const results = pos.map((o) => compare(Object.assign({}, p, { old: o, horizonMonths: H })));
+    const pick = results.map((r) => r.atHorizon.diff > 0);
+    const anyPick = pick.some(Boolean);
+
+    const months = [];
+    for (let t = 0; t <= H; t++) {
+      const m = { t, ym: results[0].months[t].ym, keep: 0, swapAll: 0, best: 0, keepReal: 0, swapAllReal: 0, bestReal: 0 };
+      results.forEach((r, i) => {
+        const x = r.months[t];
+        m.keep += x.keep; m.swapAll += x.swap; m.best += pick[i] ? x.swap : x.keep;
+        m.keepReal += x.keepReal; m.swapAllReal += x.swapReal; m.bestReal += pick[i] ? x.swapReal : x.keepReal;
+      });
+      m.diffAll = m.swapAll - m.keep; m.diffAllReal = m.swapAllReal - m.keepReal;
+      m.diffBest = m.best - m.keep; m.diffBestReal = m.bestReal - m.keepReal;
+      months.push(m);
+    }
+
+    // historia: suma wartości od najwcześniejszego zakupu (serie kupione później dochodzą w miesiącu zakupu)
+    const first = pos.map((o) => o.purchase).sort()[0];
+    const age = monthsBetween(first, now);
+    const past = [];
+    for (let a = 0; a <= age; a++) {
+      const ym = addMonths(first, a);
+      let value = 0;
+      for (const r of results) { const e = r.past.find((x) => x.ym === ym); if (e) value += e.value; }
+      past.push({ t: a - age, ym, value });
+    }
+
+    const sumSwitch = (which) => {
+      const s = { valueBeforeFee: 0, fee: 0, tax: 0, proceeds: 0, newCount: 0, cashRest: 0, cost: 0 };
+      results.forEach((r, i) => { if (!which(i)) return; for (const k in s) s[k] += r.switchNow[k]; });
+      return s;
+    };
+    const lastBE = (k) => { let b = null; for (let t = H; t >= 0; t--) { if (months[t][k] >= 0) b = t; else break; } return b; };
+    const last = months[H];
+    return {
+      now, horizonMonths: H, latestMaturity: results.map((r) => r.maturity).sort().pop(),
+      positions: results.map((r, i) => ({ spec: pos[i], result: r, swap: pick[i], diff: r.atHorizon.diff, diffReal: r.atHorizon.diffReal })),
+      anyPick, months, past,
+      switchAll: sumSwitch(() => true), switchBest: sumSwitch((i) => pick[i]),
+      atHorizon: { keep: last.keep, swapAll: last.swapAll, best: last.best, diffAll: last.diffAll, diffBest: last.diffBest,
+        keepReal: last.keepReal, swapAllReal: last.swapAllReal, bestReal: last.bestReal, diffAllReal: last.diffAllReal, diffBestReal: last.diffBestReal },
+      breakEvenMonthAll: lastBE("diffAll"), breakEvenMonthBest: anyPick ? lastBE("diffBest") : null,
+    };
+  }
+
   /** Stała przyszła inflacja, przy której różnica na koniec horyzontu = 0 (bisekcja). */
   function breakEvenInflation(p, lo = -2, hi = 25) {
     const f = (c) => compare(Object.assign({}, p, { cpiFuture: [c] })).atHorizon.diff;
@@ -311,7 +372,7 @@
     });
   }
 
-  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, breakEvenInflation,
+  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation,
     cpiHistoryFromMonths, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;

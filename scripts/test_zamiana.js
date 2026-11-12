@@ -131,6 +131,33 @@ const bi = Z.breakEvenInflation(Object.assign({}, ref, { now: "2024-04", horizon
 eq("próg inflacji zwraca wynik", typeof bi === "number" || (bi && bi.none === true), true);
 
 // ---------------------------------------------------------------------------
+// 2b. Portfel kilku serii: suma pozycji liczonych osobno
+// ---------------------------------------------------------------------------
+const pfBase = { now: "2024-04", target: ref.target, cpiHistory: ref.cpiHistory, cpiFuture: [2.5], savingsRate: 4, tax: true };
+const posA = { type: "EDO", rate1: 2.7, margin: 1.25, fee: 2, purchase: "2022-04", count: 50 };   // wykup 04.2032
+const posB = { type: "COI", rate1: 1.3, margin: 0.75, fee: 0.7, purchase: "2021-04", count: 30 }; // wykup 04.2025
+const pf = Z.comparePortfolio(Object.assign({}, pfBase, { positions: [posA, posB] }));
+eq("portfel: domyślny horyzont = wykup najpóźniejszej serii", pf.horizonMonths, 96);
+eq("portfel: najpóźniejszy wykup", pf.latestMaturity, "2032-04");
+const one = (o) => Z.compare(Object.assign({}, pfBase, { old: o, horizonMonths: 96 }));
+const rA = one(posA), rB = one(posB);
+eq("portfel: trzymam = suma pozycji", pf.atHorizon.keep, rA.atHorizon.keep + rB.atHorizon.keep);
+eq("portfel: zamieniam wszystko = suma pozycji", pf.atHorizon.swapAll, rA.atHorizon.swap + rB.atHorizon.swap);
+eq("portfel: wybór pozycji wg różnicy", pf.positions.map((x) => x.swap), [rA.atHorizon.diff > 0, rB.atHorizon.diff > 0]);
+eq("portfel: wariant „wybrane” nie gorszy niż trzymanie", pf.atHorizon.diffBest >= 0, true);
+eq("portfel: wariant „wybrane” nie gorszy niż zamiana wszystkiego", pf.atHorizon.best >= pf.atHorizon.swapAll - 1e-9, true);
+eq("portfel: koszt zerwania wszystkiego = suma", pf.switchAll.cost, rA.switchNow.cost + rB.switchNow.cost);
+eq("portfel: historia od najwcześniejszego zakupu", pf.past[0].ym, "2021-04");
+eq("portfel: historia do 04.2022 tylko COI", pf.past[11].value, rB.past[11].value);
+eq("COI w rocznicę: kupon w obu wariantach, różnica dziś = 0", rB.months[0].diff, 0);
+eq("COI: historia łączy się z „dziś” (bez wypłaconych kuponów)", rB.past[rB.past.length - 1].value, rB.months[0].keep);
+eq("portfel: historia łączy się z dziś", pf.past[pf.past.length - 1].value, pf.months[0].keep);
+const pf1 = Z.comparePortfolio(Object.assign({}, pfBase, { positions: [posA] }));
+eq("portfel z jedną serią = compare", pf1.atHorizon.diffAll, Z.compare(Object.assign({}, pfBase, { old: posA })).atHorizon.diff);
+threw = false; try { Z.comparePortfolio(Object.assign({}, pfBase, { positions: [] })); } catch (e) { threw = true; }
+eq("pusty portfel → błąd", threw, true);
+
+// ---------------------------------------------------------------------------
 // 3. Dane z archiwum (data/months.json)
 // ---------------------------------------------------------------------------
 const months = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "months.json"), "utf8"));
