@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/* Testy silnika kalkulatora zamiany (js/zamiana.js). Uruchom: node scripts/test_zamiana.js */
+"use strict";
+const path = require("path");
+const fs = require("fs");
+const Z = require(path.join(__dirname, "..", "js", "zamiana.js"));
+
+let pass = 0, fail = 0;
+function eq(name, got, exp, tol = 0.01) {
+  const ok = typeof exp === "number" ? Math.abs(got - exp) <= tol : JSON.stringify(got) === JSON.stringify(exp);
+  if (ok) pass++; else { fail++; console.log(`✗ ${name}: oczekiwano ${JSON.stringify(exp)}, jest ${JSON.stringify(got)}`); }
+}
+
+// ---------------------------------------------------------------------------
+// 1. Zgodność z niezależnym arkuszem kontrolnym (scenariusz zamiany EDO na EDO)
+//    252 szt. „starego EDO” z 04.2022 (2,70% / marża 1,25%, opłata 2 zł),
+//    CPI dla okresów: 18,4% (II 2023), 2,8% (II 2024), dalej 2,5%; konto 4%; podatek 19%.
+//    Arkusz nie zaokrągla wartości do groszy na sztukę i liczy podatek od 100 zł.
+// ---------------------------------------------------------------------------
+const ref = {
+  old: { type: "EDO", rate1: 2.7, margin: 1.25, fee: 2, purchase: "2022-04", count: 252 },
+  target: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2 },
+  rollover: { type: "EDO", rate1: 3.0, margin: 1.5, fee: 2 },
+  cpiHistory: { "2023-02": 18.4, "2024-02": 2.8 },
+  cpiFuture: [2.5], savingsRate: 4, tax: true,
+  roundPerBond: false, taxBasisNominal: true,
+};
+// wartość „trzymam” (kolumna AB) według wieku starego EDO
+const keepFromStart = Z.compare(Object.assign({}, ref, { now: "2022-04", horizonMonths: 122 })).months;
+const expKeep = { 1: 25200, 11: 25296.957, 12: 25342.884, 13: 25686.1551555, 23: 29118.8667105,
+  24: 29462.137866, 25: 29546.7908913, 36: 30477.9741696, 37: 30559.5310889, 48: 31456.6572009,
+  50: 31625.8878084, 121: 38596.4851523, 122: 38596.7456622 };
+for (const [age, v] of Object.entries(expKeep)) eq(`arkusz: trzymam, wiek ${age}`, keepFromStart[+age].keep, v);
+
+// zamiana po 24 miesiącach (kolumny AH–AT)
+const sw = Z.compare(Object.assign({}, ref, { now: "2024-04", horizonMonths: 30 }));
+eq("arkusz: liczba nowych obligacji", sw.switchNow.newCount, 294);
+eq("arkusz: reszta na konto", sw.switchNow.cashRest, 62.137866);
+const expSwap = { 1: 29462.3056382, 2: 29462.4738635, 12: 30607.2533006, 13: 30692.2044301, 24: 31626.6980145,
+  25: 31715.0459564, 26: 31803.3943814 };
+for (const [t, v] of Object.entries(expSwap)) eq(`arkusz: zamiana, miesiąc ${t}`, sw.months[+t].swap, v);
+eq("arkusz: trzymam w tym samym czasie (wiek 50)", sw.months[26].keep, 31625.8878084);
+eq("arkusz: różnica po 26 mies.", sw.months[26].diff, 31803.3943814 - 31625.8878084);
+
+// ---------------------------------------------------------------------------
+// 2. Zasady z listów emisyjnych (domyślnie: zaokrąglenie do groszy na sztukę)
+// ---------------------------------------------------------------------------
+const flat = (c) => () => c;
+// opłata nie wyższa niż narosłe odsetki: 1 miesiąc EDO 6% → 0,50 zł odsetek, opłata 3 zł → 0,50
+const e1 = { type: "EDO", rate1: 6, margin: 2, fee: 3, purchase: "2026-01" };
+const v1 = Z.bondValue(e1, 1, Z.periodRates(e1, flat(3)));
+eq("opłata ograniczona do odsetek: brutto", v1.gross, 100.5);
+eq("opłata ograniczona do odsetek: opłata", v1.fee, 0.5);
+eq("opłata ograniczona do odsetek: netto", v1.net, 100);
+// pełna opłata po 7 miesiącach: 100·(1+0,06·7/12) = 103,50 → 103,50 − 3 = 100,50
+eq("pełna opłata", Z.bondValue(e1, 7, Z.periodRates(e1, flat(3))).net, 100.5);
+// ujemna inflacja = 0 → stopa = marża
+eq("ujemne CPI → marża", Z.periodRates(e1, flat(-1.2))[1], 0.02, 1e-12);
+// CPI za miesiąc P−2: okres 2 EDO z 01.2026 zaczyna się 01.2027 → CPI za 11.2026
+let asked = null;
+Z.periodRates(e1, (ym) => { if (!asked) asked = ym; return 2; });
+eq("CPI dla okresu 2 = odczyt za P−2", asked, "2026-11");
+// wartość w terminie: 100·1,06·1,05^9, zaokrąglona do groszy
+const vT = Z.bondValue(e1, 120, Z.periodRates(e1, flat(3)));
+eq("EDO w terminie", vT.gross, Math.round(100 * 1.06 * Math.pow(1.05, 9) * 100) / 100);
+eq("EDO w terminie bez opłaty", vT.fee, 0);
+// TOS: stała stopa przez 3 lata
+Z.periodRates({ type: "TOS", rate1: 4.4, margin: 0, purchase: "2026-11" }, flat(9)).forEach((r, i) => eq(`TOS stała stopa, okres ${i + 1}`, r, 0.044, 1e-12));
+// COI: kupon roczny netto na konto; przedterminowy wykup liczy tylko odsetki bieżącego okresu
+const coi = Z.compare({
+  now: "2026-11", horizonMonths: 13,
+  old: { type: "COI", rate1: 6, margin: 1.5, fee: 2, purchase: "2026-11", count: 10 },
+  target: { type: "COI", rate1: 6, margin: 1.5, fee: 2 },
+  cpiFuture: [0], savingsRate: 0, tax: true,
+});
+eq("COI kupon po 12 mies. (netto)", coi.months[12].keep, 10 * 100 + 10 * 6 * 0.81, 0.02);
+// miesiąc 13: 100·(1+0,015/12)=100,13 → opłata 0,13 → 100; + kupon 48,60
+eq("COI po 13 mies.", coi.months[13].keep, 1000 + 48.6, 0.02);
+
+// IKE/IKZE: bez podatku, opłata zostaje
+const ike = Z.compare({ now: "2026-11", horizonMonths: 1,
+  old: { type: "EDO", rate1: 6, margin: 2, fee: 3, purchase: "2025-11", count: 10 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiFuture: [3], savingsRate: 0, tax: false });
+eq("IKE: podatek 0", ike.switchNow.tax, 0);
+eq("IKE: wpływ = (106 − 3) · 10", ike.switchNow.proceeds, 1030);
+eq("IKE: 10 nowych obligacji", ike.switchNow.newCount, 10);
+
+// z podatkiem: zysk (103 − 100)·10 = 30 → podatek 5,70 → 1024,30 → 10 szt. + 24,30 zł
+const tx = Z.compare(Object.assign({}, { now: "2026-11", horizonMonths: 1,
+  old: { type: "EDO", rate1: 6, margin: 2, fee: 3, purchase: "2025-11", count: 10 },
+  target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 }, cpiFuture: [3], savingsRate: 0 }));
+eq("podatek przy zerwaniu", tx.switchNow.tax, 5.7);
+eq("reszta na konto", tx.switchNow.cashRest, 24.3);
+
+// błędy wejścia
+let threw = false; try { Z.compare(Object.assign({}, ref, { now: "2021-01", horizonMonths: 12 })); } catch (e) { threw = true; }
+eq("zakup po dacie zamiany → błąd", threw, true);
+
+// próg inflacji: wynik liczbowy albo informacja, że znak się nie zmienia
+const bi = Z.breakEvenInflation(Object.assign({}, ref, { now: "2024-04", horizonMonths: 72 }));
+eq("próg inflacji zwraca wynik", typeof bi === "number" || (bi && bi.none === true), true);
+
+// ---------------------------------------------------------------------------
+// 3. Dane z archiwum (data/months.json)
+// ---------------------------------------------------------------------------
+const months = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "months.json"), "utf8"));
+eq("kod EDO0434", Z.parseCode("EDO0434"), { type: "EDO", maturity: "2034-04", purchase: "2024-04" });
+eq("kod COI1130 → zakup 11.2026", Z.parseCode("COI1130").purchase, "2026-11");
+eq("kod niepoprawny", Z.parseCode("XYZ"), null);
+const s1 = Z.seriesFromArchive(months, "EDO1136");
+eq("seria z archiwum: EDO1136 znaleziona", s1.found, true);
+eq("seria z archiwum: EDO1136 oprocentowanie", s1.rate1, 5.35);
+eq("seria z archiwum: EDO1136 marża", s1.margin, 2);
+eq("seria z archiwum: EDO1136 opłata", s1.fee, 3);
+const hist = Z.cpiHistoryFromMonths(months);
+eq("CPI za 02.2023 z archiwum", hist["2023-02"], 18.4);
+eq("CPI za 02.2024 z archiwum", hist["2024-02"], 2.8);
+
+console.log(`${pass} OK, ${fail} błędów`);
+process.exit(fail ? 1 : 0);
