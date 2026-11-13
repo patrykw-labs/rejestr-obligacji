@@ -92,6 +92,15 @@ function pngWatermark(ctx,cx,cy,span,col,font){
 async function downloadChartPng(chartEl,name,title,subtitle){try{downloadBlob(await chartPngBlob(chartEl,title,subtitle),name)}catch(e){alert(e.message)}}
 // przyciski eksportu (prefix id: z, b, p); png=false — tylko CSV
 const exportRowHtml=(p,png=true,csvLabel="tabela CSV")=>`<div class="row"><span class="small">Pobierz:</span>${png?`<button type="button" class="btn" id="${p}-png" data-goatcounter-click="eksport-png-${p}">wykres PNG</button>`:""}<button type="button" class="btn" id="${p}-csv" data-goatcounter-click="eksport-csv-${p}">${csvLabel}</button></div>`;
+// „Wyczyść ustawienia” z cofnięciem (kalkulator zamiany, Co kupić?, Mój portfel): id `${p}-reset` i `${p}-undo`
+const resetRowHtml=(p,isDef,undo,what)=>`<div class="row"><button type="button" class="btn" id="${p}-reset"${isDef?" disabled":""} title="${isDef?"Ustawienia są domyślne":"Przywróć ustawienia jak przy pierwszym wejściu: "+what}">↺ Wyczyść ustawienia</button>${undo?`<span class="small" role="status">Wyczyszczono. <button type="button" class="linkbtn" id="${p}-undo">Cofnij</button></span>`:""}</div>`;
+// stan widoku w state[key] (+ legenda wykresu state[visKey]); fresh() — stan domyślny; render() — przerysowanie
+function viewReset(key,visKey,fresh,render){state[key+"Undo"]={v:JSON.parse(JSON.stringify(state[key])),vis:visKey?Object.assign({},state[visKey]||{}):null};state[key+"UndoFresh"]=true;
+  state[key]=fresh();if(visKey)state[visKey]={};render()}
+function viewUndo(key,visKey,render){const u=state[key+"Undo"];if(!u)return;state[key]=u.v;if(visKey)state[visKey]=u.vis;state[key+"Undo"]=null;render()}
+// cofnięcie pokazujemy tylko w widoku tuż po wyczyszczeniu
+function viewUndoShown(key){const u=state[key+"UndoFresh"]?state[key+"Undo"]:null;state[key+"UndoFresh"]=false;return u}
+function viewResetBind(p,key,visKey,fresh,render){const r=$("#"+p+"-reset");if(r)r.addEventListener("click",()=>viewReset(key,visKey,fresh,render));const u=$("#"+p+"-undo");if(u)u.addEventListener("click",()=>viewUndo(key,visKey,render))}
 const fileSafe=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ł/g,"l").replace(/Ł/g,"L").replace(/[^A-Za-z0-9.-]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
 
 function seriesKeys(rec){const s=rec?.series||{};const ks=Object.keys(s);return [...SERIES.filter(k=>ks.includes(k)),...ks.filter(k=>!SERIES.includes(k)).sort()]}

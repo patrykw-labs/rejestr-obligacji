@@ -55,6 +55,7 @@ function pfParams(s){
 function renderPortfolio(main){
   if(!state.pf)state.pf=pfFromHash()||pfDefaults();
   const s=state.pf,now=pfNow(),opts=calcOptions(now);
+  const undo=viewUndoShown("pf"),isDef=pfHash(s)===pfHash(pfDefaults());
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
   const posHtml=(o,i)=>{const a=calcFromCode(o.code),mat=a?Zamiana.addMonths(a.p,Zamiana.TYPES[a.type].term):null;
     return `<div class="pos"><div class="pos-head"><b>${i+1}. ${esc(o.code)}</b>${s.pos.length>1?`<button type="button" class="pos-del" data-pdel="${i}" aria-label="Usuń serię ${i+1}">usuń</button>`:""}</div>
@@ -63,7 +64,8 @@ function renderPortfolio(main){
         <label class="field"><span class="flabel">Dzień${calcTip("ppd")}</span><input data-pi="${i}" data-pk="pd" type="number" min="1" max="31" step="1" inputmode="numeric" value="${esc(o.pd)}"></label></div>
       ${a?`<span class="fnote">zakup ${mShort(a.p)} · wykup ${mShort(mat)} · ${calcR1Label(a.type)} ${fmt(a.r1)}%${a.type==="OTS"||a.type==="TOS"?"":` · marża ${fmt(a.m)} p.p.`} · ${a.type==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(a.f)} zł/szt.`}</span>`:""}</div>`};
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 6 · mój portfel</p><h2>Ile są warte <span class="acc">moje obligacje</span>?</h2><p class="desc">Wpisz serie, które masz: zobaczysz ich wartość na ${esc(pfDate(now,s.bd))}, ile dostaniesz na rękę po zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania. Bez zamiany — czy opłaca się zamienić je na nowe, sprawdzisz w kalkulatorze zamiany.</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 6 · mój portfel</p><h2>Ile są warte <span class="acc">moje obligacje</span>?</h2><p class="desc">Wpisz serie, które masz: zobaczysz ich wartość na ${esc(pfDate(now,s.bd))}, ile dostaniesz na rękę po zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania. Bez zamiany — czy opłaca się zamienić je na nowe, sprawdzisz w kalkulatorze zamiany.</p></div>
+      ${resetRowHtml("p",isDef,undo,"przykładowa seria EDO, wycena na dziś, zwykły rachunek")}</div>
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}
@@ -84,6 +86,7 @@ function renderPortfolio(main){
   $("#p-bd").addEventListener("input",e=>{s.bd=e.target.value;pfRecompute()});
   main.querySelectorAll("button.chip[data-pacc]").forEach(b=>b.addEventListener("click",()=>{s.acc=b.dataset.pacc;renderPortfolio(main)}));
   main.querySelectorAll("button.chip[data-psc]").forEach(b=>b.addEventListener("click",()=>{s.sc=b.dataset.psc;renderPortfolio(main)}));
+  viewResetBind("p","pf",null,pfDefaults,()=>renderPortfolio(main));
   calcBindTips(main.querySelector(".calc-grid"));
   pfRecompute();
 }

@@ -50,8 +50,10 @@ function buyRuleTxt(c){
 function renderBuy(main){
   if(!state.buy)state.buy=buyFromHash()||buyDefaults();
   const b=state.buy,off=buyOffer(),yrs=Math.min(12,Math.max(1,Math.ceil(b.h/12)));
+  const undo=viewUndoShown("buy"),isDef=buyHash(b)===buyHash(buyDefaults())&&!Object.keys(state.buyVis||{}).length;
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 5 · co kupić</p><h2>Która seria da najwięcej <span class="acc">na rękę</span>?</h2><p class="desc">Porównuje serie z oferty na ${esc(mLabel(off.id))} dla tej samej kwoty i okresu: ile dostaniesz, wypłacając wszystko na koniec — po opłacie za przedterminowy wykup i podatku. Seria, która w tym czasie wykupi się w terminie, zamienia się na taką samą na dzisiejszych warunkach.</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 5 · co kupić</p><h2>Która seria da najwięcej <span class="acc">na rękę</span>?</h2><p class="desc">Porównuje serie z oferty na ${esc(mLabel(off.id))} dla tej samej kwoty i okresu: ile dostaniesz, wypłacając wszystko na koniec — po opłacie za przedterminowy wykup i podatku. Seria, która w tym czasie wykupi się w terminie, zamienia się na taką samą na dzisiejszych warunkach.</p></div>
+      ${resetRowHtml("b",isDef,undo,"10 000 zł na 5 lat, inflacja 2,5%, zwykły rachunek")}</div>
     <div class="calc-grid">
       <div class="card">
         <h3>Kwota i okres</h3>
@@ -87,6 +89,7 @@ function renderBuy(main){
   main.querySelectorAll("button.chip[data-bsc]").forEach(x=>x.addEventListener("click",()=>{if(x.dataset.bsc==="custom"&&b.sc!=="custom"){const v=CPI_PRESETS[b.sc]?.v??2.5;b.cpi=Array(12).fill(v)}b.sc=x.dataset.bsc;renderBuy(main)}));
   main.querySelectorAll("button.chip[data-bacc]").forEach(x=>x.addEventListener("click",()=>{b.acc=x.dataset.bacc;renderBuy(main)}));
   main.querySelectorAll("input[data-bcpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.bcpi,v=parseFloat(el.value);if(!isNaN(v)){b.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)b.cpi[j]=v;}buyRecompute()}));
+  viewResetBind("b","buy","buyVis",buyDefaults,()=>renderBuy(main));
   calcBindTips(main.querySelector(".calc-grid"));
   buyRecompute();
 }

@@ -108,8 +108,11 @@ const CASES = [
     }
     await ctx.close();
   }
-  // kalkulator: „Wyczyść ustawienia” przywraca stan domyślny, „Cofnij” — poprzedni
-  {
+  // „Wyczyść ustawienia” przywraca stan domyślny, „Cofnij” — poprzedni (kalkulator, Co kupić?, Mój portfel)
+  const RESET = [["#zamiana&pf=EDO0127~40~10,EDO0434~100~15&tt=EDO&bd=12&sc=high", "z", "#z-out .verdict", /pf=EDO0127~40~10,EDO0434~100~15.*sc=high/],
+    ["#kupno&kw=25000&h=36&sc=high&sv=5&ike=1&r8=1", "b", "#b-out .verdict", /kw=25000&h=36&sc=high/],
+    ["#portfel&pf=ROD0137~20~3,TOS1127~15&bd=28&ike=1&sc=high", "p", "#p-out .stats", /pf=ROD0137~20~3,TOS1127~15.*ike=1&sc=high/]];
+  for (const [hash, p, ready, keep] of RESET) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await ctx.newPage();
     const errors = [];
@@ -117,20 +120,20 @@ const CASES = [
     await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
     let problem = null;
     try {
-      await page.goto(base + "#zamiana&pf=EDO0127~40~10,EDO0434~100~15&tt=EDO&bd=12&sc=high");
-      await page.waitForSelector("#z-out .verdict");
-      await page.click("#z-reset");
-      await page.waitForSelector("#z-undo");
+      await page.goto(base + hash);
+      await page.waitForSelector(ready);
+      await page.click(`#${p}-reset`);
+      await page.waitForSelector(`#${p}-undo`);
       const h1 = await page.evaluate(() => location.hash);
-      if (/pf=|sc=high/.test(h1)) problem = "po wyczyszczeniu adres ma stare ustawienia: " + h1;
-      if (!(await page.isDisabled("#z-reset"))) problem = "po wyczyszczeniu przycisk powinien być nieaktywny";
-      await page.click("#z-undo");
-      await page.waitForSelector("#z-out .verdict");
+      if (keep.test(h1)) problem = "po wyczyszczeniu adres ma stare ustawienia: " + h1;
+      if (!(await page.isDisabled(`#${p}-reset`))) problem = "po wyczyszczeniu przycisk powinien być nieaktywny";
+      await page.click(`#${p}-undo`);
+      await page.waitForSelector(ready);
       const h2 = await page.evaluate(() => location.hash);
-      if (!/pf=EDO0127~40~10,EDO0434~100~15/.test(h2) || !/sc=high/.test(h2)) problem = "cofnięcie nie przywróciło ustawień: " + h2;
+      if (!keep.test(h2)) problem = "cofnięcie nie przywróciło ustawień: " + h2;
     } catch (e) { problem = e.message.split("\n")[0]; }
     if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
-    if (problem) { fail++; console.log("✗ kalkulator — reset: " + problem); } else pass++;
+    if (problem) { fail++; console.log(`✗ reset ${p}: ${problem}`); } else pass++;
     await ctx.close();
   }
   try {

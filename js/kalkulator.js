@@ -147,13 +147,12 @@ function calcValidate(c){
 function selOpts(list,cur){return list.map(([v,l])=>`<option value="${esc(v)}"${String(v)===String(cur)?" selected":""}>${esc(l)}</option>`).join("")}
 // stan domyślny (jak przy pierwszym wejściu, bez parametrów w adresie)
 function calcFresh(){const saved=state.calc;state.calc=null;const d=calcDefaults();state.calc=saved;return d}
-// „Wyczyść ustawienia”: domyślny formularz, legenda i oś wykresu; poprzedni stan do cofnięcia
-function calcReset(main){state.calcUndo={calc:JSON.parse(JSON.stringify(state.calc)),vis:Object.assign({},state.calcVis||{}),range:state.calcRange};state.calcUndoFresh=true;
-  state.calc=calcFresh();state.calcVis={};state.calcRange=undefined;renderCalc(main)}
-function calcUndoReset(main){const u=state.calcUndo;if(!u)return;state.calc=u.calc;state.calcVis=u.vis;state.calcRange=u.range;state.calcUndo=null;renderCalc(main)}
+// „Wyczyść ustawienia”: domyślny formularz, legenda i oś wykresu; poprzedni stan do cofnięcia (viewReset w app.js; oś wykresu osobno)
+function calcReset(main){state.calcRangeUndo=state.calcRange;state.calcRange=undefined;viewReset("calc","calcVis",calcFresh,()=>renderCalc(main))}
+function calcUndoReset(main){if(state.calcUndo)state.calcRange=state.calcRangeUndo;viewUndo("calc","calcVis",()=>renderCalc(main))}
 function renderCalc(main){
   if(!state.calc)state.calc=calcFromHash()||calcDefaults();
-  const undo=state.calcUndoFresh?state.calcUndo:null;state.calcUndoFresh=false;
+  const undo=viewUndoShown("calc");
   const isDef=calcHash(state.calc)===calcHash(calcFresh())&&!Object.keys(state.calcVis||{}).length&&!state.calcRange;
   const c=state.calc,now=calcNow(),opts=calcOptions(),offer=calcOfferRec(now),multi=c.pos.length>1,today=calcIsToday(),past=now<calcArchiveNow();
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
@@ -179,7 +178,7 @@ function renderCalc(main){
   };
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je${today?" dziś":""}</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii ${calcDo()} liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div>
-      <div class="row"><button type="button" class="btn" id="z-reset"${isDef?" disabled":""} title="${isDef?"Ustawienia są domyślne":"Przywróć ustawienia jak przy pierwszym wejściu: przykładowa seria, oferta z bieżącego miesiąca, inflacja 2,5%"}">↺ Wyczyść ustawienia</button>${undo?`<span class="small" role="status">Wyczyszczono. <button type="button" class="linkbtn" id="z-undo">Cofnij</button></span>`:""}</div></div>
+      ${resetRowHtml("z",isDef,undo,"przykładowa seria, oferta z bieżącego miesiąca, inflacja 2,5%")}</div>
     <div class="calc-grid">
       <div class="card">
         <h3>Twoje obligacje${multi?` <small>portfel · ${c.pos.length} serii</small>`:""}</h3>
@@ -385,7 +384,7 @@ function calcRecompute(){
     <details class="how"><summary>Jak to policzono</summary><ul>
       <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(r.ageNow)}): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
-      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (${calcDo()} z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po ${calcSwapTxt(c.tt)} na nową serię ${esc(tgtCode)} na warunkach z oferty ${mShort(calcOfferRec(calcNow()).id)}. <b>Zamieniam:</b> zrywasz ${calcD()} (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
       ${calcFutureBuysHtml(c,events)}
@@ -443,7 +442,7 @@ function calcRecomputePortfolio(out,c,now){
     <details class="how"><summary>Jak to policzono</summary><ul>
       ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
-      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (${calcDo()} z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz ${calcD()} i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł z serii zrywanych ${calcD()} łączymy przy zakupie${(pick?r.switchBest:r.switchAll).pooledExtra?` — tu daje to ${(pick?r.switchBest:r.switchAll).pooledExtra} szt. więcej`:" (tu nie dają dodatkowej obligacji)"}; przy późniejszych wykupach w terminie reszta zostaje przy każdej serii osobno. Decyzja „zamień/trzymaj” dla serii jest liczona bez tego łączenia.</li>
       ${calcFutureBuysHtml(c,events)}
