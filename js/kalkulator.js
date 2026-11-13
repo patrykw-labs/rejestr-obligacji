@@ -35,8 +35,8 @@ const calcPre=()=>state.pre||{cpi:{values:{}},series:{}};
 function calcCpiHist(){return Object.assign({},calcPre().cpi?.values||{},Zamiana.cpiHistoryFromMonths(state.raw))}
 // najwcześniejszy miesiąc zakupu, dla którego mamy CPI do wszystkich okresów (odczyt za P−2 od 2. roku)
 function calcMinPurchase(){const k=Object.keys(calcCpiHist()).sort()[0]||"2018-12";return k<"2019-01"?Zamiana.addMonths(k,-10):"2019-01"}
-function calcOptions(){
-  const now=calcNow(),out={};
+function calcOptions(now=calcNow()){
+  const out={};
   const pre=Object.entries(calcPre().series||{}).sort((a,b)=>a[1].purchase<b[1].purchase?-1:1);
   const rows=pre.map(([code,s])=>({id:s.purchase,series:{[s.type]:Object.assign({code},s)}})).concat(state.months);
   for(const m of rows)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
@@ -298,7 +298,8 @@ const CALC_TIPS={
   real:"Kwota w dzisiejszych złotych (przy zerwaniu w przeszłości — w złotych z dnia zerwania): wartość nominalna podzielona przez skumulowaną inflację z Twojego scenariusza. Pokazuje siłę nabywczą, a nie to, co zobaczysz na koncie — np. 11 877 zł po 5 latach przy inflacji 2,5% to realnie ok. 10 498 zł.",
   range:"Od zakupu — cała historia. Od zerwania — oś tylko dla prognozy, linie są bardziej rozsunięte."
 };
-const calcTip=(k,down)=>CALC_TIPS[k]?`<span class="qtip${down?" down":""}" tabindex="0" role="button" aria-label="Wyjaśnienie: ${esc(CALC_TIPS[k])}">?<span class="qtip-b" role="tooltip">${esc(CALC_TIPS[k])}</span></span>`:"";
+// objaśnienia: pola kalkulatorów (CALC_TIPS, uzupełniane w kupno.js i portfel.js) i pozostałych widoków (VIEW_TIPS w app.js)
+const calcTip=(k,down)=>{const t=CALC_TIPS[k]||VIEW_TIPS[k];return t?`<span class="qtip${down?" down":""}" tabindex="0" role="button" aria-label="Wyjaśnienie: ${esc(t)}">?<span class="qtip-b" role="tooltip">${esc(t)}</span></span>`:""};
 // dotknięcie na telefonie: pokaż/ukryj dymek; nie aktywuj pola, do którego należy etykieta; dymek nie wychodzi poza ekran
 function calcBindTips(root){root.querySelectorAll(".qtip").forEach(q=>{
   const fit=()=>{const b=q.querySelector(".qtip-b");

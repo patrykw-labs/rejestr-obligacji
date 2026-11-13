@@ -23,6 +23,8 @@
     ROS: { term: 72, indexed: true, coupon: false, label: "ROS (6 lat, 800+)" },
     COI: { term: 48, indexed: true, coupon: true, label: "COI (4 lata)" },
     TOS: { term: 36, indexed: false, coupon: false, label: "TOS (3 lata)" },
+    // DOS (w ofercie do 05.2022): 2 lata, stała stopa, kapitalizacja roczna — tylko do historii serii
+    DOS: { term: 24, indexed: false, coupon: false, label: "DOS (2 lata)" },
     // ROR/DOR: miesięczne okresy odsetkowe, stopa = referencyjna NBP + marża, odsetki wypłacane co miesiąc;
     // od 2. okresu przy przedterminowym wykupie stała opłata (bez progu 100 zł) — listy emisyjne, np. 113/2025
     DOR: { term: 24, period: 1, nbp: true, coupon: true, flatFee: true, label: "DOR (2 lata)" },
@@ -491,6 +493,99 @@
     return { now: p.now, horizonMonths: H, amount, results, ranking };
   }
 
+  /**
+   * „Mój portfel”: stan posiadanych obligacji w dniu zerwania (miesiąc now, dzień breakDay) — bez zamiany.
+   * p = { now, breakDay, positions: [{type, rate1, margin, fee, purchase, purchaseDay, count, code?}],
+   *       cpiHistory, cpiFuture, nbpHistory, nbpFuture, tax, taxRate }
+   * Dla każdej serii: wartość brutto (z narosłymi odsetkami), opłata i podatek przy zerwaniu dziś, wypłata na rękę,
+   * odsetki wypłacone dotąd, bieżący okres (stopa, koniec), następny okres (stopa, czy znana z odczytów GUS/NBP),
+   * najbliższy kupon (COI, ROR, DOR) i wykup w terminie (wartość przy obecnych założeniach). Kwoty za wszystkie sztuki.
+   */
+  function holdings(p) {
+    const taxRate = p.taxRate != null ? p.taxRate : 0.19, tax = p.tax !== false;
+    const future = (p.cpiFuture && p.cpiFuture.length) ? p.cpiFuture : [2.5];
+    const cpiAt = makeCpiAt(p.cpiHistory || {}, future, p.now), nbpAt = makeNbpAt(p.nbpHistory || {}, p.nbpFuture, p.now);
+    const taxOf = (g) => tax ? r2(Math.max(0, g) * taxRate) : 0;
+    const net = (g) => tax ? g * (1 - taxRate) : g;
+    const items = (p.positions || []).map((o) => {
+      const t = TYPES[o.type], P = periodOf(o.type), n = o.count;
+      const age = ageMonths(o.purchase, p.now, o.purchaseDay, p.breakDay);
+      const maturity = addMonths(o.purchase, t.term);
+      if (age < 0) return { spec: o, error: "future", maturity, age };
+      if (age >= t.term - 1e-9) return { spec: o, matured: true, maturity, age };
+      const rates = periodRates(o, cpiAt, nbpAt);
+      // stopa okresu idx znana z opublikowanych danych (CPI za P−2, stopa NBP na początek okresu)
+      const known = (idx) => {
+        if (idx === 0 || (!t.indexed && !t.nbp)) return true;
+        const start = addMonths(o.purchase, idx * P);
+        return t.nbp ? !!(p.nbpHistory && p.nbpHistory[start] != null) : !!(p.cpiHistory && p.cpiHistory[addMonths(start, -2)] != null);
+      };
+      const v = bondValue(o, age, rates, { roundPerBond: true });
+      const gross = v.gross * n, fee = v.fee * n;
+      const breakTax = taxOf(gross - fee - NOMINAL * n);
+      const k = Math.floor(age / P + 1e-9);
+      const periodEnd = addMonths(o.purchase, Math.min((k + 1) * P, t.term));
+      const next = (k + 1) * P < t.term ? {
+        start: periodEnd, rate: rates[k + 1], known: known(k + 1),
+        basis: t.nbp ? nbpAt(periodEnd) : t.indexed ? cpiAt(addMonths(periodEnd, -2)) : null,
+        basisMonth: t.indexed ? addMonths(periodEnd, -2) : null,
+      } : null;
+      const coupon = t.coupon ? { ym: periodEnd, gross: couponAmount(o.type, rates[k], true) * n } : null;
+      if (coupon) coupon.net = coupon.gross - taxOf(coupon.gross);
+      // wykup w terminie: kapitalizowane — wartość końcowa; COI/ROR/DOR — 100 zł + ostatni kupon
+      const last = Math.ceil(t.term / P) - 1;
+      const mv = bondValue(o, t.term, rates, { roundPerBond: true });
+      const atMaturity = t.coupon
+        ? NOMINAL * n + couponAmount(o.type, rates[last], true) * n * (tax ? 1 - taxRate : 1)
+        : mv.gross * n - taxOf((mv.gross - NOMINAL) * n);
+      let maturityKnown = true; for (let i = k + 1; i <= last; i++) if (!known(i)) maturityKnown = false;
+      return {
+        spec: o, age, maturity, monthsToMaturity: t.term - age, rates,
+        gross, fee, breakTax, payout: gross - fee - breakTax,
+        hold: gross - taxOf(gross - NOMINAL * n),
+        couponsPaid: net(v.coupons.reduce((s, c) => s + c.amount, 0) * n),
+        rateNow: rates[k], periodIndex: k, periodEnd, next, coupon,
+        atMaturity, maturityKnown,
+      };
+    });
+    return { now: p.now, breakDay: p.breakDay, items };
+  }
+
+  /**
+   * „Jak wypadła seria”: 1 obligacja (100 zł) kupiona w miesiącu emisji, trzymana do `now` albo do wykupu w terminie,
+   * jeśli był wcześniej. Kupony (COI, ROR, DOR) po podatku, bez oprocentowania.
+   * p = { spec: {type, rate1, margin, fee, purchase}, now, cpiHistory, nbpHistory, tax, taxRate,
+   *       valuation: "hold" (seria w trakcie — wartość bez opłaty, po podatku od narosłych odsetek) | "liquidate" (wypłata dziś) }
+   * Inflacja w tym czasie (orientacyjnie, z odczytów CPI r/r): Π (1 + CPI za miesiąc m)^(1/12) dla kolejnych miesięcy
+   * od zakupu; brakujące najnowsze odczyty = ostatni znany.
+   */
+  function seriesOutcome(p) {
+    const o = p.spec, t = TYPES[o.type];
+    if (!t) return null;
+    const taxRate = p.taxRate != null ? p.taxRate : 0.19, tax = p.tax !== false;
+    const maturity = addMonths(o.purchase, t.term);
+    const matured = monthsBetween(maturity, p.now) >= 0;
+    const end = matured ? maturity : p.now;
+    const age = monthsBetween(o.purchase, end);
+    if (age < 1) return null;
+    const keys = Object.keys(p.cpiHistory || {}).sort();
+    const lastCpi = keys.length ? p.cpiHistory[keys[keys.length - 1]] : 0;
+    const cpiAt = makeCpiAt(p.cpiHistory || {}, [lastCpi], keys.length ? keys[keys.length - 1] : p.now);
+    const nbpAt = makeNbpAt(p.nbpHistory || {}, null, p.now);
+    const rates = periodRates(o, cpiAt, nbpAt);
+    const v = bondValue(o, age, rates, { roundPerBond: true });
+    const coupons = v.coupons.reduce((s, c) => s + (tax ? c.amount - r2(c.amount * taxRate) : c.amount), 0);
+    const value = !matured && p.valuation === "liquidate" ? v.net : v.gross;
+    const total = value - (tax ? r2(Math.max(0, value - NOMINAL) * taxRate) : 0) + coupons;
+    let infl = 1;
+    for (let m = 0; m < age; m++) infl *= Math.pow(1 + cpiAt(addMonths(o.purchase, m)) / 100, 1 / 12);
+    const nominal = total / NOMINAL - 1, real = (1 + nominal) / infl - 1;
+    return {
+      matured, maturity, end, age, total, coupons, nominal, inflation: infl - 1, real,
+      annual: Math.pow(1 + nominal, 12 / age) - 1, realAnnual: Math.pow(1 + real, 12 / age) - 1, rates,
+    };
+  }
+
   /** Stała przyszła inflacja, przy której różnica na koniec horyzontu = 0 (bisekcja). */
   function breakEvenInflation(p, lo = -2, hi = 25) {
     const f = (c) => compare(Object.assign({}, p, { cpiFuture: [c] })).atHorizon.diff;
@@ -545,7 +640,7 @@
     });
   }
 
-  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, breakEvenInflation, breakEvenNbp,
+  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, holdings, seriesOutcome, breakEvenInflation, breakEvenNbp,
     cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;

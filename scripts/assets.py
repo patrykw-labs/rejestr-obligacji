@@ -11,7 +11,7 @@ import hashlib, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ["css/style.css", "js/zamiana.js", "js/app.js", "js/kalkulator.js", "js/kupno.js", "js/start.js"]
+ASSETS = ["css/style.css", "js/zamiana.js", "js/app.js", "js/kalkulator.js", "js/kupno.js", "js/portfel.js", "js/start.js"]
 INDEX = ROOT / "index.html"
 
 def digest(rel):

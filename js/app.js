@@ -3,6 +3,25 @@ const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};
 const state={months:[],view:"oferta",month:null,serie:"EDO",chartMode:"rate1",chartOn:new Set(["TOS","COI","EDO","ROD","CPI","NBP"]),loaded:false,dbOk:true};
 const $=s=>document.querySelector(s);
+// objaśnienia „?” w zakładkach Oferta, Wykres i Historia serii (wyświetla calcTip z js/kalkulator.js)
+const VIEW_TIPS={
+  o_rate1:"Oprocentowanie w 1. okresie odsetkowym z listu emisyjnego: przez rok (ROR i DOR — przez miesiąc, OTS — przez 3 miesiące).",
+  o_delta:"Zmiana oprocentowania 1. okresu względem oferty z poprzedniego miesiąca, w punktach procentowych.",
+  o_next:"Jak liczone jest oprocentowanie od 2. okresu: stałe przez cały czas, inflacja (CPI) + marża albo stopa referencyjna NBP + marża.",
+  o_cap:"Roczna — odsetki co rok dopisywane do kapitału (procent składany), wypłata przy wykupie. Brak — odsetki liczone zawsze od 100 zł.",
+  o_pay:"Kiedy dostajesz odsetki: przy wykupie, co rok (kupon) albo co miesiąc.",
+  o_fee:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki, więc nie stracisz z wpłaconych 100 zł (wyjątek: ROR i DOR od 2. miesiąca).",
+  o_swap:"Cena nowej obligacji przy zamianie w dniu wykupu starej — zwykle 99,90 zł zamiast 100 zł (OTS: 100,00 zł). ROS i ROD nie mają ceny zamiany.",
+  o_avail:"Kto może kupić serię: wszyscy albo tylko beneficjenci programu 800+ (obligacje rodzinne ROS i ROD).",
+  mode:"Co pokazuje wykres: oprocentowanie 1. okresu z listów emisyjnych, samą marżę ponad wskaźnik albo orientacyjne oprocentowanie kolejnych okresów (CPI lub stopa NBP z rekordu miesiąca + marża).",
+  s_cpi:"Inflacja CPI r/r z GUS za miesiąc poprzedzający ofertę (ostatni odczyt znany w chwili emisji).",
+  s_nbp:"Stopa referencyjna NBP obowiązująca 1. dnia miesiąca oferty.",
+  s_real:"Oprocentowanie 1. okresu minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki — orientacyjnie, czy start był ponad inflacją.",
+  so_val:"Ile jest warta obligacja kupiona za 100 zł w miesiącu emisji: przy wykupie w terminie albo dziś (seria w trakcie), z kuponami wypłaconymi po drodze (bez ich oprocentowania).",
+  so_ann:"Średnia roczna stopa zwrotu w tym czasie (procent składany).",
+  so_infl:"Skumulowana inflacja od zakupu do wykupu albo do dziś — orientacyjnie, z miesięcznych odczytów CPI r/r z GUS (najnowsze brakujące = ostatni znany).",
+  so_real:"Wynik po uwzględnieniu inflacji: powyżej zera — obligacja pobiła inflację, poniżej — straciła siłę nabywczą."
+};
 const fmt=(v,d=2)=>v==null||v===""||isNaN(v)?"–":Number(v).toFixed(d).replace(".",",");
 const pct=v=>v==null?"–":fmt(v)+"%";
 const zl=v=>v==null?"–":(typeof v==="number"?fmt(v)+" zł":String(v));
@@ -18,17 +37,21 @@ function ruleText(s){if(!s)return"–";const r=s.rule||"";if(r==="stałe")return
 function prevOf(id){const i=state.months.findIndex(m=>m.id===id);return i>0?state.months[i-1]:null}
 function delta(a,b){if(a==null||b==null)return'<span class="d-0">–</span>';const d=Math.round((a-b)*100)/100;if(d===0)return'<span class="d-0">0,00</span>';return d>0?'<span class="d-up">+'+fmt(d)+'</span>':'<span class="d-down">−'+fmt(-d)+'</span>'}
 
-function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v))}catch(e){}render()}
+// na wąskim ekranie pasek zakładek się przewija — aktywna zakładka zawsze widoczna
+function tabIntoView(){const b=document.querySelector('nav.tabs button[aria-selected="true"]'),n=b&&b.parentElement;if(!n||n.scrollWidth<=n.clientWidth)return;
+  const l=b.offsetLeft-n.offsetLeft,r=l+b.offsetWidth;if(l<n.scrollLeft)n.scrollLeft=l-8;else if(r>n.scrollLeft+n.clientWidth)n.scrollLeft=r-n.clientWidth+8}
+function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));tabIntoView();try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v==="portfel"&&state.pf?pfHash(state.pf):v==="seria"?seriaHash():v))}catch(e){}render()}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 
 function render(){
   const main=$("#main");
   if(!state.dbOk){main.innerHTML='<div class="empty"><strong>Nie udało się wczytać pliku data/months.json</strong>Sprawdź, czy plik istnieje w repozytorium i jest poprawnym JSON-em (python3 scripts/validate.py).</div>';return}
   if(!state.loaded)return;
+  tabIntoView();
   if(!state.months.length){main.innerHTML='<div class="empty"><strong>Archiwum jest puste</strong>Dodaj pierwszy miesiąc do data/months.json.</div>';return}
   if(!state.month||!state.months.find(m=>m.id===state.month))state.month=state.months[state.months.length-1].id;
   const reload='<button type="button" class="btn" onclick="location.reload()">Odśwież stronę</button>';
-  try{({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc,kupno:renderBuy}[state.view]||renderOffer)(main)}
+  try{({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc,kupno:renderBuy,portfel:renderPortfolio}[state.view]||renderOffer)(main)}
   catch(e){console.error(e);main.innerHTML=`<div class="empty"><strong>Nie udało się wyświetlić tego widoku</strong>Spróbuj odświeżyć stronę (Ctrl+F5). Jeśli błąd się powtarza, zgłoś go na GitHubie i podaj adres strony. <span class="small">(${esc(e.message)})</span><div class="row" style="margin-top:12px">${reload}</div></div>`}
 }
 
@@ -59,9 +82,10 @@ function renderOffer(main){
     </div>
     ${rec.changeNote?`<div class="insight"><span class="t">zmiany m/m</span>${esc(rec.changeNote)}</div>`:""}
     ${rec.verifyNote?`<div class="insight warn"><span class="t">do sprawdzenia</span>${esc(rec.verifyNote)}</div>`:""}
-    <div class="card table-card"><div class="frame"><table><thead><tr><th>Seria</th><th>Okres</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th>Kapitalizacja</th><th>Wypłata odsetek</th><th class="r" title="Opłata za przedterminowy wykup">Opłata</th><th class="r">Zamiana</th><th>Dostępność</th><th>Źródło</th></tr></thead><tbody>${rows||'<tr><td colspan="11">Brak serii w rekordzie.</td></tr>'}</tbody></table></div></div>
+    <div class="card table-card"><div class="frame"><table><thead><tr><th>Seria</th><th>Okres</th><th class="r">1. okres${calcTip("o_rate1",1)}</th><th class="r">Δ m/m${calcTip("o_delta",1)}</th><th>Kolejne okresy${calcTip("o_next",1)}</th><th>Kapitalizacja${calcTip("o_cap",1)}</th><th>Wypłata odsetek${calcTip("o_pay",1)}</th><th class="r">Opłata${calcTip("o_fee",1)}</th><th class="r">Zamiana${calcTip("o_swap",1)}</th><th>Dostępność${calcTip("o_avail",1)}</th><th>Źródło</th></tr></thead><tbody>${rows||'<tr><td colspan="11">Brak serii w rekordzie.</td></tr>'}</tbody></table></div></div>
   </div>`;
   $("#sel-month").addEventListener("change",e=>{state.month=e.target.value;render()});
+  calcBindTips(main);
 }
 
 function renderChart(main){
@@ -69,7 +93,7 @@ function renderChart(main){
   const chips=keys.map(k=>`<label class="chip"><input type="checkbox" id="c-${k}" data-k="${k}"${state.chartOn.has(k)?" checked":""}><span class="dot" style="background:${colorOf(k)}"></span>${k==="CPI"?"CPI r/r":k==="NBP"?"stopa NBP":k}${k==="DOS"||k==="TOZ"?' <span class="sub">(do 2022)</span>':""}</label>`).join("");
   main.innerHTML=`<div class="card">
     <div class="sec-head"><div><p class="kicker">§ 2 · wykres</p><h2>Oprocentowanie w czasie</h2><p class="desc">Wybrane serie miesiąc po miesiącu na tle inflacji (CPI r/r) i stopy referencyjnej NBP. Najedź na wykres, aby zobaczyć wartości.</p></div>
-      <label class="field"><span class="flabel">Miara</span><span class="sel"><select id="sel-mode"><option value="rate1"${state.chartMode==="rate1"?" selected":""}>Oprocentowanie 1. okresu</option><option value="margin"${state.chartMode==="margin"?" selected":""}>Marża (kolejne okresy)</option><option value="next"${state.chartMode==="next"?" selected":""}>Oprocentowanie kolejnych okresów</option></select></span></label></div>
+      <label class="field"><span class="flabel">Miara${calcTip("mode")}</span><span class="sel"><select id="sel-mode"><option value="rate1"${state.chartMode==="rate1"?" selected":""}>Oprocentowanie 1. okresu</option><option value="margin"${state.chartMode==="margin"?" selected":""}>Marża (kolejne okresy)</option><option value="next"${state.chartMode==="next"?" selected":""}>Oprocentowanie kolejnych okresów</option></select></span></label></div>
     <div class="chips" style="margin-top:20px">${chips}</div>
     <div class="chart" id="chart"></div>
     <div class="notes">
@@ -77,6 +101,7 @@ function renderChart(main){
     <p class="small">Linie przerywane: CPI r/r (odczyt za miesiąc poprzedzający ofertę) i stopa referencyjna NBP. Przerwy w linii oznaczają brak danych w rekordzie, nie zero.</p></div></div>`;
   $("#sel-mode").addEventListener("change",e=>{state.chartMode=e.target.value;drawChart()});
   main.querySelectorAll(".chips input").forEach(i=>i.addEventListener("change",e=>{const k=e.target.dataset.k;e.target.checked?state.chartOn.add(k):state.chartOn.delete(k);drawChart()}));
+  calcBindTips(main);
   drawChart();
 }
 function chartVal(m,k){const s=m.series?.[k];if(!s)return null;const mode=state.chartMode;
@@ -146,17 +171,48 @@ function drawChart(){
   attachHover(el,lines,x,y,W,L,R);
 }
 
+// Historia serii w adresie: #seria&s=KOD&w=1 (w=1 — tabela „Jak wypadła seria”)
+function seriaHash(){const q=[];if(state.serie!=="EDO")q.push("s="+state.serie);if(state.serTab==="wynik")q.push("w=1");return ["seria"].concat(q).join("&")}
 function renderSeries(main){
+  if(!state.serHashRead){state.serHashRead=true;const parts=(location.hash||"").slice(1).split("&");
+    if(parts[0]==="seria"){const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=")));if(q.s)state.serie=q.s.toUpperCase();if(q.w==="1")state.serTab="wynik"}}
   const all=[...new Set(state.months.flatMap(seriesKeys))];const order=[...SERIES.filter(k=>all.includes(k)),...all.filter(k=>!SERIES.includes(k))];
   if(!order.includes(state.serie))state.serie=order[0];
-  const k=state.serie;
+  const k=state.serie,tab=state.serTab==="wynik"?"wynik":"oferty";
+  try{history.replaceState(null,"","#"+seriaHash())}catch(e){}
   const rows=[...state.months].reverse().filter(m=>m.series?.[k]).map(m=>{const s=m.series[k];const p=prevOf(m.id)?.series?.[k];
     const rv=(s.rate1!=null&&m.cpi!=null)?Math.round((s.rate1-m.cpi)*100)/100:null;const real=rv==null?"–":`<span class="${rv>0?"d-up":rv<0?"d-down":"d-0"}">${rv>0?"+":rv<0?"−":""}${fmt(Math.abs(rv))}</span>`;
     return `<tr><td>${mLabel(m.id)}</td><td><span class="code">${esc(s.code||k)}</span>${s.verify?' <span class="pill p-warn">sprawdzić</span>':""}</td><td class="r num"><b>${pct(s.rate1)}</b></td><td class="r num">${delta(s.rate1,p?.rate1)}</td><td>${ruleText(s)}</td><td class="r num">${zl(s.fee)}</td><td class="r num">${zl(s.swapPrice)}</td><td class="r num">${pct(m.cpi)}</td><td class="r num">${pct(m.nbpRef)}</td><td class="r num">${real}</td></tr>`}).join("");
   const cur=state.months[state.months.length-1].series?.[k];const first=state.months.find(m=>m.series?.[k]);
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 3 · historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:500;font-size:.75em">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to orientacyjne realne oprocentowanie 1. okresu: stawka minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki.${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 3 · historia serii</p><h2>Seria <span class="acc">${esc(k)}</span>${cur?.term?` <span style="color:var(--muted);font-weight:500;font-size:.75em">· ${esc(cur.term)}</span>`:""}</h2><p class="desc">${tab==="wynik"?"Ile dała obligacja kupiona w każdej emisji tej serii: do wykupu w terminie albo do dziś, na tle inflacji w tym samym czasie.":"Każdy miesiąc oferty tej serii, od najnowszego. Ostatnia kolumna to orientacyjne realne oprocentowanie 1. okresu: stawka minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki."}${first?" Pierwszy rekord: "+mLabel(first.id)+".":""}</p></div></div>
+    <div class="chips" role="group" aria-label="Widok"><button type="button" class="chip" data-stab="oferty" aria-pressed="${tab==="oferty"}">Oferty miesiąc po miesiącu</button><button type="button" class="chip" data-stab="wynik" aria-pressed="${tab==="wynik"}">Jak wypadła seria — 100 zł od zakupu</button></div>
     <div class="chips" role="group" aria-label="Wybór serii">${order.map(s=>`<button type="button" class="chip" data-s="${s}" aria-pressed="${s===k}"><span class="dot" style="background:${colorOf(s)}"></span>${s}${s==="DOS"||s==="TOZ"?' <span class="sub">do 2022</span>':""}</button>`).join("")}</div>
-    <div class="card table-card"><div class="frame"><table><thead><tr><th>Miesiąc oferty</th><th>Kod</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th class="r">Opłata</th><th class="r">Zamiana</th><th class="r">CPI r/r</th><th class="r">NBP</th><th class="r" title="Oprocentowanie 1. okresu minus ostatni odczyt CPI r/r z rekordu miesiąca, przed podatkiem Belki">1. okres − CPI</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Brak rekordów tej serii.</td></tr>'}</tbody></table></div></div></div>`;
+    ${tab==="wynik"?seriesOutcomeHtml(k):`<div class="card table-card"><div class="frame"><table><thead><tr><th>Miesiąc oferty</th><th>Kod</th><th class="r">1. okres</th><th class="r">Δ m/m</th><th>Kolejne okresy</th><th class="r">Opłata</th><th class="r">Zamiana</th><th class="r">CPI r/r${calcTip("s_cpi",1)}</th><th class="r">NBP${calcTip("s_nbp",1)}</th><th class="r">1. okres − CPI${calcTip("s_real",1)}</th></tr></thead><tbody>${rows||'<tr><td colspan="10">Brak rekordów tej serii.</td></tr>'}</tbody></table></div></div>`}</div>`;
   main.querySelectorAll("button.chip[data-s]").forEach(b=>b.addEventListener("click",()=>{state.serie=b.dataset.s;render()}));
+  main.querySelectorAll("button.chip[data-stab]").forEach(b=>b.addEventListener("click",()=>{state.serTab=b.dataset.stab;render()}));
+  main.querySelectorAll("button.chip[data-sov]").forEach(b=>b.addEventListener("click",()=>{state.serOut.val=b.dataset.sov;render()}));
+  main.querySelectorAll("button.chip[data-sot]").forEach(b=>b.addEventListener("click",()=>{state.serOut.tax=b.dataset.sot==="1";render()}));
+  calcBindTips(main);
+}
+// „Jak wypadła seria”: 100 zł w każdej emisji wybranej serii — do wykupu w terminie albo do dziś (Zamiana.seriesOutcome)
+function seriesOutcomeHtml(k){
+  if(!Zamiana.TYPES[k])return `<div class="insight"><span class="t">jak wypadła seria</span>Wyniku ${esc(k)} nie liczymy: oprocentowanie zależało od WIBOR6M, którego archiwum nie przechowuje.</div>`;
+  state.serOut=state.serOut||{val:"hold",tax:true};const o=state.serOut,now=state.months[state.months.length-1].id;
+  const cpiHistory=calcCpiHist(),nbpHistory=Zamiana.nbpHistoryFromMonths(state.raw);
+  const em=state.months.filter(m=>m.series?.[k]).map(m=>({id:m.id,s:m.series[k]}))
+    .concat(Object.entries(calcPre().series||{}).filter(([,s])=>s.type===k).map(([code,s])=>({id:s.purchase,s:Object.assign({code},s),pre:true})));
+  const rows=em.map(e=>{const s=e.s,r=Zamiana.seriesOutcome({spec:{type:k,rate1:+s.rate1,margin:+(s.margin??0),fee:typeof s.fee==="number"?s.fee:0,purchase:e.id},
+      now,cpiHistory,nbpHistory,tax:o.tax,valuation:o.val==="liq"?"liquidate":"hold"});return r&&Object.assign(r,{id:e.id,code:s.code||k,pre:e.pre})}).filter(Boolean).sort((a,b)=>a.id<b.id?1:-1);
+  if(!rows.length)return "";
+  const p1=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v*100))+"%",cls=v=>v>0.00005?"d-up":v<-0.00005?"d-down":"d-0";
+  const beat=rows.filter(r=>r.real>0).length,best=rows.reduce((a,b)=>b.real>a.real?b:a),worst=rows.reduce((a,b)=>b.real<a.real?b:a);
+  const live=rows.some(r=>!r.matured);
+  return `<div class="card table-card"><div class="tc-head"><h3>Jak wypadła seria ${esc(k)}</h3><p class="desc">Obligacja za 100 zł kupiona w każdej emisji ${esc(k)}: wynik ${live?`do ${mLabel(now)} (serie w trakcie) albo `:""}do wykupu w terminie, ${o.tax?"po podatku Belki":"bez podatku (IKE / IKZE)"}, na tle inflacji w tym samym czasie. Inflację pobiło <b>${beat} z ${rows.length}</b> emisji; najlepiej realnie ${esc(best.code)} (${p1(best.real)}), najsłabiej ${esc(worst.code)} (${p1(worst.real)}).</p>
+      <div class="row" style="margin-top:10px">${live?`<div class="chips" role="group" aria-label="Wycena serii w trakcie"><button type="button" class="chip" data-sov="hold" aria-pressed="${o.val!=="liq"}">w trakcie: wartość bez opłaty</button><button type="button" class="chip" data-sov="liq" aria-pressed="${o.val==="liq"}">w trakcie: wypłata dziś (z opłatą)</button></div>`:""}
+        <div class="chips" role="group" aria-label="Podatek"><button type="button" class="chip" data-sot="1" aria-pressed="${o.tax}">po podatku Belki</button><button type="button" class="chip" data-sot="0" aria-pressed="${!o.tax}">IKE / IKZE</button></div></div></div>
+    <div class="frame"><table><thead><tr><th>Emisja</th><th>Kod</th><th>Stan</th><th class="r">100 zł →${calcTip("so_val",1)}</th><th class="r">Rocznie${calcTip("so_ann",1)}</th><th class="r">Inflacja w tym czasie${calcTip("so_infl",1)}</th><th class="r">Realnie${calcTip("so_real",1)}</th><th class="r">Realnie rocznie</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${mLabel(r.id)}${r.pre?' <span class="small">(sprzed archiwum)</span>':""}</td><td><span class="code">${esc(r.code)}</span></td><td>${r.matured?`wykup ${mShort(r.maturity)}`:`<span class="pill p-part">trwa</span> ${r.age} mies.`}</td>
+      <td class="r num"><b>${zl2(r.total)}</b></td><td class="r num">${p1(r.annual)}</td><td class="r num">${p1(r.inflation)}</td><td class="r num"><b class="${cls(r.real)}">${p1(r.real)}</b></td><td class="r num"><span class="${cls(r.realAnnual)}">${p1(r.realAnnual)}</span></td></tr>`).join("")}
+    </tbody></table></div></div>`;
 }

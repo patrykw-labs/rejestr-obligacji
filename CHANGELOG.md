@@ -4,6 +4,10 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Nowa zakładka **„Mój portfel”**: wartość posiadanych obligacji dziś, wypłata na rękę po zerwaniu (opłata i podatek), wartość przy wykupie w terminie, najbliższe 12 miesięcy (kupony, nowe oprocentowanie — znane albo prognoza, wykupy); do 20 serii, link do wyliczenia i przejście do kalkulatora zamiany.
+- Historia serii: przełącznik **„Jak wypadła seria”** — wynik obligacji za 100 zł z każdej emisji do wykupu albo do dziś, rocznie, na tle inflacji w tym samym czasie (realnie); po podatku albo w IKE; DOS liczony, TOZ (WIBOR) pominięty.
+- Dymki „?” także w zakładkach Oferta (kolumny tabeli), Wykres (miara) i Historia serii.
+- Na telefonie wszystkie zakładki mieszczą się w pasku, a aktywna jest zawsze widoczna.
 - Wykresy w kalkulatorze zamiany i w „Co kupić?”: legenda jako przełączniki (kliknięcie ukrywa lub pokazuje linię, oś dopasowuje się do widocznych), linie odniesienia w złotych: „wpłata + inflacja” (wpłacona kwota od dnia zakupu rośnie o inflację — obligacje nad linią zarabiają realnie, pod nią tracą) i „wpłata na stopie NBP” (po podatku; do dziś z archiwum, dalej scenariusz).
 - „Co kupić?”: tabela wszystkich serii pod wykresem.
 - Dymek „?” przy kolumnach „Realnie” i „Różnica realnie”: wyjaśnienie wartości w dzisiejszych złotych. Dymki w tabelach nie są już ucinane przez ramkę tabeli.

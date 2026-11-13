@@ -10,19 +10,20 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych od stycznia 2019 
 
 **Strona:** https://patrykw-labs.github.io/rejestr-obligacji/
 
-Na stronie jest pięć widoków:
+Na stronie jest sześć widoków (w każdym dymki „?” objaśniają pola i kolumny tabel):
 
 - **Oferta miesiąca**: wszystkie serie z wybranego miesiąca, zmiany względem poprzedniego miesiąca, CPI i stopa NBP.
 - **Wykres w czasie**: oprocentowanie 1. okresu, marże albo orientacyjne oprocentowanie kolejnych okresów dla wybranych serii na tle CPI i NBP.
-- **Historia serii**: jedna seria miesiąc po miesiącu, z różnicą m/m i realnym oprocentowaniem (1. okres − CPI).
+- **Historia serii**: jedna seria miesiąc po miesiącu, z różnicą m/m i realnym oprocentowaniem (1. okres − CPI). Przełącznik „Jak wypadła seria” pokazuje, ile dała obligacja za 100 zł z każdej emisji: do wykupu w terminie albo do dziś, po podatku (albo w IKE), rocznie i na tle inflacji w tym samym czasie.
 - **Kalkulator zamiany**: czy opłaca się zerwać posiadane obligacje (EDO, COI, TOS, ROS, ROD, DOR, ROR, OTS) i kupić nowe z bieżącej oferty. Wybierasz swoją serię z archiwum (parametry z listu emisyjnego uzupełniają się same, a oprocentowanie do dziś liczone jest z prawdziwych odczytów CPI, a dla ROR i DOR — ze stóp NBP), liczbę sztuk, dzień zakupu, miesiąc i dzień zerwania (także w przeszłości — np. żeby sprawdzić decyzję sprzed lat, z rzeczywistą inflacją albo „stanem wiedzy” z tamtego dnia — lub w przyszłości) (odsetki narosłe od ostatniej rocznicy pokrywają część opłaty), horyzont, scenariusz inflacji (i stopy NBP dla ROR/DOR), oprocentowanie konta i rachunek (zwykły, IKE albo IKZE). Wynik: werdykt, koszt zerwania (opłata i podatek), od kiedy zamiana się opłaca, próg inflacji (a dla ROR/DOR także stopy NBP), przy którym zamiana zaczyna się opłacać, wykres od zakupu (z zaznaczonymi zakupami i wykupami, paskiem różnicy i przybliżeniem prognozy) i tabela rok po roku. Możesz też dodać kilka serii naraz (portfel, do 8 serii): każda jest liczona osobno, a kalkulator wskazuje, które opłaca się zamienić, i sumuje wynik (reszty poniżej 100 zł z zerwanych serii łączy przy zakupie). Obsługuje też obligacje kupione przed 2019 r., które nie zostały jeszcze wykupione (EDO od 12.2016, ROD od 10.2016): parametry z listów emisyjnych i inflacja z GUS są w `data/przed-2019.json`, a kopie listów niedostępnych na obligacjeskarbowe.pl w `data/listy/`. Wyliczenie można udostępnić linkiem.
 - **Co kupić?**: wpisujesz kwotę, okres i założenia (inflacja, stopa NBP, konto, rachunek zwykły / IKE / IKZE), a strona porównuje wszystkie serie z bieżącej oferty: ile każda da na rękę na koniec okresu (po opłacie za wcześniejszy wykup i podatku), nominalnie i realnie, z rankingiem, wykresem i progiem inflacji, przy którym zmienia się zwycięzca. ROS i ROD pokazuje na życzenie (tylko dla beneficjentów 800+).
+- **Mój portfel**: wpisujesz serie, które masz (do 20), a strona pokazuje ich wartość dziś (z narosłymi odsetkami), ile dostaniesz na rękę po zerwaniu (opłata i podatek), ile przy wykupie w terminie, a także najbliższe 12 miesięcy: kupony, nowe oprocentowanie (znane z odczytów GUS/NBP albo prognoza) i wykupy. Jednym kliknięciem przechodzisz z tymi seriami do kalkulatora zamiany.
 
 > Projekt jest nieoficjalny. Nie jest powiązany z Ministerstwem Finansów, PKO BP ani serwisem obligacjeskarbowe.pl i nie jest rekomendacją inwestycyjną. Dane pochodzą z publicznych źródeł: listów emisyjnych, [obligacjeskarbowe.pl](https://www.obligacjeskarbowe.pl), komunikatów MF, [GUS](https://stat.gov.pl) i [NBP](https://nbp.pl). Wiążące są listy emisyjne.
 
 ## Struktura
 
-- `index.html`: szkielet strony; `css/style.css`: style; `js/app.js`, `js/kalkulator.js`, `js/start.js`: kod widoków (czysty HTML, CSS i JS, bez kroku budowania). `scripts/assets.py --fix` wpisuje do adresów plików skróty ich treści, żeby przeglądarka zawsze pobrała aktualną wersję.
+- `index.html`: szkielet strony; `css/style.css`: style; `js/app.js`, `js/kalkulator.js`, `js/kupno.js`, `js/portfel.js`, `js/start.js`: kod widoków (czysty HTML, CSS i JS, bez kroku budowania). `scripts/assets.py --fix` wpisuje do adresów plików skróty ich treści, żeby przeglądarka zawsze pobrała aktualną wersję.
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 - `data/przed-2019.json`: serie sprzed 2019 r. i inflacja z GUS za 2015–2018, tylko dla kalkulatora zamiany
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji

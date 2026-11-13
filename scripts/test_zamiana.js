@@ -387,5 +387,42 @@ eq("kupno: ROS/ROD bez ceny zamiany — przy wykupie nowe po 100 zł", bAt(144, 
   Math.floor(bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].proceeds / 100));
 eq("kupno: kwota 150 zł → 1 szt. i 50 zł na konto", [bAt(12, "TOS", { amount: 150 }).count, bAt(12, "TOS", { amount: 150 }).cash0], [1, 50]);
 
+// ---------------------------------------------------------------------------
+// 12. „Mój portfel” (holdings): wartość dziś, wypłata po zerwaniu, następny okres, kupon, wykup
+// ---------------------------------------------------------------------------
+const hEdo = { type: "EDO", rate1: 6, margin: 2, fee: 2, purchase: "2025-05", count: 10 };
+const hCoi = { type: "COI", rate1: 5, margin: 1.5, fee: 2, purchase: "2026-01", count: 20 };
+const hOts = { type: "OTS", rate1: 2, margin: 0, fee: 0, purchase: "2026-10", count: 10 };
+const hld = Z.holdings({ now: "2026-11", positions: [hEdo, hCoi, hOts, { type: "TOS", rate1: 5, margin: 0, fee: 1, purchase: "2023-01", count: 1 }],
+  cpiHistory: { "2026-03": 4 }, cpiFuture: [2.5], tax: true }).items;
+eq("portfel: EDO po 18 mies. — 10 × 106 × 1,03", hld[0].gross, 1091.8, 1e-6);
+eq("portfel: EDO — opłata 2 zł/szt.", hld[0].fee, 20, 1e-6);
+eq("portfel: EDO — podatek od zysku po opłacie", hld[0].breakTax, 13.64, 1e-6);
+eq("portfel: EDO — na rękę po zerwaniu", hld[0].payout, 1058.16, 1e-6);
+eq("portfel: EDO — 2. rok: CPI 4% + marża 2", hld[0].rateNow, 0.06, 1e-9);
+eq("portfel: EDO — następny okres od rocznicy, CPI jeszcze nieznany (scenariusz 2,5% + 2)", [hld[0].next.start, hld[0].next.known, r2(hld[0].next.rate * 100)], ["2027-05", false, 4.5]);
+eq("portfel: COI — kupon w rocznicę: 20 × 5 zł, po podatku 81 zł", [hld[1].coupon.ym, hld[1].coupon.gross, hld[1].coupon.net], ["2027-01", 100, 81]);
+eq("portfel: COI — wykup = 2000 zł + ostatni kupon (CPI 2,5% + 1,5) po podatku", hld[1].atMaturity, 2000 + 80 * 0.81, 1e-6);
+eq("portfel: OTS — przy zerwaniu 100 zł bez odsetek", hld[2].payout, 1000, 1e-6);
+eq("portfel: OTS — wykup w terminie 10 × 100,50 minus podatek", hld[2].atMaturity, 1005 - 0.95, 1e-6);
+eq("portfel: seria po terminie wykupu oznaczona", hld[3].matured, true);
+
+// ---------------------------------------------------------------------------
+// 13. „Jak wypadła seria” (seriesOutcome): 100 zł od emisji do dziś albo do wykupu
+// ---------------------------------------------------------------------------
+const so = (spec, extra) => Z.seriesOutcome(Object.assign({ spec, now: "2026-11", cpiHistory: {}, tax: true }, extra || {}));
+const soTos = so({ type: "TOS", rate1: 5, margin: 0, fee: 1, purchase: "2020-01" });
+eq("seria: TOS wykupiona — 100 × 1,05³ = 115,76, podatek 2,99", [soTos.matured, soTos.age, r2(soTos.total)], [true, 36, 112.77]);
+const cpi3 = {}; for (let m = 0; m < 60; m++) cpi3[Z.addMonths("2019-01", m)] = 3;
+const soCoi = so({ type: "COI", rate1: 6, margin: 1, fee: 2, purchase: "2019-06" }, { cpiHistory: cpi3 });
+eq("seria: COI — kupony 6 + 3 × 4 zł po podatku, wykup 100 zł", soCoi.total, 100 + 4.86 + 3 * 3.24, 1e-6);
+eq("seria: inflacja 3% przez 4 lata", soCoi.inflation, Math.pow(1.03, 4) - 1, 1e-9);
+eq("seria: realnie = nominalnie / inflacja", soCoi.real, soCoi.total / 100 / Math.pow(1.03, 4) - 1, 1e-9);
+const soEdo = { type: "EDO", rate1: 6, margin: 2, fee: 2, purchase: "2026-05" };
+eq("seria: EDO w trakcie — wartość bez opłaty po podatku", so(soEdo).total, 103 - 0.57, 1e-6);
+eq("seria: EDO w trakcie — wypłata dziś z opłatą", so(soEdo, { valuation: "liquidate" }).total, 101 - 0.19, 1e-6);
+eq("seria: IKE bez podatku", so(soEdo, { tax: false }).total, 103, 1e-6);
+eq("seria: DOS (2 lata, stała stopa)", so({ type: "DOS", rate1: 2, margin: 0, fee: 0.7, purchase: "2020-01" }).total, 104.04 - r2(4.04 * 0.19), 1e-6);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
