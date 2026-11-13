@@ -32,8 +32,11 @@ function pfLoad(){try{const j=JSON.parse(localStorage.getItem(PF_KEY)||"null");i
 const pfSaved=()=>{try{return !!localStorage.getItem(PF_KEY)}catch(e){return false}};
 // zapis po każdej zmianie; portfel przykładowy (domyślny) nie jest zapisywany — wtedy zapis jest usuwany
 // portfel otwarty z linku (state.pfLink) nie nadpisuje zapamiętanego — dopiero „Zapamiętaj ten portfel”
-function pfSave(s){if(state.pfLink)return;try{const d=pfDefaults(),same=JSON.stringify([s.pos,s.acc,s.sc])===JSON.stringify([d.pos,d.acc,d.sc]);
-    if(same)localStorage.removeItem(PF_KEY);else localStorage.setItem(PF_KEY,JSON.stringify({v:1,pos:s.pos.map(o=>({code:o.code,n:o.n,pd:o.pd})),acc:s.acc,sc:s.sc}))}catch(e){}}
+// zwraca true, gdy zapis faktycznie się zmienił (wtedy pokazujemy mignięcie „✓ Zapisano”)
+function pfSave(s){if(state.pfLink)return false;try{const d=pfDefaults(),same=JSON.stringify([s.pos,s.acc,s.sc])===JSON.stringify([d.pos,d.acc,d.sc]);
+    const prev=localStorage.getItem(PF_KEY);
+    if(same){localStorage.removeItem(PF_KEY);return false}
+    const v=JSON.stringify({v:1,pos:s.pos.map(o=>({code:o.code,n:o.n,pd:o.pd})),acc:s.acc,sc:s.sc});localStorage.setItem(PF_KEY,v);return v!==prev}catch(e){return false}}
 function pfForget(main){try{localStorage.removeItem(PF_KEY)}catch(e){}state.pfLink=false;viewReset("pf",null,pfDefaults,()=>renderPortfolio(main))}
 function pfFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="portfel"||parts.length<2)return null;
@@ -104,18 +107,18 @@ function renderPortfolio(main){
   pfRecompute();
 }
 // informacja o zapisie w przeglądarce (aktualizowana po każdej zmianie)
-function pfStoreNote(){
+function pfStoreNote(flash){
   if(state.pfLink)return `🔗 Ten portfel otwarto z linku — nie zastępuje portfela zapamiętanego w tej przeglądarce. <button type="button" class="linkbtn" id="p-keep">Zapamiętaj ten portfel</button>${pfSaved()?` · <button type="button" class="linkbtn" id="p-load">Wczytaj zapamiętany</button>`:""}`;
-  return pfSaved()?`💾 Portfel jest zapamiętany w tej przeglądarce (tylko na tym urządzeniu, nie wysyłamy go nigdzie). <button type="button" class="linkbtn" id="p-forget">Zapomnij portfel</button>`
+  return pfSaved()?`💾 Zapisano automatycznie w tej przeglądarce (tylko na tym urządzeniu, nie wysyłamy go nigdzie).${flash?' <span class="pf-flash">✓ Zapisano</span>':""} <button type="button" class="linkbtn" id="p-forget">Zapomnij portfel</button>`
   :"Po zmianie serii portfel zapamięta się w tej przeglądarce (tylko na tym urządzeniu) i wczyta przy następnej wizycie."}
 function pfBindStore(){const main=$("#main"),b=$("#p-forget"),k=$("#p-keep"),l=$("#p-load");
   if(b)b.addEventListener("click",()=>pfForget(main));
-  if(k)k.addEventListener("click",()=>{state.pfLink=false;pfSave(state.pf);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote();pfBindStore()}});
+  if(k)k.addEventListener("click",()=>{state.pfLink=false;const ch=pfSave(state.pf);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote(ch);pfBindStore()}});
   if(l)l.addEventListener("click",()=>{const v=pfLoad();if(!v)return;state.pf=v;state.pfLink=false;renderPortfolio(main)})}
 function pfRecompute(){
   const out=$("#p-out");if(!out)return;const s=state.pf,now=pfNow();
   try{history.replaceState(null,"","#"+pfHash(s))}catch(e){}
-  pfSave(s);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote();pfBindStore()}
+  const changed=pfSave(s);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote(changed);pfBindStore()}
   const errs=[];
   if(!s.pos.length)errs.push("Dodaj co najmniej jedną serię.");
   s.pos.forEach((o,i)=>{if(!(Math.floor(+o.n)>=1))errs.push(`Seria ${i+1}: podaj liczbę sztuk.`);if(!calcDayOk(o.pd))errs.push(`Seria ${i+1}: dzień zakupu od 1 do 31.`)});

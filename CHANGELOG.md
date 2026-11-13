@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- „Mój portfel”: po każdej zmianie mignięcie „✓ Zapisano”, a komunikat mówi wprost, że portfel zapisuje się automatycznie (bez przycisku „Zapisz”).
 - Porządki w kodzie: eksport (CSV, PNG) w `js/eksport.js`, dymki i „Wyczyść ustawienia” w `js/wspolne.js`; strona działa bez zmian.
 - Czytelność: kontrast tekstu co najmniej 4,5:1 (WCAG AA) w obu motywach — ciemniejszy tekst drugorzędny w jasnym motywie i wybrane przyciski w ciemnym.
 - Test strony także w ciemnym motywie: zakładki na komputerze i telefonie, kontrast tekstu w obu motywach, przełącznik motywu (zapamiętany po przeładowaniu) i eksport PNG z ciemnym tłem.

@@ -234,6 +234,7 @@ const CASES = [
       await page.fill('input[data-pi="0"][data-pk="n"]', "20");
       await page.waitForTimeout(200);
       if (!/"n":"?20/.test(await saved())) problem = "zmiana liczby sztuk nie trafiła do zapisu";
+      if (!(await page.$("#p-store .pf-flash"))) problem = "brak mignięcia „✓ Zapisano” po zmianie";
       await open("#portfel");
       if (!/pf=TOS1127~20/.test(await page.evaluate(() => location.hash))) problem = "zapisany portfel nie wczytał się przy wejściu bez parametrów";
       await open("#portfel&pf=EDO0434~10");
