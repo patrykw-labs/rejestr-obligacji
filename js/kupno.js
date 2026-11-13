@@ -134,20 +134,25 @@ function buyRecompute(){
       <li>Oprocentowanie z listów emisyjnych oferty ${esc(mLabel(off.id))}. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt za P−2) + marża (EDO, COI, ROS, ROD) albo stopa referencyjna NBP + marża (ROR, DOR); do ${mShort(off.cpiRefMonth||off.id)} z archiwum GUS i NBP, dalej Twój scenariusz (inflacja ${b.sc==="custom"?"rok po roku":fmt(CPI_PRESETS[b.sc].v,1)+"%"}, stopa NBP ${fmt(+b.nbp)}%).</li>
       <li>Kupony COI i odsetki ROR/DOR trafiają na konto po podatku. Seria, która w tym okresie wykupi się w terminie, zamienia się na taką samą serię na dzisiejszych warunkach po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD — bez ceny zamiany, po 100 zł).</li>
       <li>${liq?`Na koniec okresu wypłacasz wszystko: przed terminem wykupu z opłatą za przedterminowy wykup (nie wyższą niż narosłe odsetki; ROR i DOR od 2. miesiąca — stałą; OTS — bez odsetek) i z podatkiem 19% od zysku${b.acc!=="std"?" (w IKE/IKZE bez podatku i bez opłaty przy wypłacie z konta)":""}.`:"Wartość bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty."}${b.acc==="ikze"?" W IKZE wartości są po 10% ryczałcie przy wypłacie po 65. roku życia.":""}</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od dziś rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${b.acc==="std"?" (zysk po 19% podatku)":""}.</li>
       <li>To symulacja przy stałych założeniach, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${calcShareHtml}
   </div>`;
   const pp=buyParams(b,cands);
-  buyDrawChart(rank,{cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
+  buyDrawChart(rank,{amount:+b.kw,tax:pp.tax===false?0:(pp.taxRate||0.19),cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
   calcBindShare();calcBindTips(out);
 }
 function buyDrawChart(rank,macro){
   const el=$("#b-chart");if(!el)return;macro=macro||{};
   state.buyVis=state.buyVis||{};const vis=k=>state.buyVis[k]??true;
-  const shown=rank.filter(r=>vis(r.type)),showCpi=!!macro.cpiAt&&vis("cpi"),showNbp=!!macro.nbpAt&&vis("nbp");
-  const pts=rank[0].series,n=pts.length;const W=Math.max(640,el.clientWidth||900),Hh=300,L=64,R=showCpi||showNbp?46:14,T=16,B=30;
-  const vals=(shown.length?shown:rank).flatMap(x=>x.series.map(s=>s.total));let min=Math.min(...vals),max=Math.max(...vals);
+  const shown=rank.filter(r=>vis(r.type));
+  const pts=rank[0].series,n=pts.length;const W=Math.max(640,el.clientWidth||900),Hh=300,L=64,R=14,T=16,B=30;
+  // linie odniesienia w zł: wpłacona kwota rosnąca o inflację CPI i o stopę NBP (do dziś z archiwum, dalej scenariusz)
+  const amt=+macro.amount||0,yms=pts.map(m=>m.ym),buys=[{ym:yms[0],amount:amt}];
+  const hasCpi=amt>0&&!!macro.cpiAt,hasNbp=amt>0&&!!macro.nbpAt,showCpi=hasCpi&&vis("cpi"),showNbp=hasNbp&&vis("nbp");
+  const mac=yms.map(()=>({}));if(hasCpi)benchLine(yms,buys,macro.cpiAt).forEach((v,i)=>mac[i].cpi=v);if(hasNbp)benchLine(yms,buys,macro.nbpAt,macro.tax).forEach((v,i)=>mac[i].nbp=v);
+  const vals=(shown.length?shown:rank).flatMap(x=>x.series.map(s=>s.total)).concat(mac.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null));let min=Math.min(...vals),max=Math.max(...vals);
   const span=max-min||max*0.05||1,raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw))),step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);
   min=Math.floor(min/step)*step;max=Math.ceil(max/step)*step;if(max===min)max=min+step;
   const x=i=>L+(n<=1?0:(W-L-R)*i/(n-1)),y=v=>T+(Hh-T-B)*(1-(v-min)/(max-min));
@@ -156,14 +161,10 @@ function buyDrawChart(rank,macro){
   let xt="";const every=n>150?2:1;
   pts.forEach((m,i)=>{if((n<=24&&i%3===0)||(n>24&&m.ym.slice(5)==="01"&&(+m.ym.slice(0,4))%every===0)){const lab=n<=24?mShort(m.ym):m.ym.slice(0,4);xt+=`<line x1="${x(i)}" x2="${x(i)}" y1="${Hh-B}" y2="${Hh-B+4}" style="stroke:var(--muted)"/><text x="${x(i)}" y="${Hh-B+17}" text-anchor="middle">${lab}</text>`}});
   const path=s=>s.map((p,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(p.total).toFixed(1)).join(" ");
-  // prawa oś: inflacja CPI r/r i stopa NBP (do dziś z archiwum, dalej scenariusz)
-  const mac=pts.map(m=>({cpi:macro.cpiAt?macro.cpiAt(m.ym):null,nbp:macro.nbpAt?macro.nbpAt(m.ym):null}));let macroPaths="";
-  if(showCpi||showNbp){const pax=pctAxis(mac.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null),T,Hh-B);
-    for(let v=pax.lo;v<=pax.hi+1e-9;v+=pax.step)g+=`<text x="${W-R+6}" y="${pax.pos(v)+4}" text-anchor="start" style="fill:var(--muted)">${fmt(v,v%1?1:0)}%</text>`;
-    const pl=k=>mac.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+pax.pos(m[k]).toFixed(1)).join(" ");
-    if(showCpi)macroPaths+=`<path d="${pl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
-    if(showNbp)macroPaths+=`<path d="${pl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.6" stroke-dasharray="2 3"/>`;}
-  const items=rank.map(r=>({k:r.type,label:r.c.code,color:`var(--s-${r.type})`})).concat(macro.cpiAt?[{k:"cpi",label:"inflacja CPI (%)",color:"var(--s-CPI)",dash:1}]:[],macro.nbpAt?[{k:"nbp",label:"stopa NBP (%)",color:"var(--s-NBP)",dash:1}]:[]);
+  let macroPaths="";const pl=k=>mac.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(m[k]).toFixed(1)).join(" ");
+  if(showCpi)macroPaths+=`<path d="${pl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.8" stroke-dasharray="6 4"/>`;
+  if(showNbp)macroPaths+=`<path d="${pl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.8" stroke-dasharray="2 3"/>`;
+  const items=rank.map(r=>({k:r.type,label:r.c.code,color:`var(--s-${r.type})`})).concat(hasCpi?[{k:"cpi",label:"wpłata + inflacja",color:"var(--s-CPI)",dash:1}]:[],hasNbp?[{k:"nbp",label:macro.tax?"wpłata na stopie NBP (po podatku)":"wpłata na stopie NBP",color:"var(--s-NBP)",dash:1}]:[]);
   el.innerHTML=chartLegendHtml(items,vis)+`<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Wartość serii w czasie">${g}<line x1="${L}" x2="${W-R}" y1="${Hh-B}" y2="${Hh-B}" style="stroke:var(--line-strong)"/>${xt}${macroPaths}
     ${shown.slice().reverse().map((r,k)=>`<path d="${path(r.series)}" fill="none" style="stroke:var(--s-${r.type})" stroke-width="${r===rank[0]?3:2}" stroke-linejoin="round"/>`).join("")}
     <line class="bhov" x1="0" x2="0" y1="${T}" y2="${Hh-B}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="bpts"></g></svg><div class="tip" hidden></div>`;
@@ -173,7 +174,7 @@ function buyDrawChart(rank,macro){
   const show=i=>{hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
     const at=shown.map(r=>({r,v:r.series[i].total})).sort((a,b)=>b.v-a.v);
     dots.innerHTML=at.map(a=>`<circle cx="${x(i)}" cy="${y(a.v)}" r="3.5" style="fill:var(--s-${a.r.type});stroke:var(--surface);stroke-width:1.5"/>`).join("");
-    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>CPI r/r <span class="num">${fmt(mac[i].cpi,1)}%</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Stopa NBP <span class="num">${fmt(mac[i].nbp)}%</span></div>`:"");
+    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>Wpłata + inflacja <span class="num">${zl0(mac[i].cpi)}</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Wpłata na stopie NBP <span class="num">${zl0(mac[i].nbp)}</span></div>`:"");
     tip.innerHTML=`<div class="tt">${mLabel(pts[i].ym)} · po ${i} mies.${docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':""}</div>${at.map(a=>`<div class="tr"><span class="dot" style="background:var(--s-${a.r.type})"></span><b>${esc(a.r.c.code)}</b> <span class="num">${zl0(a.v)}</span></div>`).join("")}${mRows}`;
     tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top=(rr.top-er.top+10)+"px"};
   const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};

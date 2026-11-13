@@ -362,6 +362,7 @@ function calcRecompute(){
     <details class="how"><summary>Jak to policzono</summary><ul>
       <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(r.ageNow)}): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po ${calcSwapTxt(c.tt)} na nową serię ${esc(tgtCode)} na warunkach z oferty ${mShort(calcOfferRec(calcNow()).id)}. <b>Zamieniam:</b> zrywasz ${calcD()} (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
       ${calcFutureBuysHtml(c,events)}
@@ -369,7 +370,7 @@ function calcRecompute(){
     </ul></details>
     ${calcShareHtml}
   </div>`;
-  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
+  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,amount:Math.floor(+o.n)*100,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
   calcBindShare();calcBindTips(out);
 }
 function calcRecomputePortfolio(out,c,now){
@@ -417,6 +418,7 @@ function calcRecomputePortfolio(out,c,now){
     <details class="how"><summary>Jak to policzono</summary><ul>
       ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz ${calcD()} i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł z serii zrywanych ${calcD()} łączymy przy zakupie${(pick?r.switchBest:r.switchAll).pooledExtra?` — tu daje to ${(pick?r.switchBest:r.switchAll).pooledExtra} szt. więcej`:" (tu nie dają dodatkowej obligacji)"}; przy późniejszych wykupach w terminie reszta zostaje przy każdej serii osobno. Decyzja „zamień/trzymaj” dla serii jest liczona bez tego łączenia.</li>
       ${calcFutureBuysHtml(c,events)}
@@ -424,7 +426,7 @@ function calcRecomputePortfolio(out,c,now){
     </ul></details>
     ${calcShareHtml}
   </div>`;
-  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
+  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,amount:Math.floor(+z.o.n)*100,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
   calcBindShare();calcBindTips(out);
 }
 // kod serii kupionej w danym miesiącu: typ + MMRR terminu wykupu (np. EDO z 04.2034 → EDO0444)
@@ -448,12 +450,13 @@ function calcColorEvents(events){const map=new Map();for(const e of events.slice
 // legenda wykresu z przełącznikami: items=[{k,label,color,dash}], vis(k) → bool; kliknięcie wywołuje onToggle(k)
 function chartLegendHtml(items,vis){return `<div class="lgnd" role="group" aria-label="Pokaż lub ukryj linie">${items.map(it=>`<button type="button" data-lg="${esc(it.k)}" aria-pressed="${vis(it.k)}" title="Kliknij, aby ${vis(it.k)?"ukryć":"pokazać"} linię"><i style="${it.dash?`height:0;border-top:3px dashed ${it.color}`:`background:${it.color}`}"></i>${esc(it.label)}</button>`).join("")}</div>`}
 function chartLegendBind(el,onToggle){el.querySelectorAll(".lgnd button[data-lg]").forEach(b=>b.addEventListener("click",()=>onToggle(b.dataset.lg)))}
-// skala osi procentowej (CPI, stopa NBP): {lo,hi,step,pos(v)} dla przedziału pikseli [top,bottom]
-function pctAxis(vals,top,bottom){let lo=Math.min(0,...vals),hi=Math.max(1,...vals);const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
-  const step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);lo=Math.floor(lo/step)*step;hi=Math.ceil(hi/step)*step;if(hi===lo)hi=lo+step;
-  return {lo,hi,step,pos:v=>top+(bottom-top)*(hi-v)/(hi-lo)}}
-// dane do linii CPI i stopy NBP na wykresie: historia jak w obliczeniach, dalej scenariusz
-const calcMacro=(c,p)=>({cpiAt:Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now),nbpAt:Zamiana.makeNbpAt(p.nbpHistory,p.nbpFuture,p.now),nbp:calcUsesNbp(c)});
+// linie odniesienia w zł: wpłaty od miesiąca zakupu rosnące co miesiąc o inflację CPI r/r albo o stopę NBP,
+// (1+r/100)^(1/12); yms = kolejne miesiące wykresu, buys = [{ym,amount}] (zakup przed początkiem osi liczy się od pierwszego punktu);
+// tax — podatek od zysku (linia stopy NBP po podatku Belki jak obligacje; inflacja bez podatku)
+function benchLine(yms,buys,at,tax){let v=0,paid=0;return yms.map((ym,i)=>{if(i)v*=Math.pow(1+Math.max(-50,at(ym))/100,1/12);
+  for(const b of buys)if(b.amount&&(b.ym===ym||(i===0&&b.ym<ym))){v+=b.amount;paid+=b.amount}return v-Math.max(0,v-paid)*(tax||0)})}
+// dane do linii odniesienia (inflacja, stopa NBP): historia jak w obliczeniach, dalej scenariusz
+const calcMacro=(c,p)=>({cpiAt:Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now),nbpAt:Zamiana.makeNbpAt(p.nbpHistory,p.nbpFuture,p.now),nbp:calcUsesNbp(c),tax:p.tax===false?0:(p.taxRate||0.19)});
 function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   events=events||[];lab=lab||{keep:"Trzymam",swap:"Zamieniam"};purchases=purchases||[];macro=macro||{};
   const el=$("#z-chart");if(!el)return;
@@ -463,10 +466,13 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   // punkty: historia od zakupu (wspólna) + przyszłość (dwa warianty); indeks k = 0..N, dziś = P
   const pastAll=r.past||[],past=range==="future"?pastAll.slice(-1):pastAll,P=Math.max(0,past.length-1),fut=r.months;
   const pts=past.map(p=>({ym:p.ym,t:p.t,keep:p.value,swap:null})).slice(0,P).concat(fut.map(m=>({ym:m.ym,t:m.t,keep:m.keep,swap:m.swap,diff:m.diff})));
-  const showCpi=!!macro.cpiAt&&vis("cpi"),showNbp=!!macro.nbpAt&&vis("nbp");
-  pts.forEach(m=>{if(macro.cpiAt)m.cpi=macro.cpiAt(m.ym);if(macro.nbpAt)m.nbp=macro.nbpAt(m.ym)});
-  const n=pts.length;const W=Math.max(640,el.clientWidth||900),L=64,R=showCpi||showNbp?46:14,T=22,M1=270,D0=M1+22,D1=D0+86,H=D1+26;
-  let vals=pts.flatMap((m,i)=>[i<P?(vis("hist")?m.keep:null):(vis("keep")?m.keep:null),vis("swap")?m.swap:null]).filter(v=>v!=null);
+  // linie odniesienia liczone na pełnej osi (od zakupu), potem wycinek widocznego zakresu
+  const hasBench=purchases.some(z=>z.amount>0),fullYm=pastAll.slice(0,Math.max(0,pastAll.length-1)).map(z=>z.ym).concat(fut.map(m=>m.ym));
+  const hasCpi=hasBench&&!!macro.cpiAt,hasNbp=hasBench&&!!macro.nbpAt,showCpi=hasCpi&&vis("cpi"),showNbp=hasNbp&&vis("nbp");
+  if(hasCpi){const b=benchLine(fullYm,purchases,macro.cpiAt).slice(-pts.length);pts.forEach((m,i)=>m.cpi=b[i])}
+  if(hasNbp){const b=benchLine(fullYm,purchases,macro.nbpAt,macro.tax).slice(-pts.length);pts.forEach((m,i)=>m.nbp=b[i])}
+  const n=pts.length;const W=Math.max(640,el.clientWidth||900),L=64,R=14,T=22,M1=270,D0=M1+22,D1=D0+86,H=D1+26;
+  let vals=pts.flatMap((m,i)=>[i<P?(vis("hist")?m.keep:null):(vis("keep")?m.keep:null),vis("swap")?m.swap:null,showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null);
   if(!vals.length)vals=pts.flatMap(m=>[m.keep,m.swap]).filter(v=>v!=null);let min=Math.min(...vals),max=Math.max(...vals);
   const nice=(span)=>{const raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw||1)));return [1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw)};
   const span=max-min||max*0.1||1,step=nice(span);
@@ -482,13 +488,9 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   g+=`<line x1="${L}" x2="${W-R}" y1="${dy(0)}" y2="${dy(0)}" style="stroke:var(--ink-2);stroke-width:1"/><text x="${L-6}" y="${dy(0)+4}" text-anchor="end">0</text>`;
   if(hi>pad*1.5)g+=`<text x="${L-6}" y="${dy(hi)+10}" text-anchor="end" style="fill:var(--ok)">${dlab(Math.max(...diffs,0))}</text>`;
   if(lo<-pad*1.5)g+=`<text x="${L-6}" y="${dy(lo)}" text-anchor="end" style="fill:var(--bad)">${dlab(Math.min(...diffs,0))}</text>`;
-  // prawa oś: CPI r/r i stopa NBP (%)
-  let pax=null,macroPaths="";
-  if(showCpi||showNbp){const pv=pts.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null);pax=pctAxis(pv,T,M1);
-    for(let v=pax.lo;v<=pax.hi+1e-9;v+=pax.step)g+=`<text x="${W-R+6}" y="${pax.pos(v)+4}" text-anchor="start" style="fill:var(--muted)">${fmt(v,v%1?1:0)}%</text>`;
-    const pl=k=>pts.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+pax.pos(m[k]).toFixed(1)).join(" ");
-    if(showCpi)macroPaths+=`<path d="${pl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.6" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
-    if(showNbp)macroPaths+=`<path d="${pl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.6" stroke-dasharray="2 3" stroke-linejoin="round"/>`;}
+  let macroPaths="";const bl=k=>pts.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(m[k]).toFixed(1)).join(" ");
+  if(showCpi)macroPaths+=`<path d="${bl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.8" stroke-dasharray="6 4" stroke-linejoin="round"/>`;
+  if(showNbp)macroPaths+=`<path d="${bl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.8" stroke-dasharray="2 3" stroke-linejoin="round"/>`;
   // oś X: styczeń każdego roku (co 2 lata przy długich okresach), podpisy pod paskiem różnicy
   let xt="";const yrs=Math.ceil(n/12),every=yrs>14?2:1;
   pts.forEach((m,i)=>{if(m.ym.slice(5)==="01"&&(+m.ym.slice(0,4))%every===0)xt+=`<line x1="${x(i)}" x2="${x(i)}" y1="${D1}" y2="${D1+4}" style="stroke:var(--muted)"/><text x="${x(i)}" y="${D1+17}" text-anchor="middle">${m.ym.slice(0,4)}</text>`});
@@ -501,7 +503,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   const todayAnchor=P>n*0.85?"end":P<n*0.08?"start":"middle";
   const lgItems=[...(P>0?[{k:"hist",label:`od zakupu do ${calcIsToday()?"dziś":"zerwania"}`,color:"var(--ink-2)"}]:[]),{k:"keep",label:lab.keep.toLowerCase()==="trzymam"?`trzymam ${oldCode}`:lab.keep.toLowerCase(),color:"var(--muted)"},
     {k:"swap",label:lab.swap.toLowerCase()==="zamieniam"?`zamieniam na ${tgtCode}`:`${lab.swap.toLowerCase()} na ${tgtCode}`,color:"var(--accent)"},
-    ...(macro.cpiAt?[{k:"cpi",label:"inflacja CPI (%)",color:"var(--s-CPI)",dash:1}]:[]),...(macro.nbpAt?[{k:"nbp",label:"stopa NBP (%)",color:"var(--s-NBP)",dash:1}]:[])];
+    ...(hasCpi?[{k:"cpi",label:"wpłata + inflacja",color:"var(--s-CPI)",dash:1}]:[]),...(hasNbp?[{k:"nbp",label:macro.tax?"wpłata na stopie NBP (po podatku)":"wpłata na stopie NBP",color:"var(--s-NBP)",dash:1}]:[])];
   el.innerHTML=chartLegendHtml(lgItems,vis)+`<div class="ctools"><span class="small">Oś od:${calcTip("range")}</span><button type="button" class="chip" data-range="all" aria-pressed="${range==="all"}">zakupu</button><button type="button" class="chip" data-range="future" aria-pressed="${range==="future"}" title="Oś Y tylko dla prognozy — linie są bardziej rozsunięte">${calcIsToday()?"dziś":"zerwania"} (przybliżenie)</button></div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wartość: ${esc(lab.keep.toLowerCase())} kontra ${esc(lab.swap.toLowerCase())}, z paskiem różnicy">${g}<line x1="${L}" x2="${W-R}" y1="${M1}" y2="${M1}" style="stroke:var(--line-strong)"/>${xt}
     ${P>0?`<rect x="${L}" y="${T}" width="${x(P)-L}" height="${D1-T}" style="fill:var(--surface-2);opacity:.6"/>`:""}
@@ -527,7 +529,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   const when=m=>m.t<0?`${Math.round(-m.t)} mies. ${td?"temu":"przed zerwaniem"}`:m.t===0?(td?"dziś":"zerwanie"):`${td?"za ":""}${m.t} mies.${td?"":" po zerwaniu"}`;
   const show=i=>{const m=pts[i];hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
     const hint=docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':"";
-    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>CPI r/r <span class="num">${fmt(m.cpi,1)}%</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Stopa NBP <span class="num">${fmt(m.nbp)}%</span></div>`:"");
+    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>Wpłata + inflacja <span class="num">${zl0(m.cpi)}</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Wpłata na stopie NBP <span class="num">${zl0(m.nbp)}</span></div>`:"");
     const buyRows=buys.filter(z=>z.i===i).map(z=>`<div class="tr evrow" style="color:var(--ink)">＋ ${esc(z.p.text)}</div>`).join("");
     if(m.swap==null){
       dots.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--ink-2)" style="stroke:var(--surface);stroke-width:1.5"/>`;
