@@ -1,9 +1,9 @@
 name: Walidacja danych
 on:
   push:
-    paths: ["data/**", "scripts/**", "js/**", "index.html"]
+    paths: ["data/**", "scripts/**", "js/**", "css/**", "index.html", ".github/workflows/validate.yml"]
   pull_request:
-    paths: ["data/**", "scripts/**", "js/**", "index.html"]
+    paths: ["data/**", "scripts/**", "js/**", "css/**", "index.html", ".github/workflows/validate.yml"]
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -12,9 +12,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python3 scripts/validate.py
+      - name: Walidacja danych
+        run: python3 scripts/validate.py
+      - name: Wersje plików strony w index.html
+        run: python3 scripts/assets.py
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Testy kalkulatora zamiany
         run: node scripts/test_zamiana.js
+
+  strona:
+    name: Test strony w przeglądarce
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Playwright z Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Wszystkie zakładki i linki kalkulatora (komputer i telefon)
+        run: node scripts/test_strona.js

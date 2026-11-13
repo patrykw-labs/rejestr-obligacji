@@ -32,9 +32,11 @@ jobs:
           python-version: "3.12"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Walidacja danych
         run: python3 scripts/validate.py
+      - name: Wersje plików strony
+        run: python3 scripts/assets.py
       - name: Testy kalkulatora zamiany
         run: node scripts/test_zamiana.js
       - name: Utwórz wydanie

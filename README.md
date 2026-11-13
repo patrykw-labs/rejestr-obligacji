@@ -21,11 +21,11 @@ Na stronie są cztery widoki:
 
 ## Struktura
 
-- `index.html`: strona (czysty HTML + JS, bez kroku budowania)
+- `index.html`: szkielet strony; `css/style.css`: style; `js/app.js`, `js/kalkulator.js`, `js/start.js`: kod widoków (czysty HTML, CSS i JS, bez kroku budowania). `scripts/assets.py --fix` wpisuje do adresów plików skróty ich treści, żeby przeglądarka zawsze pobrała aktualną wersję.
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 - `data/przed-2019.json`: serie sprzed 2019 r. i inflacja z GUS za 2015–2018, tylko dla kalkulatora zamiany
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji
-- `js/zamiana.js`: silnik kalkulatora zamiany; `scripts/test_zamiana.js`: jego testy (m.in. zgodność z niezależnym arkuszem kontrolnym i z zasadami z listów emisyjnych), uruchamiane w GitHub Actions
+- `js/zamiana.js`: silnik kalkulatora zamiany; `scripts/test_zamiana.js`: jego testy (m.in. zgodność z niezależnym arkuszem kontrolnym i z zasadami z listów emisyjnych); `scripts/test_strona.js`: test strony w przeglądarce (wszystkie zakładki i linki kalkulatora, komputer i telefon). Wszystko uruchamiane w GitHub Actions
 - `.github/workflows/validate.yml`: uruchamia walidację po każdej zmianie danych
 - `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP, a 20. dnia sprawdza też, czy szybki szacunek CPI zastąpiono odczytem finalnym GUS; przy rozbieżności przebieg kończy się błędem
 - `assets/`: grafiki (baner)
