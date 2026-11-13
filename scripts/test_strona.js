@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
  * Test strony w przeglądarce (Playwright): otwiera każdą zakładkę i typowe linki kalkulatora zamiany,
- * sprawdza, czy widok się wyrenderował i czy nie było błędów JavaScript.
+ * sprawdza, czy widok się wyrenderował i czy nie było błędów JavaScript; także ciemny motyw (kontrast,
+ * przełącznik, eksport PNG), eksport CSV/PNG, „Wyczyść ustawienia” i zapamiętanie portfela.
  * Uruchom: node scripts/test_strona.js   (wymaga pakietu playwright z przeglądarką Chromium)
  */
 "use strict";
@@ -82,6 +83,85 @@ const CASES = [
       if (problem) { fail++; console.log(`✗ ${label} (${device}): ${problem}`); } else pass++;
       await ctx.close();
     }
+  }
+  // ciemny motyw: zakładki bez błędów i poziomego przewijania, kontrast tekstu, przełącznik motywu, eksport PNG
+  const DARK = [["#oferta", "main table"], ["#seria&w=1", "main table"], ["#zamiana&pf=EDO0127~40~10,EDO0434~100~15,COI1129~50~20&tt=EDO&bd=12", "#z-out .verdict"],
+    ["#kupno", "#b-out .verdict"], ["#portfel&pf=EDO0434~100~15,COI1129~50~20&bd=12", "#p-out .stats"]];
+  // kontrast WCAG tekstu względem tła (pierwsze nieprzezroczyste tło w górę drzewa); wynik: lista elementów poniżej progu
+  const contrastCheck = (page, min) => page.evaluate((min) => {
+    const rgb = (s) => { const n = (s.match(/-?[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(s) ? [n[0] * 255, n[1] * 255, n[2] * 255, n.length > 3 ? n[3] : 1] : [n[0], n[1], n[2], n.length > 3 ? n[3] : 1]; };
+    const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c[3] > 0.5) return c; } return [255, 255, 255, 1]; };
+    const bad = [];
+    for (const sel of ["main h2", "main .desc", "main th", "main td", "main .stat .v", "main .stat .s", "nav.tabs button", "main .chip", "main .btn", "main .insight", "footer"]) {
+      const el = document.querySelector(sel); if (!el) continue;
+      const a = lum(rgb(getComputedStyle(el).color)), b = lum(bgOf(el)), r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      if (r < min) bad.push(`${sel} ${r.toFixed(2)}:1`);
+    }
+    return { bad, bodyLum: lum(bgOf(document.body)) };
+  }, min);
+  for (const [hash, ready] of DARK) {
+    for (const [device, ctxOpts] of [["komputer", { viewport: { width: 1280, height: 900 } }], ["telefon", { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }]]) {
+      const ctx = await browser.newContext(Object.assign({ colorScheme: "dark" }, ctxOpts));
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+      let problem = null;
+      try {
+        await page.goto(base + hash);
+        await page.waitForSelector(ready, { timeout: 15000 });
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        if (overflow > 1) problem = `strona szersza niż ekran o ${overflow}px`;
+        const c = await contrastCheck(page, 4.5);
+        if (c.bodyLum > 0.1) problem = "ciemny motyw nie zadziałał (jasne tło)";
+        else if (c.bad.length) problem = "za słaby kontrast: " + c.bad.join(", ");
+      } catch (e) { problem = e.message.split("\n")[0]; }
+      if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+      if (problem) { fail++; console.log(`✗ ciemny motyw ${hash} (${device}): ${problem}`); } else pass++;
+      await ctx.close();
+    }
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: "light" });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      // jasny motyw: ten sam próg kontrastu
+      await page.goto(base + "#zamiana&k=EDO0434&n=100&tt=EDO&bd=12");
+      await page.waitForSelector("#z-out .verdict");
+      const cl = await contrastCheck(page, 4.5);
+      if (cl.bad.length) problem = "jasny motyw — za słaby kontrast: " + cl.bad.join(", ");
+      // przełącznik: ciemny motyw zapisany w localStorage i zachowany po przeładowaniu
+      await page.click("#theme-btn");
+      const t1 = await page.evaluate(() => [document.documentElement.dataset.theme, localStorage.getItem("theme")]);
+      if (t1[0] !== "dark" || t1[1] !== "dark") problem = "przełącznik nie ustawił ciemnego motywu: " + t1.join("/");
+      await page.reload();
+      await page.waitForSelector("#z-out .verdict");
+      const after = await contrastCheck(page, 4.5);
+      if (await page.evaluate(() => document.documentElement.dataset.theme) !== "dark" || after.bodyLum > 0.1) problem = "po przeładowaniu motyw nie jest ciemny";
+      // eksport PNG w ciemnym motywie: tło obrazu = --surface, sensowny rozmiar
+      const png = await page.evaluate(async () => {
+        const blob = await chartPngBlob(document.querySelector("#z-chart"), "test", "ciemny motyw");
+        const img = await createImageBitmap(blob), cv = document.createElement("canvas");
+        cv.width = img.width; cv.height = img.height; const ctx = cv.getContext("2d"); ctx.drawImage(img, 0, 0);
+        const px = Array.from(ctx.getImageData(4, 4, 1, 1).data).slice(0, 3);
+        const hex = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim();
+        const want = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+        return { size: blob.size, px, want };
+      });
+      if (png.size < 20000) problem = `PNG w ciemnym motywie za mały (${png.size} B)`;
+      if (png.px.some((v, i) => Math.abs(v - png.want[i]) > 3)) problem = `tło PNG ${png.px} zamiast --surface ${png.want}`;
+      // powrót do jasnego
+      await page.click("#theme-btn");
+      if (await page.evaluate(() => localStorage.getItem("theme")) !== "light") problem = "przełącznik nie wrócił do jasnego motywu";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    if (problem) { fail++; console.log("✗ motyw — przełącznik, kontrast i PNG: " + problem); } else pass++;
+    await ctx.close();
   }
   // eksport: PNG wykresu i CSV tabeli (komputer) oraz kanał Atom
   const DL = [["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", ["z-png", "z-csv"]], ["#zamiana&pf=EDO0434~100~15,COI1129~50~20&tt=EDO&bd=12", ["z-png", "z-csv"]],
