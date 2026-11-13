@@ -238,9 +238,20 @@ function renderCalc(main){
 function calcHorizonLabel(c){const el=$("#z-h");if(!el)return;const mats=c.pos.map(calcMaturity).filter(Boolean).sort(),m=mats[mats.length-1];
   el.options[0].textContent=(c.pos.length>1?"do wykupu ostatniej serii":"do wykupu starej serii")+(m?" ("+mShort(m)+")":"")}
 const calcAfter=t=>t===0?(calcIsToday()?"dziś":"zerwanie"):(t%12?fmt(t/12,1)+" roku":t/12+(t===12?" rok":[2,3,4].includes((t/12)%10)&&!(t/12>=12&&t/12<=14)?" lata":" lat"));
+// wiersze tabeli rok po roku: co 12 miesięcy, koniec okresu i miesiące zdarzeń (wykupy)
+function calcYearRows(H,events){const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
+  for(const e of events)if(!rows.includes(e.t))rows.push(e.t);return rows.sort((a,b)=>a-b)}
+// eksport wyniku: CSV tabeli rok po roku (z linkiem i założeniami) i PNG wykresu
+function calcBindExport(c,ms,H,events,lab,title,fileKey){
+  const now=calcNow(),base=`zamiana-${fileSafe(fileKey)}-${now}`;
+  $("#z-csv").addEventListener("click",()=>{const rows=calcYearRows(H,events).map(t=>{const m=ms[t];return [t,m.ym,csvNum(m.keep),csvNum(m.swap),csvNum(m.diff),csvNum(m.diffReal),events.filter(e=>e.t===t).map(e=>e.text).join(" | ")]});
+    downloadCsv(base+".csv",["Po (mies.)","Miesiąc",lab.keep+" (zł)",lab.swap+" (zł)","Różnica (zł)","Różnica realnie (zł)","Zdarzenia"],rows,
+      [["Wyliczenie",title],["Zerwanie",calcBreakDate(c)],["Rachunek",calcTaxTxt(c)],["Wycena",c.val==="liquidate"?"wypłata wszystkiego (z opłatą)":"trzymam (bez opłaty za wykup)"],
+       ["Inflacja dalej",c.sc==="custom"?c.cpi.slice(0,Math.ceil(H/12)).map(v=>fmt(v,1)+"%").join(", "):fmt(CPI_PRESETS[c.sc].v,1)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — symulacja, nie rekomendacja inwestycyjna"]])});
+  $("#z-png").addEventListener("click",()=>downloadChartPng($("#z-chart"),base+".png",title,`${lab.keep} vs ${lab.swap.toLowerCase()} · zerwanie ${calcBreakDate(c)} · ${calcTaxTxt(c)}`));
+}
 function calcYearTable(ms,H,events,lab){
-  const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
-  for(const e of events)if(!rows.includes(e.t))rows.push(e.t);rows.sort((a,b)=>a-b);
+  const rows=calcYearRows(H,events);
   return `<div class="card table-card"><div class="frame"><table><thead><tr><th>Po</th><th>Miesiąc</th><th class="r">${esc(lab.keep)}</th><th class="r">${esc(lab.swap)}</th><th class="r">Różnica</th><th class="r">Różnica realnie${calcTip("real",1)}</th></tr></thead><tbody>
       ${rows.map(t=>{const m=ms[t];const evs=events.filter(e=>e.t===t);return `<tr${evs.length?' class="ev"':""}><td>${calcAfter(t)}${evs.map(e=>`<span class="evt"><b style="color:${e.color||"inherit"}">↻</b> ${esc(e.text)}</span>`).join("")}</td><td>${mShort(m.ym)}</td><td class="r num">${zl0(m.keep)}</td><td class="r num">${zl0(m.swap)}</td><td class="r num"><span class="${m.diff>0?"d-up":m.diff<0?"d-down":"d-0"}">${sgn(m.diff)}</span></td><td class="r num">${sgn(m.diffReal)}</td></tr>`}).join("")}
     </tbody></table></div></div>`;
@@ -369,9 +380,11 @@ function calcRecompute(){
       ${calcFutureBuysHtml(c,events)}
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
+    ${exportRowHtml("z")}
     ${calcShareHtml}
   </div>`;
   drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,amount:Math.floor(+o.n)*100,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
+  calcBindExport(c,r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"},`${Math.floor(+o.n)} szt. ${oldCode} → ${tgtCode}`,`${oldCode}-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);
 }
 function calcRecomputePortfolio(out,c,now){
@@ -425,9 +438,11 @@ function calcRecomputePortfolio(out,c,now){
       ${calcFutureBuysHtml(c,events)}
       <li>Obliczenia w pełnych miesiącach; to symulacja, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
+    ${exportRowHtml("z")}
     ${calcShareHtml}
   </div>`;
   drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,amount:Math.floor(+z.o.n)*100,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
+  calcBindExport(c,ms,H,events,lab,`Portfel ${rowsP.length} serii → ${tgtCode}`,`portfel-${rowsP.length}-serii-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);
 }
 // kod serii kupionej w danym miesiącu: typ + MMRR terminu wykupu (np. EDO z 04.2034 → EDO0444)

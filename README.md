@@ -19,11 +19,14 @@ Na stronie jest sześć widoków (w każdym dymki „?” objaśniają pola i ko
 - **Co kupić?**: wpisujesz kwotę, okres i założenia (inflacja, stopa NBP, konto, rachunek zwykły / IKE / IKZE), a strona porównuje wszystkie serie z bieżącej oferty: ile każda da na rękę na koniec okresu (po opłacie za wcześniejszy wykup i podatku), nominalnie i realnie, z rankingiem, wykresem i progiem inflacji, przy którym zmienia się zwycięzca. ROS i ROD pokazuje na życzenie (tylko dla beneficjentów 800+).
 - **Mój portfel**: wpisujesz serie, które masz (do 20), a strona pokazuje ich wartość dziś (z narosłymi odsetkami), ile dostaniesz na rękę po zerwaniu (opłata i podatek), ile przy wykupie w terminie, a także najbliższe 12 miesięcy: kupony, nowe oprocentowanie (znane z odczytów GUS/NBP albo prognoza) i wykupy. Jednym kliknięciem przechodzisz z tymi seriami do kalkulatora zamiany.
 
+Wyniki kalkulatora zamiany i „Co kupić?” można pobrać: wykres jako PNG, tabelę jako CSV (otwiera się w Excelu). Nowe oferty można śledzić w czytniku RSS: kanał Atom [`feed.xml`](https://patrykw-labs.github.io/rejestr-obligacji/feed.xml).
+
 > Projekt jest nieoficjalny. Nie jest powiązany z Ministerstwem Finansów, PKO BP ani serwisem obligacjeskarbowe.pl i nie jest rekomendacją inwestycyjną. Dane pochodzą z publicznych źródeł: listów emisyjnych, [obligacjeskarbowe.pl](https://www.obligacjeskarbowe.pl), komunikatów MF, [GUS](https://stat.gov.pl) i [NBP](https://nbp.pl). Wiążące są listy emisyjne.
 
 ## Struktura
 
 - `index.html`: szkielet strony; `css/style.css`: style; `js/app.js`, `js/kalkulator.js`, `js/kupno.js`, `js/portfel.js`, `js/start.js`: kod widoków (czysty HTML, CSS i JS, bez kroku budowania). `scripts/assets.py --fix` wpisuje do adresów plików skróty ich treści, żeby przeglądarka zawsze pobrała aktualną wersję.
+- `feed.xml`: kanał Atom z ofertami z ostatnich 36 miesięcy, generowany z danych przez `scripts/feed.py` (`validate.py` sprawdza, czy jest aktualny).
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 - `data/przed-2019.json`: serie sprzed 2019 r. i inflacja z GUS za 2015–2018, tylko dla kalkulatora zamiany
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji

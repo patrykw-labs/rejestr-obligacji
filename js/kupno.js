@@ -137,10 +137,19 @@ function buyRecompute(){
       <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od dziś rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${b.acc==="std"?" (zysk po 19% podatku)":""}.</li>
       <li>To symulacja przy stałych założeniach, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
+    ${exportRowHtml("b")}
     ${calcShareHtml}
   </div>`;
   const pp=buyParams(b,cands);
   buyDrawChart(rank,{amount:+b.kw,tax:pp.tax===false?0:(pp.taxRate||0.19),cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
+  // eksport: ranking (jak tabela) i wartość każdej serii miesiąc po miesiącu; PNG wykresu
+  const base=`co-kupic-${fileSafe(zl0(+b.kw).replace(/ zł$/,"zl"))}-${H}m-${off.id}`;
+  $("#b-csv").addEventListener("click",()=>{
+    const rows=rank.map((x,i)=>[i+1,x.c.code,buyRuleTxt(x.c),csvNum(x.final),csvNum(x.gain),csvNum(x.annual==null?null:x.annual*100),csvNum(x.finalReal),notes(x)]);
+    const monthly=[[],["Miesiąc","Po (mies.)",...rank.map(x=>x.c.code+" (zł)")],...rank[0].series.map((m,t)=>[m.ym,t,...rank.map(x=>csvNum(x.series[t].total))])];
+    downloadCsv(base+".csv",["#","Seria","Oprocentowanie","Na koniec (zł)","Zysk (zł)","Rocznie (%)","Realnie (zł)","Uwagi"],rows.concat(monthly),
+      [["Kwota",csvNum(+b.kw)],["Okres",hTxt],["Rachunek",calcTaxTxt({acc:b.acc})],["Wycena",liq?"wypłata wszystkiego na koniec":"bez wypłaty"],["Inflacja dalej",b.sc==="custom"?b.cpi.slice(0,Math.ceil(H/12)).map(v=>fmt(v,1)+"%").join(", "):fmt(CPI_PRESETS[b.sc].v,1)+"%"],["Stopa NBP dalej",fmt(+b.nbp)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — symulacja, nie rekomendacja inwestycyjna"]])});
+  $("#b-png").addEventListener("click",()=>downloadChartPng($("#b-chart"),base+".png",`Co kupić: ${zl0(+b.kw)} na ${hTxt}`,`oferta ${mLabel(off.id)} · ${calcTaxTxt({acc:b.acc})} · ${liq?"wypłata na koniec okresu":"bez wypłaty"}`));
   calcBindShare();calcBindTips(out);
 }
 function buyDrawChart(rank,macro){

@@ -31,6 +31,53 @@ const mShort=id=>{const [y,m]=id.split("-");return m+"."+y};
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const colorOf=k=>cssVar("--s-"+k)||LEGACY[k]||"#888";
+// ===== eksport: CSV (średnik, przecinek dziesiętny, BOM — poprawnie otwiera się w polskim Excelu) i PNG wykresu =====
+const csvNum=(v,d=2)=>v==null||v===""||isNaN(v)?"":Number(v).toFixed(d).replace(".",",");
+function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.rel="noopener";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+function downloadCsv(name,header,rows,meta){
+  const q=v=>{const t=String(v??"");return /[;"\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+  const lines=[header,...rows].concat(meta&&meta.length?[[],...meta]:[]).map(r=>r.map(q).join(";"));
+  downloadBlob(new Blob(["﻿"+lines.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"}),name);
+}
+// PNG wykresu: kopia SVG z wpisanymi stylami (zmienne CSS i style arkusza nie działają w obrazku), nad nią tytuł i legenda (widoczne linie), pod nią źródło
+const PNG_PROPS=["fill","fill-opacity","stroke","stroke-width","stroke-dasharray","stroke-opacity","stroke-linejoin","stroke-linecap","opacity","visibility","font-family","font-size","font-weight","paint-order","text-anchor","dominant-baseline"];
+function chartPngBlob(chartEl,title,subtitle){
+  return new Promise((ok,fail)=>{
+    const svg=chartEl.querySelector("svg");if(!svg)return fail(new Error("Brak wykresu"));
+    const vb=svg.viewBox.baseVal,W=vb.width,H=vb.height,clone=svg.cloneNode(true);
+    const src=[svg,...svg.querySelectorAll("*")],dst=[clone,...clone.querySelectorAll("*")];
+    src.forEach((el,i)=>{const cs=getComputedStyle(el),d=dst[i];for(const k of PNG_PROPS){const v=cs.getPropertyValue(k);if(v)d.setAttribute(k,v)}d.removeAttribute("style");d.removeAttribute("class")});
+    // elementy podglądu pod kursorem (linia, kropki) pomijamy
+    src.forEach((el,i)=>{if(el.matches&&el.matches(".zhov,.zpts,.bhov,.bpts,#hov,#hovpts"))dst[i].remove()});
+    clone.setAttribute("xmlns","http://www.w3.org/2000/svg");clone.setAttribute("width",W);clone.setAttribute("height",H);
+    const root=getComputedStyle(document.documentElement),col=n=>root.getPropertyValue(n).trim();
+    const font=getComputedStyle(document.body).fontFamily,S=2,pad=20;
+    const items=[...chartEl.querySelectorAll('.lgnd button[aria-pressed="true"]')].map(b=>{const i=b.querySelector("i"),cs=getComputedStyle(i);
+      const dashed=cs.borderTopStyle==="dashed";return {label:b.textContent.trim(),color:dashed?cs.borderTopColor:cs.backgroundColor,dashed}});
+    const cv=document.createElement("canvas"),ctx=cv.getContext("2d");
+    // układ legendy (zawijanie wierszy)
+    ctx.font=`600 13px ${font}`;const rows=[[]];let x=pad;
+    for(const it of items){const w=26+ctx.measureText(it.label).width+18;if(x+w>W-pad&&rows[rows.length-1].length){rows.push([]);x=pad}rows[rows.length-1].push(Object.assign(it,{x}));x+=w}
+    const head=pad+24+(subtitle?20:0)+(items.length?rows.length*22+6:0)+8,foot=30;
+    cv.width=W*S;cv.height=(head+H+foot)*S;ctx.scale(S,S);
+    ctx.fillStyle=col("--surface")||"#fff";ctx.fillRect(0,0,W,head+H+foot);
+    ctx.fillStyle=col("--ink")||"#111";ctx.font=`800 18px ${font}`;ctx.textBaseline="alphabetic";ctx.fillText(title,pad,pad+16);
+    let y=pad+24;if(subtitle){ctx.fillStyle=col("--muted")||"#666";ctx.font=`500 13px ${font}`;ctx.fillText(subtitle,pad,y+12);y+=20}
+    ctx.font=`600 13px ${font}`;rows.forEach(r=>{for(const it of r){ctx.strokeStyle=it.color;ctx.lineWidth=3;ctx.setLineDash(it.dashed?[5,3]:[]);ctx.beginPath();ctx.moveTo(it.x,y+9);ctx.lineTo(it.x+18,y+9);ctx.stroke();
+      ctx.setLineDash([]);ctx.fillStyle=col("--ink-2")||"#333";ctx.fillText(it.label,it.x+26,y+13)}y+=22});
+    const img=new Image();
+    img.onload=()=>{ctx.drawImage(img,0,head,W,H);ctx.fillStyle=col("--muted")||"#666";ctx.font=`500 11.5px ${font}`;
+      ctx.fillText(`Rejestr ofert obligacji · patrykw-labs.github.io/rejestr-obligacji · symulacja, nie rekomendacja inwestycyjna`,pad,head+H+19);
+      cv.toBlob(b=>b?ok(b):fail(new Error("Nie udało się utworzyć obrazu")),"image/png")};
+    img.onerror=()=>fail(new Error("Nie udało się narysować wykresu"));
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(new XMLSerializer().serializeToString(clone));
+  });
+}
+async function downloadChartPng(chartEl,name,title,subtitle){try{downloadBlob(await chartPngBlob(chartEl,title,subtitle),name)}catch(e){alert(e.message)}}
+// przyciski eksportu (prefix id: z, b, p); png=false — tylko CSV
+const exportRowHtml=(p,png=true,csvLabel="tabela CSV")=>`<div class="row"><span class="small">Pobierz:</span>${png?`<button type="button" class="btn" id="${p}-png" data-goatcounter-click="eksport-png-${p}">wykres PNG</button>`:""}<button type="button" class="btn" id="${p}-csv" data-goatcounter-click="eksport-csv-${p}">${csvLabel}</button></div>`;
+const fileSafe=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ł/g,"l").replace(/Ł/g,"L").replace(/[^A-Za-z0-9.-]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
+
 function seriesKeys(rec){const s=rec?.series||{};const ks=Object.keys(s);return [...SERIES.filter(k=>ks.includes(k)),...ks.filter(k=>!SERIES.includes(k)).sort()]}
 function statusPill(st){if(st==="zweryfikowany")return '<span class="pill p-ok">zweryfikowany</span>';if(st==="częściowo")return '<span class="pill p-part">częściowo</span>';return '<span class="pill p-warn">do weryfikacji</span>'}
 function ruleText(s){if(!s)return"–";const r=s.rule||"";if(r==="stałe")return"stałe";const m=s.margin==null?"?":fmt(s.margin);if(r==="NBP+marża")return"stopa ref. NBP + "+m+" p.p.";if(r==="CPI+marża")return"inflacja + "+m+" p.p.";return esc(r)}
@@ -40,7 +87,7 @@ function delta(a,b){if(a==null||b==null)return'<span class="d-0">–</span>';con
 // na wąskim ekranie pasek zakładek się przewija — aktywna zakładka zawsze widoczna
 function tabIntoView(){const b=document.querySelector('nav.tabs button[aria-selected="true"]'),n=b&&b.parentElement;if(!n||n.scrollWidth<=n.clientWidth)return;
   const l=b.offsetLeft-n.offsetLeft,r=l+b.offsetWidth;if(l<n.scrollLeft)n.scrollLeft=l-8;else if(r>n.scrollLeft+n.clientWidth)n.scrollLeft=r-n.clientWidth+8}
-function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));tabIntoView();try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v==="portfel"&&state.pf?pfHash(state.pf):v==="seria"?seriaHash():v))}catch(e){}render()}
+function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));tabIntoView();try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v==="portfel"&&state.pf?pfHash(state.pf):v==="seria"?seriaHash():v==="oferta"?offerHash():v))}catch(e){}render()}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 
 function render(){
@@ -57,7 +104,12 @@ function render(){
 
 function monthSelect(id){return `<label class="field"><span class="flabel">Miesiąc oferty</span><span class="sel"><select id="sel-month">${[...state.months].reverse().map(m=>`<option value="${m.id}"${m.id===id?" selected":""}>${mLabel(m.id)}</option>`).join("")}</select></span></label>`}
 
+// Oferta w adresie: #oferta&m=RRRR-MM (miesiąc inny niż najnowszy; na ten adres prowadzą wpisy kanału Atom)
+function offerHash(){const last=state.months[state.months.length-1]?.id;return state.month&&state.month!==last?"oferta&m="+state.month:"oferta"}
 function renderOffer(main){
+  if(!state.ofHashRead){state.ofHashRead=true;const parts=(location.hash||"").slice(1).split("&");
+    if(parts[0]==="oferta"){const m=(parts.find(x=>x.startsWith("m="))||"").slice(2);if(state.months.find(x=>x.id===m))state.month=m}}
+  try{history.replaceState(null,"","#"+offerHash())}catch(e){}
   const rec=state.months.find(m=>m.id===state.month),prev=prevOf(rec.id);
   const rows=seriesKeys(rec).map(k=>{const s=rec.series[k];const p=prev?.series?.[k];
     const src=s.source?`<a class="ext" href="${esc(s.source)}" target="_blank" rel="noopener" title="List emisyjny">list ↗</a>`:"–";
@@ -73,7 +125,7 @@ function renderOffer(main){
   const avail=k=>isOpen(k)?"":' <span class="pill p-part">'+esc(rec.series[k].availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>';
   const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`    +(rec.cpi!=null?`<br><span class="hint">„Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.</span>`:""):"";
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)}</p></div>${monthSelect(rec.id)}</div>
+    <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)} · <a href="feed.xml" data-goatcounter-click="feed-oferta" title="Kanał Atom: każda nowa oferta trafi do Twojego czytnika RSS">subskrybuj nowe oferty (RSS)</a></p></div>${monthSelect(rec.id)}</div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Stopa referencyjna NBP</span><span class="v">${pct(rec.nbpRef)}</span><span class="s">${esc(rec.nbpNote||"obowiązująca 1. dnia miesiąca")}</span></div>
       <div class="stat t-red"><span class="k">Inflacja CPI r/r ${rec.cpiRefMonth?"za "+mShort(rec.cpiRefMonth):""}</span><span class="v v-red">${pct(rec.cpi)}</span><span class="s">${rec.cpiKind?'<span class="pill '+(rec.cpiKind==="finalny"?"p-ok":"p-warn")+'">'+esc(rec.cpiKind)+'</span> ':""}${esc(rec.cpiNote||"")}</span></div>

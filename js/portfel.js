@@ -136,9 +136,16 @@ function pfRecompute(){
       <li>Wykup w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki)${tax?" po podatku":""}; bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej.</li>
       <li>To wycena orientacyjna, nie wyciąg z rachunku. Wiążące są listy emisyjne i dane w serwisie, w którym kupiłeś obligacje.</li>
     </ul></details>
+    ${exportRowHtml("p",false,"serie i zdarzenia CSV")}
     ${calcShareHtml}
   </div>`;
   $("#p-calc").addEventListener("click",e=>{e.preventDefault();state.calc=null;try{history.replaceState(null,"","#"+calcH)}catch(_){}state.view="zamiana";
     document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view==="zamiana")));render();scrollTo(0,0)});
+  $("#p-csv").addEventListener("click",()=>{
+    const rows=live.map(x=>[x.code,x.spec.count,pfDate(x.spec.purchase,pd(x.i)),pfDate(x.maturity,pd(x.i)),csvNum(x.rateNow*100),pfDate(x.periodEnd,pd(x.i)),csvNum(x.gross),csvNum(x.fee),csvNum(x.breakTax),csvNum(x.payout),csvNum(x.couponsPaid),csvNum(x.atMaturity),x.maturityKnown?"znana":"prognoza"]);
+    if(live.length>1)rows.push(["Razem",live.reduce((a,x)=>a+x.spec.count,0),"","","","",csvNum(gross),csvNum(fee),csvNum(tx),csvNum(pay),csvNum(paid),csvNum(mat),""]);
+    const evs=[[],["Data","Seria","Zdarzenie"],...ev.map(e=>[pfDate(e.ym,e.d),e.code,e.text])];
+    downloadCsv(`moj-portfel-${now}-${String(s.bd).padStart(2,"0")}.csv`,["Seria","Szt.","Zakup","Wykup","Oprocentowanie (%)","Koniec okresu","Wartość (zł)","Opłata przy zerwaniu (zł)","Podatek przy zerwaniu (zł)","Na rękę po zerwaniu (zł)","Odsetki wypłacone dotąd (zł)","Wykup w terminie (zł)","Wykup"],rows.concat(evs),
+      [["Wycena na",pfDate(now,s.bd)],["Rachunek",tax?"zwykły (podatek Belki)":"IKE / IKZE (bez podatku Belki)"],["Inflacja dalej (prognozy)",fmt(CPI_PRESETS[s.sc].v,1)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — wycena orientacyjna"]])});
   calcBindShare();calcBindTips(out);
 }

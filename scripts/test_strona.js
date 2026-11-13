@@ -12,7 +12,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8", ".jpg": "image/jpeg", ".pdf": "application/pdf" };
+  ".json": "application/json; charset=utf-8", ".jpg": "image/jpeg", ".pdf": "application/pdf", ".xml": "application/atom+xml; charset=utf-8" };
 
 // prosty serwer plików repozytorium (bez zależności)
 const server = http.createServer((req, res) => {
@@ -26,6 +26,7 @@ const server = http.createServer((req, res) => {
 // [adres, opis, selektor, który musi się pojawić, tekst, który musi być w widoku]
 const CASES = [
   ["#oferta", "Oferta miesiąca", "main table", "§ 1"],
+  ["#oferta&m=2022-10", "Oferta miesiąca z adresu (link z kanału)", "main table", "październik 2022"],
   ["#wykres", "Wykres w czasie", "main svg", "§ 2"],
   ["#seria", "Historia serii", "main table", "§ 3"],
   ["#seria&w=1", "Historia serii — jak wypadła seria EDO", "main table", "pobiło"],
@@ -82,6 +83,35 @@ const CASES = [
       await ctx.close();
     }
   }
+  // eksport: PNG wykresu i CSV tabeli (komputer) oraz kanał Atom
+  const DL = [["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", ["z-png", "z-csv"]], ["#zamiana&pf=EDO0434~100~15,COI1129~50~20&tt=EDO&bd=12", ["z-png", "z-csv"]],
+    ["#kupno", ["b-png", "b-csv"]], ["#portfel&pf=EDO0434~100~15,COI1129~50~20&bd=12", ["p-csv"]]];
+  for (const [hash, ids] of DL) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    for (const id of ids) {
+      let problem = null;
+      try {
+        await page.goto(base + hash);
+        await page.waitForSelector("#" + id, { timeout: 15000 });
+        const [d] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.click("#" + id)]);
+        const buf = fs.readFileSync(await d.path());
+        if (id.endsWith("png") && buf.slice(1, 4).toString() !== "PNG") problem = "plik nie jest PNG";
+        if (id.endsWith("png") && buf.length < 20000) problem = `PNG za mały (${buf.length} B)`;
+        if (id.endsWith("csv") && !(buf[0] === 0xef && buf.toString("utf8").split("\n").length > 3 && buf.toString("utf8").includes(";"))) problem = "zły CSV";
+      } catch (e) { problem = e.message.split("\n")[0]; }
+      if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+      if (problem) { fail++; console.log(`✗ eksport ${id} (${hash}): ${problem}`); } else pass++;
+    }
+    await ctx.close();
+  }
+  try {
+    const xml = await (await fetch(base + "feed.xml")).text();
+    if (/<feed[\s>]/.test(xml) && (xml.match(/<entry>/g) || []).length >= 12) pass++; else { fail++; console.log("✗ feed.xml: brak wpisów"); }
+  } catch (e) { fail++; console.log("✗ feed.xml: " + e.message); }
   await browser.close();
   server.close();
   console.log(`${pass} OK, ${fail} błędów`);

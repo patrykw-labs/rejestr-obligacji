@@ -64,6 +64,16 @@ if PRE.exists():
             if not isinstance(s.get(k), (int, float)): errors.append(f"przed-2019/{code}: brak {k}")
         if not s.get("source") or not s.get("verifiedAt"): errors.append(f"przed-2019/{code}: brak source lub verifiedAt")
 
+# feed.xml (kanał Atom z ofertami) musi odpowiadać danym — po zmianie danych: python3 scripts/feed.py
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import feed
+    FEEDF = Path(__file__).resolve().parent.parent / "feed.xml"
+    if not FEEDF.exists() or FEEDF.read_text(encoding="utf-8") != feed.build():
+        errors.append("feed.xml nieaktualny — uruchom: python3 scripts/feed.py")
+except Exception as e:  # noqa: BLE001
+    errors.append(f"feed.xml: błąd generowania ({e})")
+
 for w in warnings: print("UWAGA:", w)
 for e in errors: print("BŁĄD:", e)
 print(f"{len(ids)} miesięcy ({ids[0]}–{ids[-1]}), błędów: {len(errors)}, uwag: {len(warnings)}")
