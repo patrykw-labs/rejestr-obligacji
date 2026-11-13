@@ -241,7 +241,7 @@ const calcAfter=t=>t===0?(calcIsToday()?"dziś":"zerwanie"):(t%12?fmt(t/12,1)+" 
 function calcYearTable(ms,H,events,lab){
   const rows=[];for(let t=0;t<=H;t+=12)rows.push(t);if(rows[rows.length-1]!==H)rows.push(H);
   for(const e of events)if(!rows.includes(e.t))rows.push(e.t);rows.sort((a,b)=>a-b);
-  return `<div class="card table-card"><div class="frame"><table><thead><tr><th>Po</th><th>Miesiąc</th><th class="r">${esc(lab.keep)}</th><th class="r">${esc(lab.swap)}</th><th class="r">Różnica</th><th class="r">Różnica realnie</th></tr></thead><tbody>
+  return `<div class="card table-card"><div class="frame"><table><thead><tr><th>Po</th><th>Miesiąc</th><th class="r">${esc(lab.keep)}</th><th class="r">${esc(lab.swap)}</th><th class="r">Różnica</th><th class="r">Różnica realnie${calcTip("real",1)}</th></tr></thead><tbody>
       ${rows.map(t=>{const m=ms[t];const evs=events.filter(e=>e.t===t);return `<tr${evs.length?' class="ev"':""}><td>${calcAfter(t)}${evs.map(e=>`<span class="evt"><b style="color:${e.color||"inherit"}">↻</b> ${esc(e.text)}</span>`).join("")}</td><td>${mShort(m.ym)}</td><td class="r num">${zl0(m.keep)}</td><td class="r num">${zl0(m.swap)}</td><td class="r num"><span class="${m.diff>0?"d-up":m.diff<0?"d-down":"d-0"}">${sgn(m.diff)}</span></td><td class="r num">${sgn(m.diffReal)}</td></tr>`}).join("")}
     </tbody></table></div></div>`;
 }
@@ -295,18 +295,26 @@ const CALC_TIPS={
   cm:"Rzeczywiste: inflacja i stopa NBP po dacie zerwania z archiwum (jak to się naprawdę potoczyło). Tylko scenariusz: stan wiedzy z dnia decyzji.",
   acc:"Zwykły rachunek — podatek 19% od zysku. IKE — bez podatku. IKZE — bez podatku Belki, ale 10% ryczałtu przy wypłacie.",
   val:"Domyślnie wartość w czasie jest bez opłaty (nikt dalej nie zrywa). Ta opcja wycenia każdy miesiąc tak, jakbyś wypłacał wszystko, z opłatą.",
+  real:"Kwota w dzisiejszych złotych (przy zerwaniu w przeszłości — w złotych z dnia zerwania): wartość nominalna podzielona przez skumulowaną inflację z Twojego scenariusza. Pokazuje siłę nabywczą, a nie to, co zobaczysz na koncie — np. 11 877 zł po 5 latach przy inflacji 2,5% to realnie ok. 10 498 zł.",
   range:"Od zakupu — cała historia. Od zerwania — oś tylko dla prognozy, linie są bardziej rozsunięte."
 };
-const calcTip=k=>CALC_TIPS[k]?`<span class="qtip" tabindex="0" role="button" aria-label="Wyjaśnienie: ${esc(CALC_TIPS[k])}">?<span class="qtip-b" role="tooltip">${esc(CALC_TIPS[k])}</span></span>`:"";
+const calcTip=(k,down)=>CALC_TIPS[k]?`<span class="qtip${down?" down":""}" tabindex="0" role="button" aria-label="Wyjaśnienie: ${esc(CALC_TIPS[k])}">?<span class="qtip-b" role="tooltip">${esc(CALC_TIPS[k])}</span></span>`:"";
 // dotknięcie na telefonie: pokaż/ukryj dymek; nie aktywuj pola, do którego należy etykieta; dymek nie wychodzi poza ekran
 function calcBindTips(root){root.querySelectorAll(".qtip").forEach(q=>{
-  const fit=()=>{const b=q.querySelector(".qtip-b");b.style.setProperty("--dx","0px");const r=b.getBoundingClientRect(),W=document.documentElement.clientWidth;
+  const fit=()=>{const b=q.querySelector(".qtip-b");
+    // w tabelach (ramka z przewijaniem przycina) dymek pozycjonujemy względem okna
+    if(q.closest(".frame")){const r=q.getBoundingClientRect(),W=document.documentElement.clientWidth;b.style.position="fixed";b.style.transform="none";b.style.bottom="auto";
+      const bw=Math.min(270,W*0.8);b.style.left=Math.max(8,Math.min(W-8-bw,r.left+r.width/2-bw/2))+"px";b.style.top=(r.bottom+8)+"px";return}
+    b.style.setProperty("--dx","0px");const r=b.getBoundingClientRect(),W=document.documentElement.clientWidth;
     let dx=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;b.style.setProperty("--dx",dx+"px")};
   q.addEventListener("mouseenter",fit);q.addEventListener("focus",fit);
-  q.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();const open=!q.classList.contains("open");document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));if(open){q.classList.add("open");fit()}});
+  q.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();const open=!q.classList.contains("open");document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));if(open){calcTipY=scrollY;q.classList.add("open");fit()}});
   q.addEventListener("keydown",e=>{if(e.key==="Escape"){q.classList.remove("open");q.blur()}});
 })}
 document.addEventListener("click",()=>document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open")));
+// przy przewijaniu chowamy otwarte dymki (dymki w tabelach mają pozycję względem okna)
+let calcTipY=0;document.addEventListener("focusin",e=>{if(e.target.classList&&e.target.classList.contains("qtip"))calcTipY=scrollY});
+window.addEventListener("scroll",()=>{if(Math.abs(scrollY-calcTipY)<40)return;document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));const a=document.activeElement;if(a&&a.classList&&a.classList.contains("qtip"))a.blur()},{passive:true});
 const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.slice(0,4)}`};
 const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
 const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości w dniu zerwania wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>
@@ -363,7 +371,7 @@ function calcRecompute(){
     ${calcShareHtml}
   </div>`;
   drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}]);
-  calcBindShare();
+  calcBindShare();calcBindTips(out);
 }
 function calcRecomputePortfolio(out,c,now){
   let r,p;
@@ -419,7 +427,7 @@ function calcRecomputePortfolio(out,c,now){
     ${calcShareHtml}
   </div>`;
   drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})));
-  calcBindShare();
+  calcBindShare();calcBindTips(out);
 }
 // kod serii kupionej w danym miesiącu: typ + MMRR terminu wykupu (np. EDO z 04.2034 → EDO0444)
 function calcCodeFor(type,purchase){const m=Zamiana.addMonths(purchase,Zamiana.TYPES[type].term);return type+m.slice(5)+m.slice(2,4)}

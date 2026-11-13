@@ -124,7 +124,7 @@ function buyRecompute(){
     <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: ${zl0(best.final)} ${liq?"na rękę":""}</div>
       <div class="vs">Zysk ${sgn(best.gain)} (${pct(best.annual)} rocznie${b.acc==="std"?" po podatku":""}), realnie ${zl0(best.finalReal)} w dzisiejszych złotych.${second?` Drugie miejsce: ${esc(second.c.code)} (${sgn(second.final-best.final)}).`:""} ${beTxt}</div></div>
     <div class="card table-card"><div class="tc-head"><h3>Wszystkie serie z oferty</h3><p class="desc">Kwota ${zl0(+b.kw)}, okres ${esc(hTxt)}, ${calcTaxTxt({acc:b.acc})}. ${liq?"Wartość na koniec = wypłata wszystkiego (po opłacie i podatku) plus konto.":"Wartość na koniec bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty, plus konto."}</p></div>
-      <div class="frame"><table><thead><tr><th>#</th><th>Seria</th><th>Oprocentowanie</th><th class="r">Na koniec</th><th class="r">Zysk</th><th class="r">Rocznie</th><th class="r">Realnie</th><th>Uwagi</th></tr></thead><tbody>
+      <div class="frame"><table><thead><tr><th>#</th><th>Seria</th><th>Oprocentowanie</th><th class="r">Na koniec</th><th class="r">Zysk</th><th class="r">Rocznie</th><th class="r">Realnie${calcTip("real",1)}</th><th>Uwagi</th></tr></thead><tbody>
       ${rank.map((x,i)=>`<tr><td>${i+1}</td><td><b style="color:var(--s-${x.type})">${esc(x.c.code)}</b> <span class="small">${esc(Zamiana.TYPES[x.type].label)}</span></td><td>${esc(buyRuleTxt(x.c))}</td><td class="r num"><b>${zl0(x.final)}</b></td><td class="r num"><span class="${x.gain>0?"d-up":x.gain<0?"d-down":"d-0"}">${sgn(x.gain)}</span></td><td class="r num">${pct(x.annual)}</td><td class="r num">${zl0(x.finalReal)}</td><td class="small">${esc(notes(x))}</td></tr>`).join("")}
       </tbody></table></div></div>
     <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div>
@@ -140,7 +140,7 @@ function buyRecompute(){
     ${calcShareHtml}
   </div>`;
   buyDrawChart(rank);
-  calcBindShare();
+  calcBindShare();calcBindTips(out);
 }
 function buyDrawChart(rank){
   const el=$("#b-chart");if(!el)return;

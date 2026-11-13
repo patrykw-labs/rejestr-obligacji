@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Dymek „?” przy kolumnach „Realnie” i „Różnica realnie”: wyjaśnienie wartości w dzisiejszych złotych. Dymki w tabelach nie są już ucinane przez ramkę tabeli.
 - Nowa zakładka **„Co kupić?”**: ta sama kwota w każdą serię z bieżącej oferty — ranking według kwoty na rękę na koniec wybranego okresu (3 miesiące – 12 lat), zysk, roczna stopa i wartość realna, wykres w czasie, próg inflacji między pierwszym a drugim miejscem; scenariusze inflacji i stopy NBP, rachunek zwykły / IKE / IKZE, ROS i ROD dla beneficjentów 800+.
 
 ## v1.1.0 — 2026-11-13
