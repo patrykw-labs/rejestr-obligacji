@@ -123,13 +123,12 @@ function buyRecompute(){
   out.innerHTML=`<div class="vlist">
     <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: ${zl0(best.final)} ${liq?"na rękę":""}</div>
       <div class="vs">Zysk ${sgn(best.gain)} (${pct(best.annual)} rocznie${b.acc==="std"?" po podatku":""}), realnie ${zl0(best.finalReal)} w dzisiejszych złotych.${second?` Drugie miejsce: ${esc(second.c.code)} (${sgn(second.final-best.final)}).`:""} ${beTxt}</div></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div></div>
+      <div class="chart" id="b-chart"></div></div>
     <div class="card table-card"><div class="tc-head"><h3>Wszystkie serie z oferty</h3><p class="desc">Kwota ${zl0(+b.kw)}, okres ${esc(hTxt)}, ${calcTaxTxt({acc:b.acc})}. ${liq?"Wartość na koniec = wypłata wszystkiego (po opłacie i podatku) plus konto.":"Wartość na koniec bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty, plus konto."}</p></div>
       <div class="frame"><table><thead><tr><th>#</th><th>Seria</th><th>Oprocentowanie</th><th class="r">Na koniec</th><th class="r">Zysk</th><th class="r">Rocznie</th><th class="r">Realnie${calcTip("real",1)}</th><th>Uwagi</th></tr></thead><tbody>
       ${rank.map((x,i)=>`<tr><td>${i+1}</td><td><b style="color:var(--s-${x.type})">${esc(x.c.code)}</b> <span class="small">${esc(Zamiana.TYPES[x.type].label)}</span></td><td>${esc(buyRuleTxt(x.c))}</td><td class="r num"><b>${zl0(x.final)}</b></td><td class="r num"><span class="${x.gain>0?"d-up":x.gain<0?"d-down":"d-0"}">${sgn(x.gain)}</span></td><td class="r num">${pct(x.annual)}</td><td class="r num">${zl0(x.finalReal)}</td><td class="small">${esc(notes(x))}</td></tr>`).join("")}
       </tbody></table></div></div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div>
-      <div class="legend">${rank.map(x=>`<span><i style="background:var(--s-${x.type})"></i>${esc(x.c.code)}</span>`).join("")}</div></div>
-      <div class="chart" id="b-chart"></div></div>
     <details class="how"><summary>Jak to policzono</summary><ul>
       <li>Za ${zl0(+b.kw)} kupujesz pełne obligacje po 100 zł (${Math.floor(+b.kw/100)} szt.), reszta trafia na konto (${fmt(+b.sv,1)}%${b.acc==="std"?" przed podatkiem":""}).</li>
       <li>Oprocentowanie z listów emisyjnych oferty ${esc(mLabel(off.id))}. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt za P−2) + marża (EDO, COI, ROS, ROD) albo stopa referencyjna NBP + marża (ROR, DOR); do ${mShort(off.cpiRefMonth||off.id)} z archiwum GUS i NBP, dalej Twój scenariusz (inflacja ${b.sc==="custom"?"rok po roku":fmt(CPI_PRESETS[b.sc].v,1)+"%"}, stopa NBP ${fmt(+b.nbp)}%).</li>
@@ -139,31 +138,44 @@ function buyRecompute(){
     </ul></details>
     ${calcShareHtml}
   </div>`;
-  buyDrawChart(rank);
+  const pp=buyParams(b,cands);
+  buyDrawChart(rank,{cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
   calcBindShare();calcBindTips(out);
 }
-function buyDrawChart(rank){
-  const el=$("#b-chart");if(!el)return;
-  const n=rank[0].series.length;const W=Math.max(640,el.clientWidth||900),Hh=300,L=64,R=14,T=16,B=30;
-  const vals=rank.flatMap(x=>x.series.map(s=>s.total));let min=Math.min(...vals),max=Math.max(...vals);
+function buyDrawChart(rank,macro){
+  const el=$("#b-chart");if(!el)return;macro=macro||{};
+  state.buyVis=state.buyVis||{};const vis=k=>state.buyVis[k]??true;
+  const shown=rank.filter(r=>vis(r.type)),showCpi=!!macro.cpiAt&&vis("cpi"),showNbp=!!macro.nbpAt&&vis("nbp");
+  const pts=rank[0].series,n=pts.length;const W=Math.max(640,el.clientWidth||900),Hh=300,L=64,R=showCpi||showNbp?46:14,T=16,B=30;
+  const vals=(shown.length?shown:rank).flatMap(x=>x.series.map(s=>s.total));let min=Math.min(...vals),max=Math.max(...vals);
   const span=max-min||max*0.05||1,raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw))),step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);
   min=Math.floor(min/step)*step;max=Math.ceil(max/step)*step;if(max===min)max=min+step;
   const x=i=>L+(n<=1?0:(W-L-R)*i/(n-1)),y=v=>T+(Hh-T-B)*(1-(v-min)/(max-min));
   const fk=v=>v>=10000?(Math.round(v/100)/10).toLocaleString("pl-PL")+" tys.":Math.round(v).toLocaleString("pl-PL");
   let g="";for(let v=min;v<=max+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--line-strong)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fk(v)}</text>`;
-  let xt="";const pts=rank[0].series,every=n>150?2:1;
+  let xt="";const every=n>150?2:1;
   pts.forEach((m,i)=>{if((n<=24&&i%3===0)||(n>24&&m.ym.slice(5)==="01"&&(+m.ym.slice(0,4))%every===0)){const lab=n<=24?mShort(m.ym):m.ym.slice(0,4);xt+=`<line x1="${x(i)}" x2="${x(i)}" y1="${Hh-B}" y2="${Hh-B+4}" style="stroke:var(--muted)"/><text x="${x(i)}" y="${Hh-B+17}" text-anchor="middle">${lab}</text>`}});
   const path=s=>s.map((p,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(p.total).toFixed(1)).join(" ");
-  el.innerHTML=`<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Wartość serii w czasie">${g}<line x1="${L}" x2="${W-R}" y1="${Hh-B}" y2="${Hh-B}" style="stroke:var(--line-strong)"/>${xt}
-    ${rank.slice().reverse().map((r,k)=>`<path d="${path(r.series)}" fill="none" style="stroke:var(--s-${r.type})" stroke-width="${k===rank.length-1?3:2}" stroke-linejoin="round"/>`).join("")}
+  // prawa oś: inflacja CPI r/r i stopa NBP (do dziś z archiwum, dalej scenariusz)
+  const mac=pts.map(m=>({cpi:macro.cpiAt?macro.cpiAt(m.ym):null,nbp:macro.nbpAt?macro.nbpAt(m.ym):null}));let macroPaths="";
+  if(showCpi||showNbp){const pax=pctAxis(mac.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null),T,Hh-B);
+    for(let v=pax.lo;v<=pax.hi+1e-9;v+=pax.step)g+=`<text x="${W-R+6}" y="${pax.pos(v)+4}" text-anchor="start" style="fill:var(--muted)">${fmt(v,v%1?1:0)}%</text>`;
+    const pl=k=>mac.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+pax.pos(m[k]).toFixed(1)).join(" ");
+    if(showCpi)macroPaths+=`<path d="${pl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+    if(showNbp)macroPaths+=`<path d="${pl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.6" stroke-dasharray="2 3"/>`;}
+  const items=rank.map(r=>({k:r.type,label:r.c.code,color:`var(--s-${r.type})`})).concat(macro.cpiAt?[{k:"cpi",label:"inflacja CPI (%)",color:"var(--s-CPI)",dash:1}]:[],macro.nbpAt?[{k:"nbp",label:"stopa NBP (%)",color:"var(--s-NBP)",dash:1}]:[]);
+  el.innerHTML=chartLegendHtml(items,vis)+`<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Wartość serii w czasie">${g}<line x1="${L}" x2="${W-R}" y1="${Hh-B}" y2="${Hh-B}" style="stroke:var(--line-strong)"/>${xt}${macroPaths}
+    ${shown.slice().reverse().map((r,k)=>`<path d="${path(r.series)}" fill="none" style="stroke:var(--s-${r.type})" stroke-width="${r===rank[0]?3:2}" stroke-linejoin="round"/>`).join("")}
     <line class="bhov" x1="0" x2="0" y1="${T}" y2="${Hh-B}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="bpts"></g></svg><div class="tip" hidden></div>`;
+  chartLegendBind(el,k=>{state.buyVis[k]=!vis(k);buyDrawChart(rank,macro)});
   const svg=el.querySelector("svg"),tip=el.querySelector(".tip"),hov=el.querySelector(".bhov"),dots=el.querySelector(".bpts");
   const docked=!!(window.matchMedia&&matchMedia("(max-width: 720px), (hover: none) and (pointer: coarse)").matches);tip.classList.toggle("docked",docked);
   const show=i=>{hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
-    const at=rank.map(r=>({r,v:r.series[i].total})).sort((a,b)=>b.v-a.v);
+    const at=shown.map(r=>({r,v:r.series[i].total})).sort((a,b)=>b.v-a.v);
     dots.innerHTML=at.map(a=>`<circle cx="${x(i)}" cy="${y(a.v)}" r="3.5" style="fill:var(--s-${a.r.type});stroke:var(--surface);stroke-width:1.5"/>`).join("");
-    tip.innerHTML=`<div class="tt">${mLabel(pts[i].ym)} · po ${i} mies.${docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':""}</div>${at.map(a=>`<div class="tr"><span class="dot" style="background:var(--s-${a.r.type})"></span><b>${esc(a.r.c.code)}</b> <span class="num">${zl0(a.v)}</span></div>`).join("")}`;
-    tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top="10px"};
+    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>CPI r/r <span class="num">${fmt(mac[i].cpi,1)}%</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Stopa NBP <span class="num">${fmt(mac[i].nbp)}%</span></div>`:"");
+    tip.innerHTML=`<div class="tt">${mLabel(pts[i].ym)} · po ${i} mies.${docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':""}</div>${at.map(a=>`<div class="tr"><span class="dot" style="background:var(--s-${a.r.type})"></span><b>${esc(a.r.c.code)}</b> <span class="num">${zl0(a.v)}</span></div>`).join("")}${mRows}`;
+    tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top=(rr.top-er.top+10)+"px"};
   const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};
   svg.addEventListener("mousemove",e=>show(idx(e.clientX)));svg.addEventListener("mouseleave",()=>{if(docked)return;tip.hidden=true;hov.style.visibility="hidden";dots.innerHTML=""});
   svg.addEventListener("touchstart",e=>show(idx(e.touches[0].clientX)),{passive:true});svg.addEventListener("touchmove",e=>show(idx(e.touches[0].clientX)),{passive:true});

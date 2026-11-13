@@ -356,8 +356,7 @@ function calcRecompute(){
       <div class="stat t-red"><span class="k">Koszt zerwania${calcIsToday()?" dziś":""}</span><span class="v">${zl0(sn.cost)}</span><span class="s">opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. + ${zl2(sn.cashRest)} na konto</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${beInflTxt}</span></div>
     </div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.${c.ike?"":" Schodki na wykresie to skutek tej metody: w miesiącu wykupu w terminie znika opłata (linia podskakuje), a przez pierwsze miesiące nowo kupionych obligacji opłata zjada narosłe odsetki (linia stoi w miejscu)."}`:`Wartość obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(r.paidCoupons)}</p></div>
-      <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do ${calcIsToday()?"dziś":"zerwania"}</span><span><i style="background:var(--muted)"></i>trzymam ${esc(oldCode)}</span><span><i style="background:var(--accent)"></i>zamieniam na ${esc(tgtCode)}</span></div></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.${c.ike?"":" Schodki na wykresie to skutek tej metody: w miesiącu wykupu w terminie znika opłata (linia podskakuje), a przez pierwsze miesiące nowo kupionych obligacji opłata zjada narosłe odsetki (linia stoi w miejscu)."}`:`Wartość obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup (nikt dalej nie zrywa), z resztą na koncie. W miesiącu wykupu ${esc(oldCode)} kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(r.paidCoupons)}</p></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"})}
     <details class="how"><summary>Jak to policzono</summary><ul>
@@ -370,7 +369,7 @@ function calcRecompute(){
     </ul></details>
     ${calcShareHtml}
   </div>`;
-  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}]);
+  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
   calcBindShare();calcBindTips(out);
 }
 function calcRecomputePortfolio(out,c,now){
@@ -412,8 +411,7 @@ function calcRecomputePortfolio(out,c,now){
       ${rowsP.map(z=>{const s=z.x.result.switchNow;return `<tr><td><b>${esc(z.code)}</b> <a class="small" href="${esc(detailHref(z))}" target="_blank" rel="noopener" title="Otwórz wyliczenie tylko dla tej serii w nowej karcie">szczegóły ↗</a></td><td class="r num">${Math.floor(+z.o.n)}</td><td>${mShort(z.x.result.maturity)}</td><td class="r num">${zl0(s.valueBeforeFee)}</td><td class="r num">${zl0(s.cost)}</td><td class="r num"><span class="${z.x.diff>0?"d-up":z.x.diff<0?"d-down":"d-0"}">${sgn(z.x.diff)}</span></td><td class="r num">${calcBeShort(z.beC)}</td>${nbpCol?`<td class="r num">${calcBeShort(z.beN)}</td>`:""}<td>${z.x.swap?'<span class="pill p-ok">zamień</span>':'<span class="pill p-part">trzymaj</span>'}</td></tr>`}).join("")}
       <tr class="sum"><td><b>Razem</b></td><td class="r num">${rowsP.reduce((s,z)=>s+Math.floor(+z.o.n),0)}</td><td>${mShort(r.latestMaturity)}</td><td class="r num">${zl0(tot("valueBeforeFee"))}</td><td class="r num">${zl0(tot("cost"))}</td><td class="r num"><span class="${a.diffAll>0?"d-up":a.diffAll<0?"d-down":"d-0"}">${sgn(a.diffAll)}</span></td><td></td>${nbpCol?"<td></td>":""}<td>${pick?`<span class="small">wybrane: ${sgn(a.diffBest)}</span>`:""}</td></tr>
       </tbody></table></div></div>
-    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.${c.ike?"":" Schodki na wykresie to skutek tej metody: w miesiącu wykupu w terminie znika opłata (linia podskakuje), a przez pierwsze miesiące nowo kupionych obligacji opłata zjada narosłe odsetki (linia stoi w miejscu)."}`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(paidC)}</p></div>
-      <div class="legend"><span><i style="background:var(--ink-2)"></i>od zakupu do ${calcIsToday()?"dziś":"zerwania"}</span><span><i style="background:var(--muted)"></i>${esc(lab.keep.toLowerCase())}</span><span><i style="background:var(--accent)"></i>${esc(lab.swap.toLowerCase())} na ${esc(tgtCode)}</span></div></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość portfela w czasie</h3><p class="desc">${liq?`Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca ${calcLiqTxt(c)}, z resztą na koncie.${c.ike?"":" Schodki na wykresie to skutek tej metody: w miesiącu wykupu w terminie znika opłata (linia podskakuje), a przez pierwsze miesiące nowo kupionych obligacji opłata zjada narosłe odsetki (linia stoi w miejscu)."}`:`Suma wartości obligacji${c.acc==="ikze"?" po 10% ryczałcie przy wypłacie z IKZE":c.ike?"":" po podatku od narosłych odsetek"}, bez opłaty za wykup, z resztą na koncie. Serie kupione później dochodzą do historii w miesiącu zakupu; w miesiącach wykupu kwota na rękę przechodzi przez zamianę po ${calcSwapTxt(c.tt)}.`}${calcCouponDesc(paidC)}</p></div></div>
       <div class="chart" id="z-chart"></div></div>
     ${calcYearTable(ms,H,events,lab)}
     <details class="how"><summary>Jak to policzono</summary><ul>
@@ -426,7 +424,7 @@ function calcRecomputePortfolio(out,c,now){
     </ul></details>
     ${calcShareHtml}
   </div>`;
-  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})));
+  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
   calcBindShare();calcBindTips(out);
 }
 // kod serii kupionej w danym miesiącu: typ + MMRR terminu wykupu (np. EDO z 04.2034 → EDO0444)
@@ -447,15 +445,29 @@ function calcEvents(r,o,tt,oldCode,tgtCode){
 // kolory zdarzeń wykupu: każda wykupowana seria ma własny kolor (linia, etykieta, dymek, tabela)
 function calcColorEvents(events){const map=new Map();for(const e of events.slice().sort((a,b)=>a.t-b.t)){if(e.t===0){e.color="var(--accent)";continue}
   if(!map.has(e.src))map.set(e.src,`var(--e${map.size%6+1})`);e.color=map.get(e.src)}return events}
-function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases){
-  events=events||[];lab=lab||{keep:"Trzymam",swap:"Zamieniam"};purchases=purchases||[];
+// legenda wykresu z przełącznikami: items=[{k,label,color,dash}], vis(k) → bool; kliknięcie wywołuje onToggle(k)
+function chartLegendHtml(items,vis){return `<div class="lgnd" role="group" aria-label="Pokaż lub ukryj linie">${items.map(it=>`<button type="button" data-lg="${esc(it.k)}" aria-pressed="${vis(it.k)}" title="Kliknij, aby ${vis(it.k)?"ukryć":"pokazać"} linię"><i style="${it.dash?`height:0;border-top:3px dashed ${it.color}`:`background:${it.color}`}"></i>${esc(it.label)}</button>`).join("")}</div>`}
+function chartLegendBind(el,onToggle){el.querySelectorAll(".lgnd button[data-lg]").forEach(b=>b.addEventListener("click",()=>onToggle(b.dataset.lg)))}
+// skala osi procentowej (CPI, stopa NBP): {lo,hi,step,pos(v)} dla przedziału pikseli [top,bottom]
+function pctAxis(vals,top,bottom){let lo=Math.min(0,...vals),hi=Math.max(1,...vals);const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw||1)));
+  const step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);lo=Math.floor(lo/step)*step;hi=Math.ceil(hi/step)*step;if(hi===lo)hi=lo+step;
+  return {lo,hi,step,pos:v=>top+(bottom-top)*(hi-v)/(hi-lo)}}
+// dane do linii CPI i stopy NBP na wykresie: historia jak w obliczeniach, dalej scenariusz
+const calcMacro=(c,p)=>({cpiAt:Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now),nbpAt:Zamiana.makeNbpAt(p.nbpHistory,p.nbpFuture,p.now),nbp:calcUsesNbp(c)});
+function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
+  events=events||[];lab=lab||{keep:"Trzymam",swap:"Zamieniam"};purchases=purchases||[];macro=macro||{};
   const el=$("#z-chart");if(!el)return;
+  // widoczność linii: wybór użytkownika (state.calcVis) albo domyślnie (stopa NBP tylko przy ROR/DOR)
+  state.calcVis=state.calcVis||{};const vis=k=>state.calcVis[k]??(k==="nbp"?!!macro.nbp:true);
   const range=state.calcRange==="future"?"future":"all";
   // punkty: historia od zakupu (wspólna) + przyszłość (dwa warianty); indeks k = 0..N, dziś = P
   const pastAll=r.past||[],past=range==="future"?pastAll.slice(-1):pastAll,P=Math.max(0,past.length-1),fut=r.months;
   const pts=past.map(p=>({ym:p.ym,t:p.t,keep:p.value,swap:null})).slice(0,P).concat(fut.map(m=>({ym:m.ym,t:m.t,keep:m.keep,swap:m.swap,diff:m.diff})));
-  const n=pts.length;const W=Math.max(640,el.clientWidth||900),L=64,R=14,T=22,M1=270,D0=M1+22,D1=D0+86,H=D1+26;
-  const vals=pts.flatMap(m=>[m.keep,m.swap]).filter(v=>v!=null);let min=Math.min(...vals),max=Math.max(...vals);
+  const showCpi=!!macro.cpiAt&&vis("cpi"),showNbp=!!macro.nbpAt&&vis("nbp");
+  pts.forEach(m=>{if(macro.cpiAt)m.cpi=macro.cpiAt(m.ym);if(macro.nbpAt)m.nbp=macro.nbpAt(m.ym)});
+  const n=pts.length;const W=Math.max(640,el.clientWidth||900),L=64,R=showCpi||showNbp?46:14,T=22,M1=270,D0=M1+22,D1=D0+86,H=D1+26;
+  let vals=pts.flatMap((m,i)=>[i<P?(vis("hist")?m.keep:null):(vis("keep")?m.keep:null),vis("swap")?m.swap:null]).filter(v=>v!=null);
+  if(!vals.length)vals=pts.flatMap(m=>[m.keep,m.swap]).filter(v=>v!=null);let min=Math.min(...vals),max=Math.max(...vals);
   const nice=(span)=>{const raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw||1)));return [1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw)};
   const span=max-min||max*0.1||1,step=nice(span);
   min=Math.floor(min/step)*step;max=Math.ceil(max/step)*step;if(max===min)max=min+step;
@@ -470,6 +482,13 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases){
   g+=`<line x1="${L}" x2="${W-R}" y1="${dy(0)}" y2="${dy(0)}" style="stroke:var(--ink-2);stroke-width:1"/><text x="${L-6}" y="${dy(0)+4}" text-anchor="end">0</text>`;
   if(hi>pad*1.5)g+=`<text x="${L-6}" y="${dy(hi)+10}" text-anchor="end" style="fill:var(--ok)">${dlab(Math.max(...diffs,0))}</text>`;
   if(lo<-pad*1.5)g+=`<text x="${L-6}" y="${dy(lo)}" text-anchor="end" style="fill:var(--bad)">${dlab(Math.min(...diffs,0))}</text>`;
+  // prawa oś: CPI r/r i stopa NBP (%)
+  let pax=null,macroPaths="";
+  if(showCpi||showNbp){const pv=pts.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null);pax=pctAxis(pv,T,M1);
+    for(let v=pax.lo;v<=pax.hi+1e-9;v+=pax.step)g+=`<text x="${W-R+6}" y="${pax.pos(v)+4}" text-anchor="start" style="fill:var(--muted)">${fmt(v,v%1?1:0)}%</text>`;
+    const pl=k=>pts.map((m,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+pax.pos(m[k]).toFixed(1)).join(" ");
+    if(showCpi)macroPaths+=`<path d="${pl("cpi")}" fill="none" style="stroke:var(--s-CPI)" stroke-width="1.6" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+    if(showNbp)macroPaths+=`<path d="${pl("nbp")}" fill="none" style="stroke:var(--s-NBP)" stroke-width="1.6" stroke-dasharray="2 3" stroke-linejoin="round"/>`;}
   // oś X: styczeń każdego roku (co 2 lata przy długich okresach), podpisy pod paskiem różnicy
   let xt="";const yrs=Math.ceil(n/12),every=yrs>14?2:1;
   pts.forEach((m,i)=>{if(m.ym.slice(5)==="01"&&(+m.ym.slice(0,4))%every===0)xt+=`<line x1="${x(i)}" x2="${x(i)}" y1="${D1}" y2="${D1+4}" style="stroke:var(--muted)"/><text x="${x(i)}" y="${D1+17}" text-anchor="middle">${m.ym.slice(0,4)}</text>`});
@@ -480,7 +499,10 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases){
   const buys=range==="future"?[]:purchases.map(p=>({p,i:pts.findIndex((m,k)=>k<=P&&m.ym===p.ym)})).filter(z=>z.i>=0);
   const evs=events.filter(e=>e.t>0);
   const todayAnchor=P>n*0.85?"end":P<n*0.08?"start":"middle";
-  el.innerHTML=`<div class="ctools"><span class="small">Oś od:${calcTip("range")}</span><button type="button" class="chip" data-range="all" aria-pressed="${range==="all"}">zakupu</button><button type="button" class="chip" data-range="future" aria-pressed="${range==="future"}" title="Oś Y tylko dla prognozy — linie są bardziej rozsunięte">${calcIsToday()?"dziś":"zerwania"} (przybliżenie)</button></div>
+  const lgItems=[...(P>0?[{k:"hist",label:`od zakupu do ${calcIsToday()?"dziś":"zerwania"}`,color:"var(--ink-2)"}]:[]),{k:"keep",label:lab.keep.toLowerCase()==="trzymam"?`trzymam ${oldCode}`:lab.keep.toLowerCase(),color:"var(--muted)"},
+    {k:"swap",label:lab.swap.toLowerCase()==="zamieniam"?`zamieniam na ${tgtCode}`:`${lab.swap.toLowerCase()} na ${tgtCode}`,color:"var(--accent)"},
+    ...(macro.cpiAt?[{k:"cpi",label:"inflacja CPI (%)",color:"var(--s-CPI)",dash:1}]:[]),...(macro.nbpAt?[{k:"nbp",label:"stopa NBP (%)",color:"var(--s-NBP)",dash:1}]:[])];
+  el.innerHTML=chartLegendHtml(lgItems,vis)+`<div class="ctools"><span class="small">Oś od:${calcTip("range")}</span><button type="button" class="chip" data-range="all" aria-pressed="${range==="all"}">zakupu</button><button type="button" class="chip" data-range="future" aria-pressed="${range==="future"}" title="Oś Y tylko dla prognozy — linie są bardziej rozsunięte">${calcIsToday()?"dziś":"zerwania"} (przybliżenie)</button></div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wartość: ${esc(lab.keep.toLowerCase())} kontra ${esc(lab.swap.toLowerCase())}, z paskiem różnicy">${g}<line x1="${L}" x2="${W-R}" y1="${M1}" y2="${M1}" style="stroke:var(--line-strong)"/>${xt}
     ${P>0?`<rect x="${L}" y="${T}" width="${x(P)-L}" height="${D1-T}" style="fill:var(--surface-2);opacity:.6"/>`:""}
     <text x="${W-R}" y="${D0-6}" text-anchor="end" style="fill:var(--muted)">różnica: zamiana − trzymanie</text>
@@ -489,28 +511,31 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases){
     <line x1="${x(P)}" x2="${x(P)}" y1="${T-8}" y2="${D1}" style="stroke:var(--ink-2);stroke-width:1.2;stroke-dasharray:4 3"/>
     <text x="${x(P)}" y="${T-11}" text-anchor="${todayAnchor}" style="fill:var(--ink);font-weight:700">${calcIsToday()?"dziś · ":""}decyzja ${mShort(calcNow())}</text>
     ${P>0?`<text x="${L+6}" y="${T+14}" style="fill:var(--muted)">zakup ${mShort(pts[0].ym)}</text>`:""}
-    ${histPath?`<path d="${histPath}" fill="none" stroke="var(--ink-2)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
-    <path d="${line(P,n-1,"keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>
-    <path d="${line(P,n-1,"swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>
+    ${macroPaths}
+    ${histPath&&vis("hist")?`<path d="${histPath}" fill="none" stroke="var(--ink-2)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
+    ${vis("keep")?`<path d="${line(P,n-1,"keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
+    ${vis("swap")?`<path d="${line(P,n-1,"swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>`:""}
     ${evs.map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7;return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${D1}" style="stroke:${e.color};stroke-width:1.6;stroke-dasharray:3 3"/><text x="${right?xe-5:xe+5}" y="${M1-8-k*15}" text-anchor="${right?"end":"start"}" style="fill:${e.color};font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round">↻ ${esc(e.short)} → zamiana po ${e.priceTxt||"99,90"}</text>`}).join("")}
-    ${buys.map(z=>`<circle cx="${x(z.i)}" cy="${y(pts[z.i].keep)}" r="5" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:2.2"/>`).join("")}
+    ${vis("hist")?buys.map(z=>`<circle cx="${x(z.i)}" cy="${y(pts[z.i].keep)}" r="5" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:2.2"/>`).join(""):""}
     <line class="zhov" x1="0" x2="0" y1="${T}" y2="${D1}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
   calcBindTips(el);
-  el.querySelectorAll("button[data-range]").forEach(b=>b.addEventListener("click",()=>{state.calcRange=b.dataset.range;drawCalcChart(r,oldCode,tgtCode,events,lab,purchases)}));
+  chartLegendBind(el,k=>{state.calcVis[k]=!vis(k);drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro)});
+  el.querySelectorAll("button[data-range]").forEach(b=>b.addEventListener("click",()=>{state.calcRange=b.dataset.range;drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro)}));
   const svg=el.querySelector("svg"),tip=el.querySelector(".tip"),hov=el.querySelector(".zhov"),dots=el.querySelector(".zpts");
   const docked=!!(window.matchMedia&&matchMedia("(max-width: 720px), (hover: none) and (pointer: coarse)").matches);tip.classList.toggle("docked",docked);
   const td=calcIsToday();
   const when=m=>m.t<0?`${Math.round(-m.t)} mies. ${td?"temu":"przed zerwaniem"}`:m.t===0?(td?"dziś":"zerwanie"):`${td?"za ":""}${m.t} mies.${td?"":" po zerwaniu"}`;
   const show=i=>{const m=pts[i];hov.setAttribute("x1",x(i));hov.setAttribute("x2",x(i));hov.style.visibility="visible";
     const hint=docked?'<span class="hint">dotknij wykresu, aby zmienić miesiąc</span>':"";
+    const mRows=(showCpi?`<div class="tr"><span class="dot" style="background:var(--s-CPI)"></span>CPI r/r <span class="num">${fmt(m.cpi,1)}%</span></div>`:"")+(showNbp?`<div class="tr"><span class="dot" style="background:var(--s-NBP)"></span>Stopa NBP <span class="num">${fmt(m.nbp)}%</span></div>`:"");
     const buyRows=buys.filter(z=>z.i===i).map(z=>`<div class="tr evrow" style="color:var(--ink)">＋ ${esc(z.p.text)}</div>`).join("");
     if(m.swap==null){
       dots.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--ink-2)" style="stroke:var(--surface);stroke-width:1.5"/>`;
-      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}<div class="tr"><span class="dot" style="background:var(--ink-2)"></span><b>${esc(oldCode)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr" style="color:var(--muted)">przed decyzją — wartość posiadanych obligacji</div>`;
+      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}<div class="tr"><span class="dot" style="background:var(--ink-2)"></span><b>${esc(oldCode)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr" style="color:var(--muted)">przed decyzją — wartość posiadanych obligacji</div>${mRows}`;
     }else{
       dots.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--muted)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${y(m.swap)}" r="4" fill="var(--accent)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${dy(m.diff)}" r="3.5" fill="${m.diff>=0?"var(--ok)":"var(--bad)"}" style="stroke:var(--surface);stroke-width:1.5"/>`;
       const evRows=events.filter(e=>P+e.t===i).map(e=>`<div class="tr evrow" style="color:${e.color||"var(--accent-ink)"}">↻ ${esc(e.text)}</div>`).join("");
-      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}${evRows}<div class="tr"><span class="dot" style="background:var(--muted)"></span><b>${esc(docked?"Trzymam":lab.keep)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>${esc(docked?"Zamieniam":lab.swap)}</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>`;
+      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}${evRows}<div class="tr"><span class="dot" style="background:var(--muted)"></span><b>${esc(docked?"Trzymam":lab.keep)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>${esc(docked?"Zamieniam":lab.swap)}</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>${mRows}`;
     }
     tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top=(rr.top-er.top+10)+"px"};
   const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};
