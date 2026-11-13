@@ -4,17 +4,20 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
-- Przycisk „Wyczyść ustawienia” w kalkulatorze zamiany, „Co kupić?” i „Mój portfel” — przywraca formularz (i legendę oraz oś wykresu) do stanu jak przy pierwszym wejściu; „Cofnij” przywraca poprzednie ustawienia.
-- Eksport: w kalkulatorze zamiany i w „Co kupić?” wykres do PNG (z tytułem, legendą widocznych linii, kolorami bieżącego motywu i znakiem wodnym z logo i adresem strony pod liniami wykresu) i tabela do CSV (średnik, przecinek dziesiętny — otwiera się w Excelu; z założeniami i linkiem); w „Mój portfel” serie i zdarzenia do CSV.
-- Kanał Atom (`feed.xml`) z ofertami z ostatnich 36 miesięcy — link „subskrybuj nowe oferty (RSS)” w zakładce Oferta i w stopce; wpis prowadzi do oferty danego miesiąca (`#oferta&m=RRRR-MM`).
+## v1.2.0 — 2026-11-13
+
+Nowe zakładki „Co kupić?” i „Mój portfel”, wynik historyczny każdej serii, eksport wyników i kanał Atom z ofertami.
+
+- Nowa zakładka **„Co kupić?”**: ta sama kwota w każdą serię z bieżącej oferty — ranking według kwoty na rękę na koniec wybranego okresu (3 miesiące – 12 lat), zysk, roczna stopa i wartość realna, wykres w czasie i tabela wszystkich serii, próg inflacji między pierwszym a drugim miejscem; scenariusze inflacji i stopy NBP, rachunek zwykły / IKE / IKZE, ROS i ROD dla beneficjentów 800+.
 - Nowa zakładka **„Mój portfel”**: wartość posiadanych obligacji dziś, wypłata na rękę po zerwaniu (opłata i podatek), wartość przy wykupie w terminie, najbliższe 12 miesięcy (kupony, nowe oprocentowanie — znane albo prognoza, wykupy); do 20 serii, link do wyliczenia i przejście do kalkulatora zamiany.
 - Historia serii: przełącznik **„Jak wypadła seria”** — wynik obligacji za 100 zł z każdej emisji do wykupu albo do dziś, rocznie, na tle inflacji w tym samym czasie (realnie); po podatku albo w IKE; DOS liczony, TOZ (WIBOR) pominięty.
-- Dymki „?” także w zakładkach Oferta (kolumny tabeli), Wykres (miara) i Historia serii; dymki w kafelkach nie są ucinane.
+- Wykresy w kalkulatorze zamiany i w „Co kupić?”: legenda jako przełączniki (kliknięcie ukrywa lub pokazuje linię, oś dopasowuje się do widocznych) i linie odniesienia w złotych: „wpłata + inflacja” (obligacje nad linią zarabiają realnie, pod nią tracą) i „wpłata na stopie NBP” (po podatku).
+- Eksport: wykres do PNG (tytuł, legenda widocznych linii, kolory bieżącego motywu, znak wodny z logo i adresem strony) i tabela do CSV (średnik i przecinek dziesiętny — otwiera się w Excelu; z założeniami i linkiem) w kalkulatorze zamiany i w „Co kupić?”; w „Mój portfel” serie i zdarzenia do CSV.
+- Kanał Atom (`feed.xml`) z ofertami z ostatnich 36 miesięcy — link „subskrybuj nowe oferty (RSS)” w zakładce Oferta i w stopce; wpis prowadzi do oferty danego miesiąca (`#oferta&m=RRRR-MM`). CI sprawdza, czy kanał odpowiada danym.
+- Przycisk „Wyczyść ustawienia” w kalkulatorze zamiany, „Co kupić?” i „Mój portfel” — przywraca stan jak przy pierwszym wejściu; „Cofnij” przywraca poprzednie ustawienia.
+- Dymki „?” we wszystkich zakładkach (kolumny tabel w Ofercie i Historii serii, miara na wykresie, „Realnie” — wartość w dzisiejszych złotych); dymki w tabelach i kafelkach nie są już ucinane.
 - Na telefonie wszystkie zakładki mieszczą się w pasku, a aktywna jest zawsze widoczna.
-- Wykresy w kalkulatorze zamiany i w „Co kupić?”: legenda jako przełączniki (kliknięcie ukrywa lub pokazuje linię, oś dopasowuje się do widocznych), linie odniesienia w złotych: „wpłata + inflacja” (wpłacona kwota od dnia zakupu rośnie o inflację — obligacje nad linią zarabiają realnie, pod nią tracą) i „wpłata na stopie NBP” (po podatku; do dziś z archiwum, dalej scenariusz).
-- „Co kupić?”: tabela wszystkich serii pod wykresem.
-- Dymek „?” przy kolumnach „Realnie” i „Różnica realnie”: wyjaśnienie wartości w dzisiejszych złotych. Dymki w tabelach nie są już ucinane przez ramkę tabeli.
-- Nowa zakładka **„Co kupić?”**: ta sama kwota w każdą serię z bieżącej oferty — ranking według kwoty na rękę na koniec wybranego okresu (3 miesiące – 12 lat), zysk, roczna stopa i wartość realna, wykres w czasie, próg inflacji między pierwszym a drugim miejscem; scenariusze inflacji i stopy NBP, rachunek zwykły / IKE / IKZE, ROS i ROD dla beneficjentów 800+.
+- Serie EDO1028, EDO1128 i EDO1228: źródłem są listy emisyjne na obligacjeskarbowe.pl zamiast kopii w repozytorium.
 
 ## v1.1.0 — 2026-11-13
 
