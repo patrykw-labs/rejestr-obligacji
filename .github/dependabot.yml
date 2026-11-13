@@ -1,0 +1,13 @@
+# Co miesiąc sprawdza nowe wersje akcji używanych w .github/workflows (checkout, setup-python, setup-node)
+# i otwiera pull request z podbiciem — do przejrzenia i scalenia na GitHubie.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      akcje:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Actions"
