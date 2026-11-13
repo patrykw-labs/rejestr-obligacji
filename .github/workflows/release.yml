@@ -1,6 +1,6 @@
 name: Wydanie
 
-# Tworzy wydanie na GitHubie z notatkami z .github/release-notes/vX.Y.Z.md (bez pliku — z notatkami
+# Tworzy wydanie na GitHubie z notatkami z sekcji „## vX.Y.Z” w CHANGELOG.md (bez sekcji — z notatkami
 # wygenerowanymi z listy commitów). Uruchomienie: wypchnięcie tagu vX.Y.Z albo ręcznie (Actions → Wydanie →
 # Run workflow, pole „tag”) — wtedy tag powstaje na bieżącym commicie gałęzi main. Najpierw walidacja i testy.
 on:
@@ -45,8 +45,9 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           case "$TAG" in v[0-9]*) ;; *) echo "Zła wersja: $TAG (oczekiwano vX.Y.Z)"; exit 1;; esac
-          NOTES=".github/release-notes/${TAG}.md"
-          if [ -f "$NOTES" ]; then SRC=(--notes-file "$NOTES"); else SRC=(--generate-notes); fi
+          # sekcja „## vX.Y.Z …” z CHANGELOG.md do następnego nagłówka „## ”
+          awk -v t="## ${TAG}" 'index($0,t)==1{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > /tmp/notes.md
+          if [ -s /tmp/notes.md ]; then SRC=(--notes-file /tmp/notes.md); else SRC=(--generate-notes); fi
           if [ "${{ github.event_name }}" = "push" ]; then WHERE=(--verify-tag); else WHERE=(--target "${{ inputs.target || github.sha }}"); fi
           if [ "${{ inputs.recreate }}" = "true" ] && gh release view "$TAG" >/dev/null 2>&1; then gh release delete "$TAG" --cleanup-tag --yes; fi
           if [ "${{ inputs.recreate }}" = "true" ]; then git push origin ":refs/tags/$TAG" 2>/dev/null || true; fi
