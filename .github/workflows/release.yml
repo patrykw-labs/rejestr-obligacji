@@ -11,6 +11,13 @@ on:
       tag:
         description: "Wersja, np. v1.0.0"
         required: true
+      target:
+        description: "Commit (SHA) dla tagu; puste = bieżący main"
+        required: false
+      recreate:
+        description: "Usuń istniejące wydanie i tag o tej nazwie i utwórz je od nowa (np. po przepisaniu historii)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -38,5 +45,7 @@ jobs:
           case "$TAG" in v[0-9]*) ;; *) echo "Zła wersja: $TAG (oczekiwano vX.Y.Z)"; exit 1;; esac
           NOTES=".github/release-notes/${TAG}.md"
           if [ -f "$NOTES" ]; then SRC=(--notes-file "$NOTES"); else SRC=(--generate-notes); fi
-          if [ "${{ github.event_name }}" = "push" ]; then WHERE=(--verify-tag); else WHERE=(--target "$GITHUB_SHA"); fi
+          if [ "${{ github.event_name }}" = "push" ]; then WHERE=(--verify-tag); else WHERE=(--target "${{ inputs.target || github.sha }}"); fi
+          if [ "${{ inputs.recreate }}" = "true" ] && gh release view "$TAG" >/dev/null 2>&1; then gh release delete "$TAG" --cleanup-tag --yes; fi
+          if [ "${{ inputs.recreate }}" = "true" ]; then git push origin ":refs/tags/$TAG" 2>/dev/null || true; fi
           gh release create "$TAG" "${WHERE[@]}" --title "${TAG} – Rejestr ofert obligacji" "${SRC[@]}"
