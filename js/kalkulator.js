@@ -145,8 +145,16 @@ function calcValidate(c){
   return errs;
 }
 function selOpts(list,cur){return list.map(([v,l])=>`<option value="${esc(v)}"${String(v)===String(cur)?" selected":""}>${esc(l)}</option>`).join("")}
+// stan domyślny (jak przy pierwszym wejściu, bez parametrów w adresie)
+function calcFresh(){const saved=state.calc;state.calc=null;const d=calcDefaults();state.calc=saved;return d}
+// „Wyczyść ustawienia”: domyślny formularz, legenda i oś wykresu; poprzedni stan do cofnięcia
+function calcReset(main){state.calcUndo={calc:JSON.parse(JSON.stringify(state.calc)),vis:Object.assign({},state.calcVis||{}),range:state.calcRange};state.calcUndoFresh=true;
+  state.calc=calcFresh();state.calcVis={};state.calcRange=undefined;renderCalc(main)}
+function calcUndoReset(main){const u=state.calcUndo;if(!u)return;state.calc=u.calc;state.calcVis=u.vis;state.calcRange=u.range;state.calcUndo=null;renderCalc(main)}
 function renderCalc(main){
   if(!state.calc)state.calc=calcFromHash()||calcDefaults();
+  const undo=state.calcUndoFresh?state.calcUndo:null;state.calcUndoFresh=false;
+  const isDef=calcHash(state.calc)===calcHash(calcFresh())&&!Object.keys(state.calcVis||{}).length&&!state.calcRange;
   const c=state.calc,now=calcNow(),opts=calcOptions(),offer=calcOfferRec(now),multi=c.pos.length>1,today=calcIsToday(),past=now<calcArchiveNow();
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
   const targets=CALC_TYPES.filter(t=>offer.series?.[t]).map(t=>[t,offer.series[t].code+" · "+Zamiana.TYPES[t].label]);
@@ -170,7 +178,8 @@ function renderCalc(main){
       ${o.code?`<span class="fnote">zakup ${mShort(o.p)} · wykup ${mat?mShort(mat):"–"} · ${calcR1Label(o.type)} ${fmt(o.r1)}% · marża ${fmt(o.m)} p.p. · ${o.type==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(o.f)} zł/szt.`} (z listu emisyjnego)</span>`:`<div class="frow">${typeF}${pF}</div>${parF}`}</div>`;
   };
   main.innerHTML=`<div class="vlist">
-    <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je${today?" dziś":""}</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii ${calcDo()} liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div></div>
+    <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je${today?" dziś":""}</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii ${calcDo()} liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div>
+      <div class="row"><button type="button" class="btn" id="z-reset"${isDef?" disabled":""} title="${isDef?"Ustawienia są domyślne":"Przywróć ustawienia jak przy pierwszym wejściu: przykładowa seria, oferta z bieżącego miesiąca, inflacja 2,5%"}">↺ Wyczyść ustawienia</button>${undo?`<span class="small" role="status">Wyczyszczono. <button type="button" class="linkbtn" id="z-undo">Cofnij</button></span>`:""}</div></div>
     <div class="calc-grid">
       <div class="card">
         <h3>Twoje obligacje${multi?` <small>portfel · ${c.pos.length} serii</small>`:""}</h3>
@@ -215,6 +224,8 @@ function renderCalc(main){
     if(k==="code")el.addEventListener("change",()=>{o.code=el.value;if(o.code)Object.assign(o,calcFromCode(o.code));renderCalc(main)});
     else el.addEventListener(el.tagName==="SELECT"?"change":"input",()=>{o[k]=el.value;if(k==="type"){renderCalc(main);return}if(k==="p")calcHorizonLabel(c);calcRecompute()});});
   main.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click",()=>{c.pos.splice(+b.dataset.del,1);renderCalc(main)}));
+  $("#z-reset").addEventListener("click",()=>calcReset(main));
+  if($("#z-undo"))$("#z-undo").addEventListener("click",()=>calcUndoReset(main));
   $("#z-add").addEventListener("click",()=>{if(c.pos.length<CALC_MAXPOS){c.pos.push(calcPosDefault(calcNextCode(c)));renderCalc(main)}});
   const bind=(id,key)=>{const el=$("#"+id);el.addEventListener(el.type==="checkbox"?"change":"input",()=>{c[key]=el.type==="checkbox"?el.checked:el.value;calcRecompute()})};
   if($("#z-rr1"))$("#z-rr1").addEventListener("input",e=>{c.rr1=e.target.value;calcRecompute()});

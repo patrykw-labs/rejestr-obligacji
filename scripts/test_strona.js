@@ -108,6 +108,31 @@ const CASES = [
     }
     await ctx.close();
   }
+  // kalkulator: „Wyczyść ustawienia” przywraca stan domyślny, „Cofnij” — poprzedni
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      await page.goto(base + "#zamiana&pf=EDO0127~40~10,EDO0434~100~15&tt=EDO&bd=12&sc=high");
+      await page.waitForSelector("#z-out .verdict");
+      await page.click("#z-reset");
+      await page.waitForSelector("#z-undo");
+      const h1 = await page.evaluate(() => location.hash);
+      if (/pf=|sc=high/.test(h1)) problem = "po wyczyszczeniu adres ma stare ustawienia: " + h1;
+      if (!(await page.isDisabled("#z-reset"))) problem = "po wyczyszczeniu przycisk powinien być nieaktywny";
+      await page.click("#z-undo");
+      await page.waitForSelector("#z-out .verdict");
+      const h2 = await page.evaluate(() => location.hash);
+      if (!/pf=EDO0127~40~10,EDO0434~100~15/.test(h2) || !/sc=high/.test(h2)) problem = "cofnięcie nie przywróciło ustawień: " + h2;
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    if (problem) { fail++; console.log("✗ kalkulator — reset: " + problem); } else pass++;
+    await ctx.close();
+  }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();
     if (/<feed[\s>]/.test(xml) && (xml.match(/<entry>/g) || []).length >= 12) pass++; else { fail++; console.log("✗ feed.xml: brak wpisów"); }

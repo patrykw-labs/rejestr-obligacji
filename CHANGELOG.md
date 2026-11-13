@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Kalkulator zamiany: przycisk „Wyczyść ustawienia” — przywraca formularz, legendę i oś wykresu do stanu jak przy pierwszym wejściu; „Cofnij” przywraca poprzednie ustawienia.
 - Eksport: w kalkulatorze zamiany i w „Co kupić?” wykres do PNG (z tytułem, legendą widocznych linii, kolorami bieżącego motywu i znakiem wodnym z logo i adresem strony pod liniami wykresu) i tabela do CSV (średnik, przecinek dziesiętny — otwiera się w Excelu; z założeniami i linkiem); w „Mój portfel” serie i zdarzenia do CSV.
 - Kanał Atom (`feed.xml`) z ofertami z ostatnich 36 miesięcy — link „subskrybuj nowe oferty (RSS)” w zakładce Oferta i w stopce; wpis prowadzi do oferty danego miesiąca (`#oferta&m=RRRR-MM`).
 - Nowa zakładka **„Mój portfel”**: wartość posiadanych obligacji dziś, wypłata na rękę po zerwaniu (opłata i podatek), wartość przy wykupie w terminie, najbliższe 12 miesięcy (kupony, nowe oprocentowanie — znane albo prognoza, wykupy); do 20 serii, link do wyliczenia i przejście do kalkulatora zamiany.
