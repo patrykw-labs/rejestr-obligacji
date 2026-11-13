@@ -66,12 +66,28 @@ function chartPngBlob(chartEl,title,subtitle){
     ctx.font=`600 13px ${font}`;rows.forEach(r=>{for(const it of r){ctx.strokeStyle=it.color;ctx.lineWidth=3;ctx.setLineDash(it.dashed?[5,3]:[]);ctx.beginPath();ctx.moveTo(it.x,y+9);ctx.lineTo(it.x+18,y+9);ctx.stroke();
       ctx.setLineDash([]);ctx.fillStyle=col("--ink-2")||"#333";ctx.fillText(it.label,it.x+26,y+13)}y+=22});
     const img=new Image();
-    img.onload=()=>{ctx.drawImage(img,0,head,W,H);ctx.fillStyle=col("--muted")||"#666";ctx.font=`500 11.5px ${font}`;
+    img.onload=()=>{pngWatermark(ctx,W/2,head+H*0.42,Math.min(W,H*2.2),col,font);ctx.drawImage(img,0,head,W,H);ctx.fillStyle=col("--muted")||"#666";ctx.font=`500 11.5px ${font}`;
       ctx.fillText(`Rejestr ofert obligacji · patrykw-labs.github.io/rejestr-obligacji · symulacja, nie rekomendacja inwestycyjna`,pad,head+H+19);
       cv.toBlob(b=>b?ok(b):fail(new Error("Nie udało się utworzyć obrazu")),"image/png")};
     img.onerror=()=>fail(new Error("Nie udało się narysować wykresu"));
     img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(new XMLSerializer().serializeToString(clone));
   });
+}
+// znak wodny eksportu PNG: logo (kwadrat z linią wykresu) i napis „RejestrObligacji” ukośnie na środku wykresu, z adresem strony;
+// rysowany przed wykresem, więc linie są nad nim
+function pngWatermark(ctx,cx,cy,span,col,font){
+  const dark=document.documentElement.dataset.theme==="dark"||(!document.documentElement.dataset.theme&&matchMedia("(prefers-color-scheme: dark)").matches);
+  const fs=Math.max(28,Math.min(64,span/13)),ink=col("--ink")||"#111",acc=col("--accent")||"#2454d6";
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(-Math.PI/14);ctx.globalAlpha=dark?0.13:0.09;ctx.textBaseline="middle";
+  ctx.font=`800 ${fs}px ${font}`;const w1=ctx.measureText("Rejestr").width,w2=ctx.measureText("Obligacji").width,box=fs*1.05,gap=fs*0.35,tw=box+gap+w1+w2;
+  let x=-tw/2;
+  // logo: zaokrąglony kwadrat w kolorze akcentu z linią wykresu
+  const r=box*0.24,y0=-box/2;ctx.fillStyle=acc;ctx.beginPath();ctx.moveTo(x+r,y0);ctx.arcTo(x+box,y0,x+box,y0+box,r);ctx.arcTo(x+box,y0+box,x,y0+box,r);ctx.arcTo(x,y0+box,x,y0,r);ctx.arcTo(x,y0,x+box,y0,r);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="#fff";ctx.lineWidth=box*0.09;ctx.lineJoin="round";ctx.lineCap="round";ctx.beginPath();
+  [[0.2,0.68],[0.42,0.46],[0.58,0.58],[0.8,0.3]].forEach(([px,py],i)=>ctx[i?"lineTo":"moveTo"](x+box*px,y0+box*py));ctx.stroke();
+  x+=box+gap;ctx.fillStyle=ink;ctx.fillText("Rejestr",x,0);ctx.fillStyle=acc;ctx.fillText("Obligacji",x+w1,0);
+  ctx.font=`600 ${Math.round(fs*0.32)}px ${font}`;ctx.fillStyle=ink;ctx.textAlign="center";ctx.fillText("patrykw-labs.github.io/rejestr-obligacji",0,fs*0.95);
+  ctx.restore();
 }
 async function downloadChartPng(chartEl,name,title,subtitle){try{downloadBlob(await chartPngBlob(chartEl,title,subtitle),name)}catch(e){alert(e.message)}}
 // przyciski eksportu (prefix id: z, b, p); png=false — tylko CSV
