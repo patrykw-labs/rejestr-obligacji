@@ -33,9 +33,6 @@
   };
   const periodOf = (type) => TYPES[type].period || 12;
   const NOMINAL = 100;
-  // Wersja silnika: index.html ładuje js/zamiana.js?v=<VERSION> (omija starą kopię w pamięci przeglądarki).
-  // Po każdej zmianie silnika podbij ją tutaj i w index.html — test_zamiana.js sprawdza zgodność.
-  const VERSION = "2026-11-12.2";
 
   // ---------- daty "RRRR-MM" ----------
   const ymToIdx = (ym) => { const [y, m] = ym.split("-").map(Number); return y * 12 + (m - 1); };
@@ -517,7 +514,7 @@
     });
   }
 
-  const api = { VERSION, TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation, breakEvenNbp,
+  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation, breakEvenNbp,
     cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;

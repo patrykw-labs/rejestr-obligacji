@@ -367,10 +367,5 @@ eq("blog, scenariusz 2: do wykupu wygrywa stara seria", d2[7] < 0, true);
 const sc3 = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4 }));
 eq("blog: kilkaset sztuk → po 8 latach ok. 100 zł", sc3.atHorizon.diff > 80 && sc3.atHorizon.diff < 120, true);
 
-// wersja silnika w index.html (js/zamiana.js?v=… i CALC_ENGINE_V) musi się zgadzać z Z.VERSION
-const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-eq("index.html ładuje js/zamiana.js z aktualną wersją", (html.match(/js\/zamiana\.js\?v=([^"]+)"/) || [])[1], Z.VERSION);
-eq("index.html sprawdza aktualną wersję silnika", (html.match(/CALC_ENGINE_V="([^"]+)"/) || [])[1], Z.VERSION);
-
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
