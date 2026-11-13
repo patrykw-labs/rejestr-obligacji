@@ -33,12 +33,13 @@ Na stronie są cztery widoki:
 
 ## Aktualizacja co miesiąc
 
-Około 4. dnia miesiąca, gdy na obligacjeskarbowe.pl jest już nowa oferta, a GUS opublikował szybki szacunek CPI, w folderze repozytorium napisz Claude Code: „dopisz nowy miesiąc”. Procedura z `.claude/CLAUDE.md`:
+Dane aktualizują się automatycznie:
 
-1. Dopisz rekord z ofertą wszystkich serii, sprawdzoną w listach emisyjnych.
-2. Dopisz stopę referencyjną NBP z 1. dnia miesiąca i CPI za poprzedni miesiąc.
-3. W rekordzie poprzedniego miesiąca zamień szybki szacunek CPI na odczyt finalny.
-4. Uruchom `python3 scripts/validate.py` i zrób commit `oferta RRRR-MM`.
+- **4. dnia miesiąca** zadanie w chmurze (Claude Code) dopisuje rekord nowej oferty: każdą serię sprawdza w liście emisyjnym, dodaje stopę referencyjną NBP z 1. dnia miesiąca i szybki szacunek CPI z GUS, a w poprzednim rekordzie zamienia szybki szacunek na odczyt finalny. Po walidacji (`scripts/validate.py`) robi commit `oferta RRRR-MM`.
+- **17. dnia miesiąca** to samo zadanie zamienia szybki szacunek CPI w bieżącym rekordzie na odczyt finalny GUS (commit `CPI RRRR-MM finalny`).
+- **5. i 20. dnia miesiąca** GitHub Actions (`scripts/check_offer.py`) porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i archiwum stóp NBP, a od 18. dnia sprawdza, czy CPI jest już finalne. Przy rozbieżności przebieg kończy się błędem.
+
+Ręcznie (np. gdy zadanie się nie powiodło): w folderze repozytorium napisz Claude Code „dopisz nowy miesiąc” albo „podmień CPI na finalny”. Procedury są opisane w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 
 ## Podgląd lokalny
 
