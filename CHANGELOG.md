@@ -13,7 +13,7 @@ Porządki w repozytorium i zabezpieczenia strony; obliczenia i dane bez zmian.
 - Test strony w przeglądarce w GitHub Actions (`scripts/test_strona.js`): wszystkie zakładki i kilkanaście linków kalkulatora, na komputerze i telefonie.
 - Dependabot: comiesięczne podbijanie wersji akcji GitHub Actions; Node 22 w workflow.
 - Workflow „Wydanie”: notatki z tego pliku, opcja odtworzenia wydania na wskazanym commicie.
-- Instrukcje projektu: zasada niezależności od zewnętrznych produktów (bez ich nazw, autorów i brandingu).
+- Instrukcje projektu: zasada niezależności od zewnętrznych produktów.
 
 ## v1.0.0 — 2026-11-13
 
