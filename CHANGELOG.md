@@ -4,6 +4,10 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+## v1.1.0 — 2026-11-13
+
+Porządki w repozytorium i zabezpieczenia strony; obliczenia i dane bez zmian.
+
 - Strona podzielona na pliki: `css/style.css`, `js/app.js`, `js/kalkulator.js`, `js/start.js`; adresy plików z `?v=<skrót treści>` (`scripts/assets.py`), więc przeglądarka nie łączy nowej strony ze starą kopią plików.
 - Poprawka: ukryte dymki „?” nie poszerzają już strony kalkulatora na komputerze (zbędny poziomy pasek przewijania).
 - Test strony w przeglądarce w GitHub Actions (`scripts/test_strona.js`): wszystkie zakładki i kilkanaście linków kalkulatora, na komputerze i telefonie.
