@@ -319,24 +319,6 @@ const CALC_TIPS={
   real:"Kwota w dzisiejszych złotych (przy zerwaniu w przeszłości — w złotych z dnia zerwania): wartość nominalna podzielona przez skumulowaną inflację z Twojego scenariusza. Pokazuje siłę nabywczą, a nie to, co zobaczysz na koncie — np. 11 877 zł po 5 latach przy inflacji 2,5% to realnie ok. 10 498 zł.",
   range:"Od zakupu — cała historia. Od zerwania — oś tylko dla prognozy, linie są bardziej rozsunięte."
 };
-// objaśnienia: pola kalkulatorów (CALC_TIPS, uzupełniane w kupno.js i portfel.js) i pozostałych widoków (VIEW_TIPS w app.js)
-const calcTip=(k,down)=>{const t=CALC_TIPS[k]||VIEW_TIPS[k];return t?`<span class="qtip${down?" down":""}" tabindex="0" role="button" aria-label="Wyjaśnienie: ${esc(t)}">?<span class="qtip-b" role="tooltip">${esc(t)}</span></span>`:""};
-// dotknięcie na telefonie: pokaż/ukryj dymek; nie aktywuj pola, do którego należy etykieta; dymek nie wychodzi poza ekran
-function calcBindTips(root){root.querySelectorAll(".qtip").forEach(q=>{
-  const fit=()=>{const b=q.querySelector(".qtip-b");
-    // w tabelach i kafelkach (kontenery z przycinaniem treści) dymek pozycjonujemy względem okna, pod ikoną
-    if(q.closest(".frame,.stats")){const r=q.getBoundingClientRect(),W=document.documentElement.clientWidth;b.style.position="fixed";b.style.transform="none";b.style.bottom="auto";
-      const bw=Math.min(270,W*0.8);b.style.left=Math.max(8,Math.min(W-8-bw,r.left+r.width/2-bw/2))+"px";b.style.top=(r.bottom+8)+"px";return}
-    b.style.setProperty("--dx","0px");const r=b.getBoundingClientRect(),W=document.documentElement.clientWidth;
-    let dx=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;b.style.setProperty("--dx",dx+"px")};
-  q.addEventListener("mouseenter",fit);q.addEventListener("focus",fit);
-  q.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();const open=!q.classList.contains("open");document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));if(open){calcTipY=scrollY;q.classList.add("open");fit()}});
-  q.addEventListener("keydown",e=>{if(e.key==="Escape"){q.classList.remove("open");q.blur()}});
-})}
-document.addEventListener("click",()=>document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open")));
-// przy przewijaniu chowamy otwarte dymki (dymki w tabelach mają pozycję względem okna)
-let calcTipY=0;document.addEventListener("focusin",e=>{if(e.target.classList&&e.target.classList.contains("qtip"))calcTipY=scrollY});
-window.addEventListener("scroll",()=>{if(Math.abs(scrollY-calcTipY)<40)return;document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));const a=document.activeElement;if(a&&a.classList&&a.classList.contains("qtip"))a.blur()},{passive:true});
 const calcBreakDate=c=>{const n=calcNow();return `${+c.bd}.${n.slice(5)}.${n.slice(0,4)}`};
 const calcAgeTxt=a=>a%1>1e-9?`${Math.floor(a)} mies. i ${Math.round((a%1)*30)} dni`:`${a} mies.`;
 const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji liczymy od dnia zakupu co do dnia, a do wartości w dniu zerwania wchodzą odsetki narosłe od ostatniej miesięcznicy (ROR, DOR) albo rocznicy zakupu (pozostałe), więc opłata za wykup jest częściowo pokryta. Według listów emisyjnych odsetki biegną do dnia wykupu, ok. 5 dni roboczych po złożeniu dyspozycji — jako dzień zerwania wpisz dzień wykupu. Dalsze kroki w tabeli to kolejne miesiące od dnia zerwania.</li>

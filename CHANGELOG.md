@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Porządki w kodzie: eksport (CSV, PNG) w `js/eksport.js`, dymki i „Wyczyść ustawienia” w `js/wspolne.js`; strona działa bez zmian.
 - Czytelność: kontrast tekstu co najmniej 4,5:1 (WCAG AA) w obu motywach — ciemniejszy tekst drugorzędny w jasnym motywie i wybrane przyciski w ciemnym.
 - Test strony także w ciemnym motywie: zakładki na komputerze i telefonie, kontrast tekstu w obu motywach, przełącznik motywu (zapamiętany po przeładowaniu) i eksport PNG z ciemnym tłem.
 - „Mój portfel” zapamiętuje się w przeglądarce (tylko na tym urządzeniu) i wczytuje przy następnej wizycie; „Zapomnij portfel” usuwa zapis. Portfel otwarty z linku nie nadpisuje zapamiętanego — można go zapamiętać albo wczytać własny.
