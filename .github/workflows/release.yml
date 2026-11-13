@@ -12,7 +12,7 @@ on:
         description: "Wersja, np. v1.0.0"
         required: true
       target:
-        description: "Commit (SHA) dla tagu; puste = bieżący main"
+        description: "Commit (SHA) dla tagu; puste = bieżący main. Pliki .github/workflows w tym commicie muszą być takie jak na main (inaczej GitHub odmówi: 403)"
         required: false
       recreate:
         description: "Usuń istniejące wydanie i tag o tej nazwie i utwórz je od nowa (np. po przepisaniu historii)"
