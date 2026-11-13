@@ -160,6 +160,7 @@ td b{font-weight:700}
 .qtip-b{position:absolute;z-index:20;bottom:calc(100% + 8px);left:50%;transform:translateX(calc(-50% + var(--dx,0px)));width:max-content;max-width:min(270px,80vw);padding:8px 10px;border-radius:10px;background:var(--ink);color:var(--bg);font-size:12.5px;font-weight:500;line-height:1.4;text-align:left;white-space:normal;box-shadow:var(--shadow-pop);pointer-events:none;display:none}
 .qtip:hover .qtip-b,.qtip:focus .qtip-b,.qtip.open .qtip-b{display:block}
 .qtip.down .qtip-b{bottom:auto;top:calc(100% + 8px)}
+.stat .qtip-b{font-weight:500;letter-spacing:0}
 th .qtip-b{font-weight:500;text-transform:none;letter-spacing:0}
 .ctools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0 0 6px}
 .chart svg{display:block;width:100%;height:auto}

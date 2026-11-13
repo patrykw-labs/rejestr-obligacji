@@ -303,8 +303,8 @@ const calcTip=(k,down)=>{const t=CALC_TIPS[k]||VIEW_TIPS[k];return t?`<span clas
 // dotknięcie na telefonie: pokaż/ukryj dymek; nie aktywuj pola, do którego należy etykieta; dymek nie wychodzi poza ekran
 function calcBindTips(root){root.querySelectorAll(".qtip").forEach(q=>{
   const fit=()=>{const b=q.querySelector(".qtip-b");
-    // w tabelach (ramka z przewijaniem przycina) dymek pozycjonujemy względem okna
-    if(q.closest(".frame")){const r=q.getBoundingClientRect(),W=document.documentElement.clientWidth;b.style.position="fixed";b.style.transform="none";b.style.bottom="auto";
+    // w tabelach i kafelkach (kontenery z przycinaniem treści) dymek pozycjonujemy względem okna, pod ikoną
+    if(q.closest(".frame,.stats")){const r=q.getBoundingClientRect(),W=document.documentElement.clientWidth;b.style.position="fixed";b.style.transform="none";b.style.bottom="auto";
       const bw=Math.min(270,W*0.8);b.style.left=Math.max(8,Math.min(W-8-bw,r.left+r.width/2-bw/2))+"px";b.style.top=(r.bottom+8)+"px";return}
     b.style.setProperty("--dx","0px");const r=b.getBoundingClientRect(),W=document.documentElement.clientWidth;
     let dx=0;if(r.right>W-8)dx=W-8-r.right;if(r.left+dx<8)dx=8-r.left;b.style.setProperty("--dx",dx+"px")};
