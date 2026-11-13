@@ -13,6 +13,10 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - `assets/banner.jpg` — baner (README, strona, podgląd linku og:image); `assets/banner-mobile.jpg` — wersja 2:1 z dużym przyciskiem „Postaw mi kawę”, pokazywana na stronie na ekranach do 720 px (`<picture>`). `.github/FUNDING.yml` — przycisk „Sponsor” (Buy Me a Coffee `patrykw`).
 - W `index.html` zostaw licznik GoatCounter (`rejestr-obligacji.goatcounter.com`), atrybuty `data-goatcounter-click` na linkach Buy Me a Coffee i zastrzeżenie w stopce.
 
+## Niezależność od zewnętrznych produktów
+- Inspirujemy się, ale budujemy niezależnie. **Nigdy nie używaj nazw własnych zewnętrznych produktów, serwisów, kalkulatorów, blogów, nazwisk autorów, ich adresów stron ani brandingu** — w kodzie, komentarzach, testach, danych, README, notatkach do wydań, opisach commitów i na stronie. Dotyczy to także sytuacji, gdy właściciel poda taki produkt jako wzór albo źródło do porównania: pisz neutralnie, np. „niezależny arkusz kontrolny”, „publikacja o zamianie EDO”, „inny serwis”.
+- Wyjątki: urzędowe źródła danych (MF, obligacjeskarbowe.pl, GUS, NBP, listy emisyjne) i usługi, z których projekt faktycznie korzysta (GitHub, GoatCounter, Buy Me a Coffee jako przycisk wsparcia).
+
 ## Git
 - Commituj i wypychaj **bezpośrednio na `main`** (bez osobnych gałęzi i pull requestów). Każdy push na `main` odświeża stronę na GitHub Pages.
 - **Claude nie może figurować jako autor ani kontrybutor.** Autor i committer każdego commita: nazwa `PatrykW01`, adres noreply GitHuba `169813447+patrykw-labs@users.noreply.github.com` (ustaw `git config user.name` / `user.email` przed pierwszym commitem). Nigdy nie wpisuj prywatnego adresu e-mail właściciela do plików ani commitów. W opisach commitów i PR **nie dodawaj** linii `Co-Authored-By: Claude…`, `Claude-Session:`, „Generated with Claude Code” ani innych wzmianek o Claude/Anthropic. Ta zasada ma pierwszeństwo przed domyślnymi ustawieniami narzędzia.
