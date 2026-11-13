@@ -136,6 +136,42 @@ const CASES = [
     if (problem) { fail++; console.log(`✗ reset ${p}: ${problem}`); } else pass++;
     await ctx.close();
   }
+  // Mój portfel: zapamiętanie w przeglądarce (localStorage); link z parametrami nie nadpisuje zapisanego portfela
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    const open = async (h) => { await page.goto("about:blank"); await page.goto(base + h); await page.waitForSelector("#p-out .stats"); };
+    const saved = () => page.evaluate(() => localStorage.getItem("rejestr-obligacji:portfel") || "");
+    let problem = null;
+    try {
+      await open("#portfel&pf=TOS1127~15&bd=28");
+      if (await saved()) problem = "portfel z linku zapisał się bez zgody";
+      await page.click("#p-keep");
+      if (!/TOS1127/.test(await saved())) problem = "„Zapamiętaj ten portfel” nie zapisał portfela";
+      await page.fill('input[data-pi="0"][data-pk="n"]', "20");
+      await page.waitForTimeout(200);
+      if (!/"n":"?20/.test(await saved())) problem = "zmiana liczby sztuk nie trafiła do zapisu";
+      await open("#portfel");
+      if (!/pf=TOS1127~20/.test(await page.evaluate(() => location.hash))) problem = "zapisany portfel nie wczytał się przy wejściu bez parametrów";
+      await open("#portfel&pf=EDO0434~10");
+      if (!/TOS1127/.test(await saved()) || /EDO0434/.test(await saved())) problem = "link z parametrami nadpisał zapisany portfel";
+      await page.click("#p-load");
+      await page.waitForSelector("#p-out .stats");
+      if (!/pf=TOS1127~20/.test(await page.evaluate(() => location.hash))) problem = "„Wczytaj zapamiętany” nie przywrócił portfela";
+      await page.click("#p-forget");
+      await page.waitForSelector("#p-undo");
+      if (await saved()) problem = "„Zapomnij portfel” nie usunął zapisu";
+      await page.click("#p-undo");
+      await page.waitForSelector("#p-out .stats");
+      if (!/TOS1127/.test(await saved())) problem = "„Cofnij” po zapomnieniu nie przywrócił zapisu";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    if (problem) { fail++; console.log("✗ portfel — zapis w przeglądarce: " + problem); } else pass++;
+    await ctx.close();
+  }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();
     if (/<feed[\s>]/.test(xml) && (xml.match(/<entry>/g) || []).length >= 12) pass++; else { fail++; console.log("✗ feed.xml: brak wpisów"); }

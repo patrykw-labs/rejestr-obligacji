@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- „Mój portfel” zapamiętuje się w przeglądarce (tylko na tym urządzeniu) i wczytuje przy następnej wizycie; „Zapomnij portfel” usuwa zapis. Portfel otwarty z linku nie nadpisuje zapamiętanego — można go zapamiętać albo wczytać własny.
 - Ikona RSS w górnej belce (obok przełącznika motywu) — link do kanału z nowymi ofertami.
 
 ## v1.2.0 — 2026-11-13

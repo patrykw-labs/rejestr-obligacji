@@ -23,6 +23,18 @@ function pfDefaults(){
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0]||"";
   return {pos:pick?[{code:pick,n:100,pd:1}]:[],bd:calcDefaultBreakDay(),acc:"std",sc:"base"};
 }
+// zapamiętanie portfela w tej przeglądarce (localStorage, tylko na tym urządzeniu): serie, rachunek, scenariusz;
+// bez dnia wyceny (zawsze dziś). Adres z parametrami ma pierwszeństwo; brak dostępu do pamięci nie psuje strony.
+const PF_KEY="rejestr-obligacji:portfel";
+function pfLoad(){try{const j=JSON.parse(localStorage.getItem(PF_KEY)||"null");if(!j||!Array.isArray(j.pos))return null;const s=pfDefaults();
+    const pos=j.pos.slice(0,PF_MAX).map(o=>{const a=calcFromCode(o.code);return a&&CALC_TYPES.includes(a.type)&&+o.n>=1?{code:a.code,n:Math.floor(+o.n),pd:calcDayOk(o.pd)?+o.pd:1}:null}).filter(Boolean);
+    if(!pos.length)return null;s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;return s}catch(e){return null}}
+const pfSaved=()=>{try{return !!localStorage.getItem(PF_KEY)}catch(e){return false}};
+// zapis po każdej zmianie; portfel przykładowy (domyślny) nie jest zapisywany — wtedy zapis jest usuwany
+// portfel otwarty z linku (state.pfLink) nie nadpisuje zapamiętanego — dopiero „Zapamiętaj ten portfel”
+function pfSave(s){if(state.pfLink)return;try{const d=pfDefaults(),same=JSON.stringify([s.pos,s.acc,s.sc])===JSON.stringify([d.pos,d.acc,d.sc]);
+    if(same)localStorage.removeItem(PF_KEY);else localStorage.setItem(PF_KEY,JSON.stringify({v:1,pos:s.pos.map(o=>({code:o.code,n:o.n,pd:o.pd})),acc:s.acc,sc:s.sc}))}catch(e){}}
+function pfForget(main){try{localStorage.removeItem(PF_KEY)}catch(e){}state.pfLink=false;viewReset("pf",null,pfDefaults,()=>renderPortfolio(main))}
 function pfFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="portfel"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const s=pfDefaults();
@@ -53,7 +65,7 @@ function pfParams(s){
     cpiHistory:calcCpiHist(),cpiFuture:[CPI_PRESETS[s.sc].v],nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:calcNbpNow(),tax:s.acc==="std"};
 }
 function renderPortfolio(main){
-  if(!state.pf)state.pf=pfFromHash()||pfDefaults();
+  if(!state.pf){const h=pfFromHash();if(h){state.pf=h;state.pfLink=true}else state.pf=pfLoad()||pfDefaults()}
   const s=state.pf,now=pfNow(),opts=calcOptions(now);
   const undo=viewUndoShown("pf"),isDef=pfHash(s)===pfHash(pfDefaults());
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
@@ -69,7 +81,8 @@ function renderPortfolio(main){
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}
-        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span></div></div>
+        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span></div>
+        <p class="small" id="p-store">${pfStoreNote()}</p></div>
       <div class="card"><h3>Wycena</h3>
         <div class="frow"><label class="field"><span class="flabel">Dzień wyceny${calcTip("pbd")}</span><input id="p-bd" type="number" min="1" max="${calcDaysIn(now)}" step="1" inputmode="numeric" value="${esc(s.bd)}"><span class="fnote">${esc(mLabel(now))}</span></label></div>
         <div class="field"><span class="flabel">Rachunek${calcTip("pacc")}</span><div class="chips" role="group" aria-label="Rachunek">${PF_ACC.map(([k,l])=>`<button type="button" class="chip" data-pacc="${k}" aria-pressed="${s.acc===k}">${l}</button>`).join("")}</div></div>
@@ -90,9 +103,19 @@ function renderPortfolio(main){
   calcBindTips(main.querySelector(".calc-grid"));
   pfRecompute();
 }
+// informacja o zapisie w przeglądarce (aktualizowana po każdej zmianie)
+function pfStoreNote(){
+  if(state.pfLink)return `🔗 Ten portfel otwarto z linku — nie zastępuje portfela zapamiętanego w tej przeglądarce. <button type="button" class="linkbtn" id="p-keep">Zapamiętaj ten portfel</button>${pfSaved()?` · <button type="button" class="linkbtn" id="p-load">Wczytaj zapamiętany</button>`:""}`;
+  return pfSaved()?`💾 Portfel jest zapamiętany w tej przeglądarce (tylko na tym urządzeniu, nie wysyłamy go nigdzie). <button type="button" class="linkbtn" id="p-forget">Zapomnij portfel</button>`
+  :"Po zmianie serii portfel zapamięta się w tej przeglądarce (tylko na tym urządzeniu) i wczyta przy następnej wizycie."}
+function pfBindStore(){const main=$("#main"),b=$("#p-forget"),k=$("#p-keep"),l=$("#p-load");
+  if(b)b.addEventListener("click",()=>pfForget(main));
+  if(k)k.addEventListener("click",()=>{state.pfLink=false;pfSave(state.pf);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote();pfBindStore()}});
+  if(l)l.addEventListener("click",()=>{const v=pfLoad();if(!v)return;state.pf=v;state.pfLink=false;renderPortfolio(main)})}
 function pfRecompute(){
   const out=$("#p-out");if(!out)return;const s=state.pf,now=pfNow();
   try{history.replaceState(null,"","#"+pfHash(s))}catch(e){}
+  pfSave(s);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote();pfBindStore()}
   const errs=[];
   if(!s.pos.length)errs.push("Dodaj co najmniej jedną serię.");
   s.pos.forEach((o,i)=>{if(!(Math.floor(+o.n)>=1))errs.push(`Seria ${i+1}: podaj liczbę sztuk.`);if(!calcDayOk(o.pd))errs.push(`Seria ${i+1}: dzień zakupu od 1 do 31.`)});
