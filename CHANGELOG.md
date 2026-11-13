@@ -4,6 +4,8 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Ikona RSS w górnej belce (obok przełącznika motywu) — link do kanału z nowymi ofertami.
+
 ## v1.2.0 — 2026-11-13
 
 Nowe zakładki „Co kupić?” i „Mój portfel”, wynik historyczny każdej serii, eksport wyników i kanał Atom z ofertami.
