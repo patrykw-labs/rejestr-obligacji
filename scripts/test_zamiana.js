@@ -367,5 +367,25 @@ eq("blog, scenariusz 2: do wykupu wygrywa stara seria", d2[7] < 0, true);
 const sc3 = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4 }));
 eq("blog: kilkaset sztuk → po 8 latach ok. 100 zł", sc3.atHorizon.diff > 80 && sc3.atHorizon.diff < 120, true);
 
+// ---------------------------------------------------------------------------
+// 11. „Co kupić?” (compareBuy): ta sama kwota w każdą serię z oferty 11.2026, wypłata na koniec okresu
+// ---------------------------------------------------------------------------
+const off11 = months["2026-11"].series;
+const buyCands = ["EDO", "COI", "TOS", "ROS", "ROD", "DOR", "ROR", "OTS"].map((t) => ({ type: t, rate1: off11[t].rate1, margin: off11[t].margin || 0,
+  fee: typeof off11[t].fee === "number" ? off11[t].fee : 0, swapPrice: off11[t].swapPrice }));
+const buyBase = { now: "2026-11", amount: 10000, candidates: buyCands, cpiHistory: hist, nbpHistory: nbpHist, nbpFuture: 3.75, cpiFuture: [2.5], savingsRate: 4, tax: true };
+const bAt = (H, t, extra) => Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: H }, extra || {})).results.find((x) => x.type === t);
+eq("kupno: OTS po 3 mies. — 10 000 + 50 zł odsetek − 9,50 zł podatku", bAt(3, "OTS").final, 10040.5, 1e-6);
+eq("kupno: EDO po 3 mies. — opłata do wysokości odsetek, wypłata 100 zł/szt.", bAt(3, "EDO").final, 10000, 1e-6);
+eq("kupno: COI po roku — kupon 475 zł po podatku, obligacje po 100 zł", bAt(12, "COI").final, 10384.75, 1e-6);
+eq("kupno: EDO po roku — 105,35 − opłata 3 zł, podatek od 2,35 zł", bAt(12, "EDO").final, 10000 + 235 * 0.81, 1e-6);
+eq("kupno: TOS w IKE po 3 latach — zamiana na nowe TOS po 99,90", bAt(36, "TOS", { tax: false }).events.filter((e) => e.kind === "wykup").map((e) => e.t), [36]);
+const b120 = Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: 120 }));
+eq("kupno: ranking malejąco", b120.ranking.map((t) => b120.results.find((x) => x.type === t).final).every((v, i, a) => i === 0 || v <= a[i - 1]), true);
+eq("kupno: EDO po 10 latach = wykup w terminie, bez opłaty (zgodnie z compare)", Math.abs(bAt(120, "EDO").final - 14593) < 1, true);
+eq("kupno: ROS/ROD bez ceny zamiany — przy wykupie nowe po 100 zł", bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].newCount,
+  Math.floor(bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].proceeds / 100));
+eq("kupno: kwota 150 zł → 1 szt. i 50 zł na konto", [bAt(12, "TOS", { amount: 150 }).count, bAt(12, "TOS", { amount: 150 }).cash0], [1, 50]);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);

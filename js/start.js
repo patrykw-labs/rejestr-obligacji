@@ -1,6 +1,6 @@
 /* Rejestr ofert obligacji — start: zakładka z adresu, wczytanie danych, przełącznik motywu. Ładowany przez index.html (bez kroku budowania). */
-(function(){const h=(location.hash||"").slice(1).split("&")[0];if(["oferta","wykres","seria","zamiana"].includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
-let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(state.view==="wykres")drawChart();if(state.view==="zamiana")calcRecompute()},150)});
+(function(){const h=(location.hash||"").slice(1).split("&")[0];if(["oferta","wykres","seria","zamiana","kupno"].includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(state.view==="wykres")drawChart();if(state.view==="zamiana")calcRecompute();if(state.view==="kupno")buyRecompute()},150)});
 
 (async()=>{
   try{

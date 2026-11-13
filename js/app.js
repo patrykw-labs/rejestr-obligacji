@@ -18,7 +18,7 @@ function ruleText(s){if(!s)return"–";const r=s.rule||"";if(r==="stałe")return
 function prevOf(id){const i=state.months.findIndex(m=>m.id===id);return i>0?state.months[i-1]:null}
 function delta(a,b){if(a==null||b==null)return'<span class="d-0">–</span>';const d=Math.round((a-b)*100)/100;if(d===0)return'<span class="d-0">0,00</span>';return d>0?'<span class="d-up">+'+fmt(d)+'</span>':'<span class="d-down">−'+fmt(-d)+'</span>'}
 
-function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v))}catch(e){}render()}
+function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v))}catch(e){}render()}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
 
 function render(){
@@ -28,7 +28,7 @@ function render(){
   if(!state.months.length){main.innerHTML='<div class="empty"><strong>Archiwum jest puste</strong>Dodaj pierwszy miesiąc do data/months.json.</div>';return}
   if(!state.month||!state.months.find(m=>m.id===state.month))state.month=state.months[state.months.length-1].id;
   const reload='<button type="button" class="btn" onclick="location.reload()">Odśwież stronę</button>';
-  try{({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc}[state.view]||renderOffer)(main)}
+  try{({oferta:renderOffer,wykres:renderChart,seria:renderSeries,zamiana:renderCalc,kupno:renderBuy}[state.view]||renderOffer)(main)}
   catch(e){console.error(e);main.innerHTML=`<div class="empty"><strong>Nie udało się wyświetlić tego widoku</strong>Spróbuj odświeżyć stronę (Ctrl+F5). Jeśli błąd się powtarza, zgłoś go na GitHubie i podaj adres strony. <span class="small">(${esc(e.message)})</span><div class="row" style="margin-top:12px">${reload}</div></div>`}
 }
 

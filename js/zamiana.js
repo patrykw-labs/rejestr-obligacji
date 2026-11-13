@@ -460,6 +460,37 @@
     };
   }
 
+  /**
+   * „Co kupić dziś?”: ta sama kwota w każdą z podanych serii kupionych dziś (po 100 zł), trzymanych do końca
+   * horyzontu; przy wykupie w terminie zamiana na tę samą serię na dzisiejszych warunkach (cena zamiany serii,
+   * a gdy jej nie ma — 100 zł). Reszta poniżej 100 zł i kupony na koncie.
+   * p = { now, amount, horizonMonths, candidates: [{type, rate1, margin, fee, swapPrice?}], cpiHistory, cpiFuture,
+   *       nbpHistory, nbpFuture, savingsRate, tax, withdrawalTax, valuation: "liquidate" (domyślnie — wypłata
+   *       wszystkiego na koniec, z opłatą i podatkiem) | "hold" }
+   */
+  function compareBuy(p) {
+    const H = Math.max(1, Math.round(p.horizonMonths || 12));
+    const amount = +p.amount || 0;
+    const wk = 1 - (p.withdrawalTax || 0);
+    const results = (p.candidates || []).map((c) => {
+      const spec = { type: c.type, rate1: +c.rate1, margin: +(c.margin || 0), fee: +(c.fee || 0), purchase: p.now };
+      const roll = Object.assign({}, spec, { swapPrice: c.swapPrice || TYPES[c.type].swapPrice || NOMINAL });
+      delete roll.purchase;
+      const { ctx, future, buyPrice } = buildCtx(Object.assign({}, p, { valuation: p.valuation === "hold" ? "hold" : "liquidate",
+        target: spec, rollover: roll }), H);
+      const count = Math.floor(amount / buyPrice + 1e-9), cash0 = amount - count * buyPrice;
+      const defl = deflator(future, H);
+      const leg = simulateLeg({ spec, count, ageAt0: 0, cash0, costBasis: buyPrice }, ctx);
+      const series = leg.series.map((x, t) => ({ t, ym: x.ym, total: x.total * wk, real: x.total * wk / defl[t] }));
+      const last = series[H];
+      return { type: c.type, count, cash0, series, events: leg.events, final: last.total, finalReal: last.real,
+        gain: last.total - amount, annual: amount > 0 && last.total > 0 ? Math.pow(last.total / amount, 12 / H) - 1 : null,
+        rates: periodRates(spec, ctx.cpiAt, ctx.nbpAt) };
+    });
+    const ranking = results.slice().sort((a, b) => b.final - a.final).map((r) => r.type);
+    return { now: p.now, horizonMonths: H, amount, results, ranking };
+  }
+
   /** Stała przyszła inflacja, przy której różnica na koniec horyzontu = 0 (bisekcja). */
   function breakEvenInflation(p, lo = -2, hi = 25) {
     const f = (c) => compare(Object.assign({}, p, { cpiFuture: [c] })).atHorizon.diff;
@@ -514,7 +545,7 @@
     });
   }
 
-  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, breakEvenInflation, breakEvenNbp,
+  const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, breakEvenInflation, breakEvenNbp,
     cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
