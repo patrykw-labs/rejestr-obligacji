@@ -554,10 +554,11 @@
   /**
    * „Jak wypadła seria”: 1 obligacja (100 zł) kupiona w miesiącu emisji, trzymana do `now` albo do wykupu w terminie,
    * jeśli był wcześniej. Kupony (COI, ROR, DOR) po podatku, bez oprocentowania.
-   * p = { spec: {type, rate1, margin, fee, purchase}, now, cpiHistory, nbpHistory, tax, taxRate,
+   * p = { spec: {type, rate1, margin, fee, purchase}, now, cpiHistory, cpiYtd, nbpHistory, tax, taxRate,
    *       valuation: "hold" (seria w trakcie — wartość bez opłaty, po podatku od narosłych odsetek) | "liquidate" (wypłata dziś) }
-   * Inflacja w tym czasie (orientacyjnie, z odczytów CPI r/r): Π (1 + CPI za miesiąc m)^(1/12) dla kolejnych miesięcy
-   * od zakupu; brakujące najnowsze odczyty = ostatni znany.
+   * Inflacja w tym czasie: zmiana poziomu cen GUS w miesiącach od zakupu do miesiąca przed końcem, P(koniec−1) / P(zakup−1)
+   * z łańcucha „grudzień poprzedniego roku = 100” (cpiYtd); miesiące bez tego odczytu — przybliżenie z CPI r/r
+   * (brakujące najnowsze odczyty = ostatni znany). inflationExact = wszystkie miesiące z łańcucha GUS.
    */
   function seriesOutcome(p) {
     const o = p.spec, t = TYPES[o.type];
@@ -577,11 +578,17 @@
     const coupons = v.coupons.reduce((s, c) => s + (tax ? c.amount - r2(c.amount * taxRate) : c.amount), 0);
     const value = !matured && p.valuation === "liquidate" ? v.net : v.gross;
     const total = value - (tax ? r2(Math.max(0, value - NOMINAL) * taxRate) : 0) + coupons;
-    let infl = 1;
-    for (let m = 0; m < age; m++) infl *= Math.pow(1 + cpiAt(addMonths(o.purchase, m)) / 100, 1 / 12);
+    // dokładnie z dwóch końców łańcucha, gdy oba są znane; inaczej miesiąc po miesiącu z przybliżeniem tam, gdzie brak odczytu
+    const level = makePriceLevel(p.cpiYtd), la = level(addMonths(end, -1)), lb = level(addMonths(o.purchase, -1));
+    let infl = 1, exact = true;
+    if (la != null && lb != null) infl = la / lb;
+    else {
+      const step = makeInflationStep(p.cpiYtd, cpiAt);
+      for (let m = 0; m < age; m++) { const ym = addMonths(o.purchase, m); infl *= step(ym); if (!step.exact(ym)) exact = false; }
+    }
     const nominal = total / NOMINAL - 1, real = (1 + nominal) / infl - 1;
     return {
-      matured, maturity, end, age, total, coupons, nominal, inflation: infl - 1, real,
+      matured, maturity, end, age, total, coupons, nominal, inflation: infl - 1, inflationExact: exact, real,
       annual: Math.pow(1 + nominal, 12 / age) - 1, realAnnual: Math.pow(1 + real, 12 / age) - 1, rates,
     };
   }
@@ -618,6 +625,48 @@
     return (lo + hi) / 2;
   }
 
+  /**
+   * Poziom cen z łańcucha GUS „grudzień poprzedniego roku = 100”: ytd = {"RRRR-MM": wskaźnik − 100}.
+   * P(ym) = Π (1 + ytd[grudzień k]/100) po latach przed rokiem ym × (1 + ytd[ym]/100), od grudnia roku sprzed
+   * najstarszego odczytu (= 1). To oficjalny sposób liczenia zmiany cen w dłuższym okresie: dla grudnia daje dokładnie
+   * wskaźnik r/r, a przy zaokrągleniu do 0,1 błąd nie narasta z każdym miesiącem. Zwraca null, gdy brakuje danych.
+   */
+  function makePriceLevel(ytd) {
+    const keys = Object.keys(ytd || {}).sort();
+    if (!keys.length) return () => null;
+    const baseYear = +keys[0].slice(0, 4) - 1;
+    return function (ym) {
+      if (ym === `${baseYear}-12`) return 1;
+      const y = +ym.slice(0, 4);
+      if (y <= baseYear || ytd[ym] == null) return null;
+      let f = 1 + ytd[ym] / 100;
+      for (let k = baseYear + 1; k < y; k++) { const d = ytd[`${k}-12`]; if (d == null) return null; f *= 1 + d / 100; }
+      return f;
+    };
+  }
+
+  /**
+   * Inflacja w miesiącu ym jako mnożnik: P(ym) / P(ym−1) z łańcucha GUS (makePriceLevel), a gdy brak danych —
+   * przybliżenie (1 + CPI r/r za ym)^(1/12) (scenariusz w przyszłości, najnowsze miesiące bez odczytu).
+   */
+  function makeInflationStep(ytd, cpiAt) {
+    const level = makePriceLevel(ytd);
+    const step = function (ym) {
+      const a = level(ym), b = level(addMonths(ym, -1));
+      if (a != null && b != null) return a / b;
+      return Math.pow(1 + Math.max(-50, cpiAt(ym)) / 100, 1 / 12);
+    };
+    step.exact = (ym) => level(ym) != null && level(addMonths(ym, -1)) != null;
+    return step;
+  }
+
+  /** Historia „grudzień poprzedniego roku = 100” z data/months.json: {"RRRR-MM" (cpiRefMonth): cpiYtd}. */
+  function cpiYtdFromMonths(monthsObj) {
+    const h = {};
+    for (const rec of Object.values(monthsObj)) if (rec && rec.cpiRefMonth && typeof rec.cpiYtd === "number") h[rec.cpiRefMonth] = rec.cpiYtd;
+    return h;
+  }
+
   /** Historia CPI z data/months.json: {"RRRR-MM" (miesiąc odczytu): %}. */
   function cpiHistoryFromMonths(monthsObj) {
     const h = {};
@@ -641,7 +690,7 @@
   }
 
   const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, holdings, seriesOutcome, breakEvenInflation, breakEvenNbp,
-    cpiHistoryFromMonths, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
+    cpiHistoryFromMonths, cpiYtdFromMonths, makePriceLevel, makeInflationStep, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

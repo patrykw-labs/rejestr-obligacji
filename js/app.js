@@ -186,11 +186,11 @@ function renderSeries(main){
 function seriesOutcomeHtml(k){
   if(!Zamiana.TYPES[k])return `<div class="insight"><span class="t">jak wypadła seria</span>Wyniku ${esc(k)} nie liczymy: oprocentowanie zależało od WIBOR6M, którego archiwum nie przechowuje.</div>`;
   state.serOut=state.serOut||{val:"hold",tax:true};const o=state.serOut,now=state.months[state.months.length-1].id;
-  const cpiHistory=calcCpiHist(),nbpHistory=Zamiana.nbpHistoryFromMonths(state.raw);
+  const cpiHistory=calcCpiHist(),cpiYtd=calcYtdHist(),nbpHistory=Zamiana.nbpHistoryFromMonths(state.raw);
   const em=state.months.filter(m=>m.series?.[k]).map(m=>({id:m.id,s:m.series[k]}))
     .concat(Object.entries(calcPre().series||{}).filter(([,s])=>s.type===k).map(([code,s])=>({id:s.purchase,s:Object.assign({code},s),pre:true})));
   const rows=em.map(e=>{const s=e.s,r=Zamiana.seriesOutcome({spec:{type:k,rate1:+s.rate1,margin:+(s.margin??0),fee:typeof s.fee==="number"?s.fee:0,purchase:e.id},
-      now,cpiHistory,nbpHistory,tax:o.tax,valuation:o.val==="liq"?"liquidate":"hold"});return r&&Object.assign(r,{id:e.id,code:s.code||k,pre:e.pre})}).filter(Boolean).sort((a,b)=>a.id<b.id?1:-1);
+      now,cpiHistory,cpiYtd,nbpHistory,tax:o.tax,valuation:o.val==="liq"?"liquidate":"hold"});return r&&Object.assign(r,{id:e.id,code:s.code||k,pre:e.pre})}).filter(Boolean).sort((a,b)=>a.id<b.id?1:-1);
   if(!rows.length)return "";
   const p1=v=>(v>0?"+":v<0?"−":"")+fmt(Math.abs(v*100))+"%",cls=v=>v>0.00005?"d-up":v<-0.00005?"d-down":"d-0";
   const beat=rows.filter(r=>r.real>0).length,best=rows.reduce((a,b)=>b.real>a.real?b:a),worst=rows.reduce((a,b)=>b.real<a.real?b:a);
@@ -200,6 +200,6 @@ function seriesOutcomeHtml(k){
         <div class="chips" role="group" aria-label="Podatek"><button type="button" class="chip" data-sot="1" aria-pressed="${o.tax}">po podatku Belki</button><button type="button" class="chip" data-sot="0" aria-pressed="${!o.tax}">IKE / IKZE</button></div></div></div>
     <div class="frame"><table><thead><tr><th>Emisja</th><th>Kod</th><th>Stan</th><th class="r">100 zł →${calcTip("so_val",1)}</th><th class="r">Rocznie${calcTip("so_ann",1)}</th><th class="r">Inflacja w tym czasie${calcTip("so_infl",1)}</th><th class="r">Realnie${calcTip("so_real",1)}</th><th class="r">Realnie rocznie</th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td>${mLabel(r.id)}${r.pre?' <span class="small">(sprzed archiwum)</span>':""}</td><td><span class="code">${esc(r.code)}</span></td><td>${r.matured?`wykup ${mShort(r.maturity)}`:`<span class="pill p-part">trwa</span> ${r.age} mies.`}</td>
-      <td class="r num"><b>${zl2(r.total)}</b></td><td class="r num">${p1(r.annual)}</td><td class="r num">${p1(r.inflation)}</td><td class="r num"><b class="${cls(r.real)}">${p1(r.real)}</b></td><td class="r num"><span class="${cls(r.realAnnual)}">${p1(r.realAnnual)}</span></td></tr>`).join("")}
+      <td class="r num"><b>${zl2(r.total)}</b></td><td class="r num">${p1(r.annual)}</td><td class="r num"${r.inflationExact?"":' title="Najnowsze miesiące bez odczytu GUS „grudzień poprzedniego roku = 100” — przybliżone z wskaźnika r/r"'}>${r.inflationExact?"":"≈ "}${p1(r.inflation)}</td><td class="r num"><b class="${cls(r.real)}">${p1(r.real)}</b></td><td class="r num"><span class="${cls(r.realAnnual)}">${p1(r.realAnnual)}</span></td></tr>`).join("")}
     </tbody></table></div></div>`;
 }

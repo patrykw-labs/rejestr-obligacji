@@ -9,7 +9,8 @@ Niczego nie zapisuje. Sprawdza:
   - stopę referencyjną NBP obowiązującą 1. dnia miesiąca (archiwum XML NBP),
   - czy CPI w rekordzie dotyczy poprzedniego miesiąca, a od 18. dnia miesiąca
     (i zawsze dla wcześniejszych miesięcy) czy jest już odczytem finalnym GUS
-    (szybki szacunek GUS zastępuje odczytem finalnym ok. 15. dnia).
+    (szybki szacunek GUS zastępuje odczytem finalnym ok. 15. dnia); przy odczycie finalnym także cpiYtd
+    (zmiana cen od grudnia poprzedniego roku).
 
 Kod wyjścia 1, gdy coś się nie zgadza albo nie da się tego odczytać.
 Użycie: python3 scripts/check_offer.py [RRRR-MM]
@@ -196,6 +197,12 @@ def check_macro(rec, month, first_day, prev, today, cur):
                           "powinien już zastąpić szybki szacunek")
         else:
             oks.append(f"CPI {fmt(rec['cpi'])}% za {prev} ({kind})" + ("" if need_final else "; odczyt finalny wymagany od 18. dnia"))
+        # cpiYtd (GUS „grudzień poprzedniego roku = 100” − 100) — do dokładnej inflacji skumulowanej; wymagany przy odczycie finalnym
+        if rec.get("cpiYtd") is None:
+            if kind == "finalny":
+                errors.append(f"brak cpiYtd za {prev} (GUS „grudzień poprzedniego roku = 100”, ta sama tablica co CPI r/r)")
+        else:
+            oks.append(f"zmiana cen od grudnia (cpiYtd) {fmt(rec['cpiYtd'])}% za {prev}")
 
 
 def report(month):

@@ -33,6 +33,8 @@ const calcOfferRec=ym=>state.raw[ym]?Object.assign({id:ym},state.raw[ym]):state.
 const calcPre=()=>state.pre||{cpi:{values:{}},series:{}};
 // historia CPI: odczyty sprzed 2019 r. (data/przed-2019.json) + archiwum miesięcy (ma pierwszeństwo)
 function calcCpiHist(){return Object.assign({},calcPre().cpi?.values||{},Zamiana.cpiHistoryFromMonths(state.raw))}
+// łańcuch GUS „grudzień poprzedniego roku = 100” (cpiYtd): sprzed 2019 r. + archiwum — do dokładnej inflacji skumulowanej
+function calcYtdHist(){return Object.assign({},calcPre().cpi?.ytd||{},Zamiana.cpiYtdFromMonths(state.raw))}
 // najwcześniejszy miesiąc zakupu, dla którego mamy CPI do wszystkich okresów (odczyt za P−2 od 2. roku)
 function calcMinPurchase(){const k=Object.keys(calcCpiHist()).sort()[0]||"2018-12";return k<"2019-01"?Zamiana.addMonths(k,-10):"2019-01"}
 function calcOptions(now=calcNow()){
@@ -366,7 +368,7 @@ function calcRecompute(){
     <details class="how"><summary>Jak to policzono</summary><ul>
       <li><b>${esc(oldCode)}</b> (zakup ${mShort(o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(r.ageNow)}): ${calcRateTxt(r.oldRates,o.p,o.type)}</li>
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.targetRates,now,c.tt)}</li>
-      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (${calcDo()} z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc tak jak poziom cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, ${calcDo()} z archiwum), a dalej o (1 + inflacja ze scenariusza)<sup>1/12</sup>; wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Trzymam:</b> ${esc(oldCode)} dochodzi do wykupu w terminie (${mShort(r.maturity)}) bez opłaty; całą kwotę na rękę zamieniasz po ${calcSwapTxt(c.tt)} na nową serię ${esc(tgtCode)} na warunkach z oferty ${mShort(calcOfferRec(calcNow()).id)}. <b>Zamieniam:</b> zrywasz ${calcD()} (opłata${c.ike?"":" i podatek"}) i kupujesz nowe po 100 zł. To jedyne zerwanie w obliczeniach${liq?" — ale wycena na każdy miesiąc zakłada wypłatę wszystkiego, z opłatą (zaznaczona opcja)":""}. Miesiące wykupu są wyróżnione w tabeli.</li>
       ${calcFutureBuysHtml(c,events)}
@@ -424,7 +426,7 @@ function calcRecomputePortfolio(out,c,now){
     <details class="how"><summary>Jak to policzono</summary><ul>
       ${rowsP.map(z=>`<li><b>${esc(z.code)}</b> (zakup ${mShort(z.o.p)}, ${calcIsToday()?"dziś":"w dniu zerwania"} ${calcAgeTxt(z.x.result.ageNow)}): ${calcRateTxt(z.x.result.oldRates,z.o.p,z.o.type)}</li>`).join("")}
       <li><b>${esc(tgtCode)}</b> (zakup ${mShort(now)}): ${calcRateTxt(r.positions[0].result.targetRates,now,c.tt)}</li>
-      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (${calcDo()} z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od miesiąca zakupu rośnie co miesiąc tak jak poziom cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, ${calcDo()} z archiwum), a dalej o (1 + inflacja ze scenariusza)<sup>1/12</sup>; wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${c.ike?"":" (zysk po 19% podatku)"}.</li>
       ${calcRulesHtml(c)}
       <li><b>Portfel:</b> każda seria liczona osobno: trzymasz ją do wykupu w terminie (i zamieniasz po ${calcSwapTxt(c.tt)} na ${esc(tgtCode)}) albo zrywasz ${calcD()} i kupujesz nowe po 100 zł. Seria dostaje „zamień”, jeśli zamiana daje więcej na koniec wspólnego okresu (${esc(yrsTxt)}). Reszty poniżej 100 zł z serii zrywanych ${calcD()} łączymy przy zakupie${(pick?r.switchBest:r.switchAll).pooledExtra?` — tu daje to ${(pick?r.switchBest:r.switchAll).pooledExtra} szt. więcej`:" (tu nie dają dodatkowej obligacji)"}; przy późniejszych wykupach w terminie reszta zostaje przy każdej serii osobno. Decyzja „zamień/trzymaj” dla serii jest liczona bez tego łączenia.</li>
       ${calcFutureBuysHtml(c,events)}
@@ -458,13 +460,16 @@ function calcColorEvents(events){const map=new Map();for(const e of events.slice
 // legenda wykresu z przełącznikami: items=[{k,label,color,dash}], vis(k) → bool; kliknięcie wywołuje onToggle(k)
 function chartLegendHtml(items,vis){return `<div class="lgnd" role="group" aria-label="Pokaż lub ukryj linie">${items.map(it=>`<button type="button" data-lg="${esc(it.k)}" aria-pressed="${vis(it.k)}" title="Kliknij, aby ${vis(it.k)?"ukryć":"pokazać"} linię"><i style="${it.dash?`height:0;border-top:3px dashed ${it.color}`:`background:${it.color}`}"></i>${esc(it.label)}</button>`).join("")}</div>`}
 function chartLegendBind(el,onToggle){el.querySelectorAll(".lgnd button[data-lg]").forEach(b=>b.addEventListener("click",()=>onToggle(b.dataset.lg)))}
-// linie odniesienia w zł: wpłaty od miesiąca zakupu rosnące co miesiąc o inflację CPI r/r albo o stopę NBP,
-// (1+r/100)^(1/12); yms = kolejne miesiące wykresu, buys = [{ym,amount}] (zakup przed początkiem osi liczy się od pierwszego punktu);
-// tax — podatek od zysku (linia stopy NBP po podatku Belki jak obligacje; inflacja bez podatku)
-function benchLine(yms,buys,at,tax){let v=0,paid=0;return yms.map((ym,i)=>{if(i)v*=Math.pow(1+Math.max(-50,at(ym))/100,1/12);
+// linie odniesienia w zł: wpłaty od miesiąca zakupu rosnące co miesiąc o step(miesiąc) — inflację (poziom cen GUS z łańcucha
+// „grudzień poprzedniego roku = 100”, dalej scenariusz: Zamiana.makeInflationStep) albo stopę NBP ((1+r/100)^(1/12));
+// yms = kolejne miesiące wykresu, buys = [{ym,amount}] (zakup przed początkiem osi liczy się od pierwszego punktu);
+// między punktami i−1 a i rośnie o step(yms[i−1]); tax — podatek od zysku (linia NBP po podatku Belki jak obligacje; inflacja bez podatku)
+const nbpStep=nbpAt=>ym=>Math.pow(1+Math.max(0,nbpAt(ym))/100,1/12);
+function benchLine(yms,buys,step,tax){let v=0,paid=0;return yms.map((ym,i)=>{if(i)v*=step(yms[i-1]);
   for(const b of buys)if(b.amount&&(b.ym===ym||(i===0&&b.ym<ym))){v+=b.amount;paid+=b.amount}return v-Math.max(0,v-paid)*(tax||0)})}
 // dane do linii odniesienia (inflacja, stopa NBP): historia jak w obliczeniach, dalej scenariusz
-const calcMacro=(c,p)=>({cpiAt:Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now),nbpAt:Zamiana.makeNbpAt(p.nbpHistory,p.nbpFuture,p.now),nbp:calcUsesNbp(c),tax:p.tax===false?0:(p.taxRate||0.19)});
+const calcMacro=(c,p)=>({cpiAt:Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now),
+  inflStep:Zamiana.makeInflationStep(calcHistKnown(calcYtdHist(),c,-1),Zamiana.makeCpiAt(p.cpiHistory,p.cpiFuture,p.now)),nbpAt:Zamiana.makeNbpAt(p.nbpHistory,p.nbpFuture,p.now),nbp:calcUsesNbp(c),tax:p.tax===false?0:(p.taxRate||0.19)});
 function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   events=events||[];lab=lab||{keep:"Trzymam",swap:"Zamieniam"};purchases=purchases||[];macro=macro||{};
   const el=$("#z-chart");if(!el)return;
@@ -477,8 +482,8 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   // linie odniesienia liczone na pełnej osi (od zakupu), potem wycinek widocznego zakresu
   const hasBench=purchases.some(z=>z.amount>0),fullYm=pastAll.slice(0,Math.max(0,pastAll.length-1)).map(z=>z.ym).concat(fut.map(m=>m.ym));
   const hasCpi=hasBench&&!!macro.cpiAt,hasNbp=hasBench&&!!macro.nbpAt,showCpi=hasCpi&&vis("cpi"),showNbp=hasNbp&&vis("nbp");
-  if(hasCpi){const b=benchLine(fullYm,purchases,macro.cpiAt).slice(-pts.length);pts.forEach((m,i)=>m.cpi=b[i])}
-  if(hasNbp){const b=benchLine(fullYm,purchases,macro.nbpAt,macro.tax).slice(-pts.length);pts.forEach((m,i)=>m.nbp=b[i])}
+  if(hasCpi){const b=benchLine(fullYm,purchases,macro.inflStep).slice(-pts.length);pts.forEach((m,i)=>m.cpi=b[i])}
+  if(hasNbp){const b=benchLine(fullYm,purchases,nbpStep(macro.nbpAt),macro.tax).slice(-pts.length);pts.forEach((m,i)=>m.nbp=b[i])}
   const n=pts.length;const W=Math.max(640,el.clientWidth||900),L=64,R=14,T=22,M1=270,D0=M1+22,D1=D0+86,H=D1+26;
   let vals=pts.flatMap((m,i)=>[i<P?(vis("hist")?m.keep:null):(vis("keep")?m.keep:null),vis("swap")?m.swap:null,showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null);
   if(!vals.length)vals=pts.flatMap(m=>[m.keep,m.swap]).filter(v=>v!=null);let min=Math.min(...vals),max=Math.max(...vals);

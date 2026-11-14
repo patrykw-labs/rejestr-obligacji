@@ -27,6 +27,7 @@ Wyniki kalkulatora zamiany i „Co kupić?” można pobrać: wykres jako PNG, t
 
 - `index.html`: szkielet strony; `css/style.css`: style; `js/app.js`, `js/kalkulator.js`, `js/kupno.js`, `js/portfel.js`: kod widoków; `js/wspolne.js` (dymki, „Wyczyść ustawienia”), `js/eksport.js` (CSV, PNG), `js/start.js` (start strony) (czysty HTML, CSS i JS, bez kroku budowania). `scripts/assets.py --fix` wpisuje do adresów plików skróty ich treści, żeby przeglądarka zawsze pobrała aktualną wersję.
 - `feed.xml`: kanał Atom z ofertami z ostatnich 36 miesięcy, generowany z danych przez `scripts/feed.py` (`validate.py` sprawdza, czy jest aktualny).
+- Inflacja skumulowana (wynik realny serii, linie „wpłata + inflacja”) liczona jest z poziomu cen GUS: łańcucha wskaźników „grudzień poprzedniego roku = 100” (pole `cpiYtd`).
 - `data/months.json`: wszystkie dane, jeden rekord na miesiąc oferty (`"RRRR-MM"`). Schemat jest opisany w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 - `data/przed-2019.json`: serie sprzed 2019 r. i inflacja z GUS za 2015–2018, tylko dla kalkulatora zamiany
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji

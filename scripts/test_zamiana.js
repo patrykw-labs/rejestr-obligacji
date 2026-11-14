@@ -424,5 +424,32 @@ eq("seria: EDO w trakcie — wypłata dziś z opłatą", so(soEdo, { valuation: 
 eq("seria: IKE bez podatku", so(soEdo, { tax: false }).total, 103, 1e-6);
 eq("seria: DOS (2 lata, stała stopa)", so({ type: "DOS", rate1: 2, margin: 0, fee: 0.7, purchase: "2020-01" }).total, 104.04 - r2(4.04 * 0.19), 1e-6);
 
+// ---------------------------------------------------------------------------
+// 14. Inflacja skumulowana z łańcucha GUS „grudzień poprzedniego roku = 100” (cpiYtd)
+// ---------------------------------------------------------------------------
+const ytdT = { "2015-06": 1, "2015-12": 2, "2016-12": 3, "2017-12": -1, "2018-12": 2.5 };
+const PL = Z.makePriceLevel(ytdT);
+eq("łańcuch: grudzień przed najstarszym odczytem = 1", PL("2014-12"), 1, 1e-12);
+eq("łańcuch: czerwiec 2015 = 1,01", PL("2015-06"), 1.01, 1e-12);
+eq("łańcuch: grudzień 2018 = iloczyn grudni", PL("2018-12"), 1.02 * 1.03 * 0.99 * 1.025, 1e-12);
+eq("łańcuch: brak odczytu → null", [PL("2016-05"), PL("2014-11")], [null, null]);
+const soChain = so({ type: "TOS", rate1: 5, margin: 0, fee: 1, purchase: "2016-01" }, { cpiYtd: ytdT, cpiHistory: { "2016-06": 9 } });
+eq("seria: TOS 2016-01 → 2019-01 — inflacja = P(12.2018) / P(12.2015)", [soChain.inflation, soChain.inflationExact], [1.03 * 0.99 * 1.025 - 1, true]);
+const soGap = so({ type: "TOS", rate1: 5, margin: 0, fee: 1, purchase: "2015-02" }, { cpiYtd: ytdT, cpiHistory: { "2015-02": 1.2 } });
+eq("seria: miesiące bez odczytu GUS — przybliżenie z r/r, inflationExact = false", soGap.inflationExact, false);
+// prawdziwe dane: rok od grudnia do grudnia = oficjalny wskaźnik r/r za grudzień
+const mj = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "months.json"), "utf8"));
+const pj = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "przed-2019.json"), "utf8"));
+const ytdR = Object.assign({}, pj.cpi.ytd, Z.cpiYtdFromMonths(mj)), cpiR = Object.assign({}, pj.cpi.values, Z.cpiHistoryFromMonths(mj));
+for (const yr of [2016, 2019, 2021, 2022, 2023, 2025]) {
+  const r = so({ type: "TOS", rate1: 1, margin: 0, fee: 0, purchase: `${yr}-01` }, { now: `${yr + 1}-01`, cpiYtd: ytdR, cpiHistory: cpiR });
+  eq(`dane GUS: inflacja 01.${yr} → 01.${yr + 1} = CPI r/r za 12.${yr} (${cpiR[yr + "-12"]}%)`, r2(r.inflation * 100), cpiR[`${yr}-12`], 0.051);
+}
+const LR = Z.makePriceLevel(ytdR);
+const soReal = so({ type: "EDO", rate1: 7.25, margin: 1.25, fee: 2, purchase: "2023-04" }, { now: "2026-11", cpiYtd: ytdR, cpiHistory: cpiR });
+eq("dane GUS: EDO z 04.2023 — inflacja do dziś = P(10.2026) / P(03.2023)", soReal.inflation, LR("2026-10") / LR("2023-03") - 1, 1e-12);
+const stepR = Z.makeInflationStep(ytdR, Z.makeCpiAt(cpiR, [2.5], "2026-11"));
+eq("krok inflacji: miesiąc bez odczytu → scenariusz (2,5% rocznie)", stepR("2027-03"), Math.pow(1.025, 1 / 12), 1e-12);
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);

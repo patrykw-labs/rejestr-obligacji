@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Dokładna inflacja skumulowana: „Jak wypadła seria” i linie „wpłata + inflacja” liczą zmianę cen z poziomu cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, nowe pole `cpiYtd` od 2015 r.) zamiast przybliżenia z CPI r/r — dla serii kupionych w czasie wysokiej inflacji wynik realny zmienił się o kilka punktów procentowych (np. EDO z 04.2023: inflacja do dziś 12,1% zamiast 18,0%).
 - „Mój portfel”: po każdej zmianie mignięcie „✓ Zapisano”, a komunikat mówi wprost, że portfel zapisuje się automatycznie (bez przycisku „Zapisz”).
 - Porządki w kodzie: eksport (CSV, PNG) w `js/eksport.js`, dymki i „Wyczyść ustawienia” w `js/wspolne.js`; strona działa bez zmian.
 - Czytelność: kontrast tekstu co najmniej 4,5:1 (WCAG AA) w obu motywach — ciemniejszy tekst drugorzędny w jasnym motywie i wybrane przyciski w ciemnym.

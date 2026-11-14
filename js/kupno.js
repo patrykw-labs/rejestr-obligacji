@@ -137,14 +137,14 @@ function buyRecompute(){
       <li>Oprocentowanie z listów emisyjnych oferty ${esc(mLabel(off.id))}. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt za P−2) + marża (EDO, COI, ROS, ROD) albo stopa referencyjna NBP + marża (ROR, DOR); do ${mShort(off.cpiRefMonth||off.id)} z archiwum GUS i NBP, dalej Twój scenariusz (inflacja ${b.sc==="custom"?"rok po roku":fmt(CPI_PRESETS[b.sc].v,1)+"%"}, stopa NBP ${fmt(+b.nbp)}%).</li>
       <li>Kupony COI i odsetki ROR/DOR trafiają na konto po podatku. Seria, która w tym okresie wykupi się w terminie, zamienia się na taką samą serię na dzisiejszych warunkach po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD — bez ceny zamiany, po 100 zł).</li>
       <li>${liq?`Na koniec okresu wypłacasz wszystko: przed terminem wykupu z opłatą za przedterminowy wykup (nie wyższą niż narosłe odsetki; ROR i DOR od 2. miesiąca — stałą; OTS — bez odsetek) i z podatkiem 19% od zysku${b.acc!=="std"?" (w IKE/IKZE bez podatku i bez opłaty przy wypłacie z konta)":""}.`:"Wartość bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty."}${b.acc==="ikze"?" W IKZE wartości są po 10% ryczałcie przy wypłacie po 65. roku życia.":""}</li>
-      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od dziś rośnie co miesiąc o (1 + CPI r/r)<sup>1/12</sup> (do dziś z archiwum GUS, dalej scenariusz); wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${b.acc==="std"?" (zysk po 19% podatku)":""}.</li>
+      <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od dziś rośnie co miesiąc tak jak poziom cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, do dziś z archiwum), a dalej o (1 + inflacja ze scenariusza)<sup>1/12</sup>; wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${b.acc==="std"?" (zysk po 19% podatku)":""}.</li>
       <li>To symulacja przy stałych założeniach, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>
     ${exportRowHtml("b")}
     ${calcShareHtml}
   </div>`;
   const pp=buyParams(b,cands);
-  buyDrawChart(rank,{amount:+b.kw,tax:pp.tax===false?0:(pp.taxRate||0.19),cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
+  buyDrawChart(rank,{amount:+b.kw,tax:pp.tax===false?0:(pp.taxRate||0.19),cpiAt:Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now),inflStep:Zamiana.makeInflationStep(calcYtdHist(),Zamiana.makeCpiAt(pp.cpiHistory,pp.cpiFuture,pp.now)),nbpAt:Zamiana.makeNbpAt(pp.nbpHistory,pp.nbpFuture,pp.now)});
   // eksport: ranking (jak tabela) i wartość każdej serii miesiąc po miesiącu; PNG wykresu
   const base=`co-kupic-${fileSafe(zl0(+b.kw).replace(/ zł$/,"zl"))}-${H}m-${off.id}`;
   $("#b-csv").addEventListener("click",()=>{
@@ -163,7 +163,7 @@ function buyDrawChart(rank,macro){
   // linie odniesienia w zł: wpłacona kwota rosnąca o inflację CPI i o stopę NBP (do dziś z archiwum, dalej scenariusz)
   const amt=+macro.amount||0,yms=pts.map(m=>m.ym),buys=[{ym:yms[0],amount:amt}];
   const hasCpi=amt>0&&!!macro.cpiAt,hasNbp=amt>0&&!!macro.nbpAt,showCpi=hasCpi&&vis("cpi"),showNbp=hasNbp&&vis("nbp");
-  const mac=yms.map(()=>({}));if(hasCpi)benchLine(yms,buys,macro.cpiAt).forEach((v,i)=>mac[i].cpi=v);if(hasNbp)benchLine(yms,buys,macro.nbpAt,macro.tax).forEach((v,i)=>mac[i].nbp=v);
+  const mac=yms.map(()=>({}));if(hasCpi)benchLine(yms,buys,macro.inflStep).forEach((v,i)=>mac[i].cpi=v);if(hasNbp)benchLine(yms,buys,nbpStep(macro.nbpAt),macro.tax).forEach((v,i)=>mac[i].nbp=v);
   const vals=(shown.length?shown:rank).flatMap(x=>x.series.map(s=>s.total)).concat(mac.flatMap(m=>[showCpi?m.cpi:null,showNbp?m.nbp:null]).filter(v=>v!=null));let min=Math.min(...vals),max=Math.max(...vals);
   const span=max-min||max*0.05||1,raw=span/5,mag=Math.pow(10,Math.floor(Math.log10(raw))),step=[1,2,2.5,5,10].map(k=>k*mag).find(s=>s>=raw);
   min=Math.floor(min/step)*step;max=Math.ceil(max/step)*step;if(max===min)max=min+step;

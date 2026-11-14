@@ -35,6 +35,13 @@ for mid in ids:
         warnings.append(f"{mid}: wszystko sprawdzone, a status={st!r}")
     if m.get("cpiKind") == "szybki szacunek":
         warnings.append(f"{mid}: CPI to szybki szacunek — zastąp odczytem finalnym, gdy GUS go opublikuje")
+    # cpiYtd: zmiana cen od grudnia poprzedniego roku (GUS „grudzień poprzedniego roku = 100” − 100) za cpiRefMonth;
+    # do dokładnej inflacji skumulowanej; przy szybkim szacunku może być null (uzupełnić przy odczycie finalnym)
+    y = m.get("cpiYtd")
+    if y is not None and not (isinstance(y, (int, float)) and -15 <= y <= 40):
+        errors.append(f"{mid}: cpiYtd={y!r} poza zakresem")
+    if y is None and m.get("cpiKind") == "finalny":
+        warnings.append(f"{mid}: brak cpiYtd (GUS „grudzień poprzedniego roku = 100” za {m.get('cpiRefMonth')})")
 
 # ciągłość miesięcy
 def nxt(i):
@@ -52,6 +59,14 @@ if PRE.exists():
         if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", ym) or ym >= ids[0]:
             errors.append(f"przed-2019/cpi: miesiąc {ym!r} poza zakresem (przed {ids[0]})")
         if not isinstance(v, (int, float)): errors.append(f"przed-2019/cpi/{ym}: wartość {v!r}")
+    ytd = pre.get("cpi", {}).get("ytd") or {}
+    for ym, v in ytd.items():
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", ym) or ym >= ids[0] or not isinstance(v, (int, float)):
+            errors.append(f"przed-2019/cpi/ytd/{ym}: {v!r}")
+    # łańcuch poziomu cen wymaga grudniów kolejnych lat (od grudnia 2014)
+    for yr in range(2015, int(ids[0][:4])):
+        if f"{yr}-12" not in ytd and not any(data[k].get("cpiRefMonth") == f"{yr}-12" for k in ids):
+            errors.append(f"przed-2019/cpi/ytd: brak grudnia {yr} (łańcuch poziomu cen)")
     for code, s in (pre.get("series") or {}).items():
         t = s.get("type")
         if t not in TERMS or not code.startswith(t) or not re.fullmatch(r"[A-Z]{3}\d{4}", code):
