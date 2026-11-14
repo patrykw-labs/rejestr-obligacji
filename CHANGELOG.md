@@ -4,13 +4,16 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
-- Dokładna inflacja skumulowana: „Jak wypadła seria” i linie „wpłata + inflacja” liczą zmianę cen z poziomu cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, nowe pole `cpiYtd` od 2015 r.) zamiast przybliżenia z CPI r/r — dla serii kupionych w czasie wysokiej inflacji wynik realny zmienił się o kilka punktów procentowych (np. EDO z 04.2023: inflacja do dziś 12,1% zamiast 18,0%).
-- „Mój portfel”: po każdej zmianie mignięcie „✓ Zapisano”, a komunikat mówi wprost, że portfel zapisuje się automatycznie (bez przycisku „Zapisz”).
-- Porządki w kodzie: eksport (CSV, PNG) w `js/eksport.js`, dymki i „Wyczyść ustawienia” w `js/wspolne.js`; strona działa bez zmian.
-- Czytelność: kontrast tekstu co najmniej 4,5:1 (WCAG AA) w obu motywach — ciemniejszy tekst drugorzędny w jasnym motywie i wybrane przyciski w ciemnym.
-- Test strony także w ciemnym motywie: zakładki na komputerze i telefonie, kontrast tekstu w obu motywach, przełącznik motywu (zapamiętany po przeładowaniu) i eksport PNG z ciemnym tłem.
-- „Mój portfel” zapamiętuje się w przeglądarce (tylko na tym urządzeniu) i wczytuje przy następnej wizycie; „Zapomnij portfel” usuwa zapis. Portfel otwarty z linku nie nadpisuje zapamiętanego — można go zapamiętać albo wczytać własny.
+## v1.3.0 — 2026-11-14
+
+Dokładniejsza inflacja skumulowana, zapamiętany portfel, ikona RSS i lepsza czytelność w obu motywach.
+
+- Dokładna inflacja skumulowana: „Jak wypadła seria” i linie „wpłata + inflacja” liczą zmianę cen z poziomu cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, nowe pole `cpiYtd` od 2015 r.) zamiast przybliżenia z CPI r/r. Dla serii kupionych w czasie wysokiej inflacji wynik realny zmienił się o kilka punktów procentowych — np. EDO z 04.2023: inflacja do dziś 12,1% zamiast 18,0%, wynik realny +4,2% zamiast −1,0%.
+- „Mój portfel” zapamiętuje się w przeglądarce (tylko na tym urządzeniu) i wczytuje przy następnej wizycie; po każdej zmianie mignięcie „✓ Zapisano”, „Zapomnij portfel” usuwa zapis. Portfel otwarty z linku nie nadpisuje zapamiętanego — można go zapamiętać albo wczytać własny.
 - Ikona RSS w górnej belce (obok przełącznika motywu) — link do kanału z nowymi ofertami.
+- Czytelność: kontrast tekstu co najmniej 4,5:1 (WCAG AA) w obu motywach — ciemniejszy tekst drugorzędny w jasnym motywie i wybrane przyciski w ciemnym.
+- Test strony także w ciemnym motywie: zakładki na komputerze i telefonie, kontrast tekstu, przełącznik motywu i eksport PNG z ciemnym tłem.
+- Porządki w kodzie: eksport (CSV, PNG) w `js/eksport.js`, dymki i „Wyczyść ustawienia” w `js/wspolne.js`.
 
 ## v1.2.0 — 2026-11-13
 
