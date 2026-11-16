@@ -13,7 +13,7 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8", ".jpg": "image/jpeg", ".pdf": "application/pdf", ".xml": "application/atom+xml; charset=utf-8" };
+  ".json": "application/json; charset=utf-8", ".jpg": "image/jpeg", ".pdf": "application/pdf", ".xml": "application/atom+xml; charset=utf-8", ".woff2": "font/woff2" };
 
 // prosty serwer plików repozytorium (bez zależności)
 const server = http.createServer((req, res) => {
@@ -42,6 +42,9 @@ const CASES = [
   ["#kupno&kw=5000&h=6&sc=custom&cpi=3,4&val=h", "Co kupić — pół roku, bez wypłaty", "#b-out .verdict", "bez wypłaty"],
   ["#kupno&kw=10000&h=60", "Co kupić — 5 lat: notka o momencie wypłaty (rocznica COI)", "#b-out .verdict", "moment wypłaty"],
   ["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", "Kalkulator — EDO", "#z-out .verdict", "Jak to policzono"],
+  ["#zamiana&k=XXX9999&n=10&tt=EDO&bd=12", "Kalkulator — nieznana seria w linku: komunikat", "main .insight.warn", "Seria XXX9999 nie występuje w archiwum"],
+  ["#kupno&kw=1000000000&h=30", "Co kupić — kwota i okres spoza zakresu: komunikat", "main .insight.warn", "nie wszystko z linku dało się wczytać"],
+  ["#portfel&pf=EDO0434~100~15,ABC1234~5&bd=12", "Mój portfel — nieznana seria w linku: komunikat", "main .insight.warn", "ABC1234"],
   ["#zamiana&k=COI1129&n=50&tt=EDO&bd=12&ike=1", "Kalkulator — COI w IKE", "#z-out .verdict", "IKE"],
   ["#zamiana&k=DOR0627&n=30&tt=EDO&bd=12", "Kalkulator — DOR (stopa NBP)", "#z-out .verdict", "stopie referencyjnej NBP"],
   ["#zamiana&k=ROR0527&n=100&tt=ROR&bd=12", "Kalkulator — ROR na ROR", "#z-out .verdict", "ROR"],
@@ -84,6 +87,24 @@ const CASES = [
       if (problem) { fail++; console.log(`✗ ${label} (${device}): ${problem}`); } else pass++;
       await ctx.close();
     }
+  }
+  // czcionka z własnego serwera: wczytana Plus Jakarta Sans, żadnych żądań do serwerów czcionek Google
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    const ext = [];
+    page.on("request", (r) => { if (/fonts\.(googleapis|gstatic)\.com/.test(r.url())) ext.push(r.url()); });
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      await page.goto(base + "#oferta");
+      await page.waitForSelector("main table");
+      const ok = await page.evaluate(async () => { await document.fonts.ready; return document.fonts.check('700 16px "Plus Jakarta Sans"', "Zażółć gęślą jaźń"); });
+      if (!ok) problem = "czcionka Plus Jakarta Sans nie wczytała się z assets/fonts";
+      if (ext.length) problem = "żądania do Google Fonts: " + ext[0];
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (problem) { fail++; console.log("✗ czcionki: " + problem); } else pass++;
+    await ctx.close();
   }
   // ciemny motyw: zakładki bez błędów i poziomego przewijania, kontrast tekstu, przełącznik motywu, eksport PNG
   const DARK = [["#oferta", "main table"], ["#seria&w=1", "main table"], ["#zamiana&pf=EDO0127~40~10,EDO0434~100~15,COI1129~50~20&tt=EDO&bd=12", "#z-out .verdict"],
@@ -252,6 +273,47 @@ const CASES = [
     } catch (e) { problem = e.message.split("\n")[0]; }
     if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
     if (problem) { fail++; console.log("✗ portfel — zapis w przeglądarce: " + problem); } else pass++;
+    await ctx.close();
+  }
+  // skrót do wyniku: pasek widoczny, gdy werdykt jest poniżej ekranu; kliknięcie przewija do wyniku i pasek znika
+  for (const [hash, out] of [["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", "#z-out"], ["#kupno", "#b-out"]]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      await page.goto(base + hash);
+      await page.waitForSelector(out + " .verdict");
+      await page.waitForSelector("#peek:not([hidden])", { timeout: 5000 });
+      await page.click("#peek");
+      await page.waitForSelector("#peek[hidden]", { state: "attached", timeout: 5000 });
+      await page.waitForFunction(() => new Promise((ok) => { const y = scrollY; setTimeout(() => ok(scrollY === y), 150); }), null, { timeout: 5000 });
+      const top = await page.evaluate((s) => document.querySelector(s + " .verdict").getBoundingClientRect().top, out);
+      if (top < -5 || top > 300) problem = `po kliknięciu werdykt nie jest na górze ekranu (top ${Math.round(top)})`;
+      await page.click("#tab-oferta");
+      if (await page.$("#peek")) problem = "pasek zostaje po zmianie zakładki";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (problem) { fail++; console.log(`✗ skrót do wyniku ${hash}: ${problem}`); } else pass++;
+    await ctx.close();
+  }
+  // zakładki z klawiatury: strzałka w prawo przełącza widok, aktywna zakładka ma tabindex 0
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      await page.goto(base + "#oferta");
+      await page.waitForSelector("main table");
+      await page.focus("#tab-oferta");
+      await page.keyboard.press("ArrowRight");
+      await page.waitForSelector("main svg");
+      const st = await page.evaluate(() => [document.activeElement.id, document.querySelector("#tab-wykres").tabIndex, document.querySelector("#tab-oferta").tabIndex, document.querySelector("#main").getAttribute("aria-labelledby")]);
+      if (st.join() !== "tab-wykres,0,-1,tab-wykres") problem = "stan zakładek po strzałce: " + st.join();
+      await page.keyboard.press("End");
+      if (await page.evaluate(() => document.activeElement.id) !== "tab-portfel") problem = "End nie przechodzi do ostatniej zakładki";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (problem) { fail++; console.log("✗ zakładki z klawiatury: " + problem); } else pass++;
     await ctx.close();
   }
   try {

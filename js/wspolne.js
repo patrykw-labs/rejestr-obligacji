@@ -39,6 +39,28 @@ document.addEventListener("click",()=>document.querySelectorAll(".qtip.open").fo
 // przy przewijaniu chowamy otwarte dymki (dymki w tabelach mają pozycję względem okna)
 let calcTipY=0;document.addEventListener("focusin",e=>{if(e.target.classList&&e.target.classList.contains("qtip"))calcTipY=scrollY});
 window.addEventListener("scroll",()=>{if(Math.abs(scrollY-calcTipY)<40)return;document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));const a=document.activeElement;if(a&&a.classList&&a.classList.contains("qtip"))a.blur()},{passive:true});
+// ustawienia z adresu, których nie dało się wczytać (nieznana seria, okres, typ…): state.linkWarn[widok] = [teksty];
+// komunikat pokazujemy raz, przy pierwszym wyświetleniu widoku, zamiast cicho przechodzić na ustawienia domyślne
+function linkWarnSet(view,list){if(list&&list.length){state.linkWarn=state.linkWarn||{};state.linkWarn[view]=list}}
+function linkWarnHtml(view){const l=state.linkWarn&&state.linkWarn[view];if(!l)return "";delete state.linkWarn[view];
+  return `<div class="insight warn" role="status"><span class="t">nie wszystko z linku dało się wczytać</span>${l.map(esc).join("<br>")}</div>`}
+// skrót do wyniku (kalkulator zamiany, „Co kupić?”): przyklejony pasek z werdyktem, widoczny, dopóki werdykt jest poniżej
+// widocznej części ekranu; kliknięcie przewija do wyniku. Wywołanie po każdym przeliczeniu; bez werdyktu — pasek znika.
+let peekObs=null;
+function resultPeekClear(){if(peekObs){peekObs.disconnect();peekObs=null}const b=document.getElementById("peek");if(b)b.remove()}
+function resultPeekBind(outSel){
+  const v=document.querySelector(outSel+" .verdict");
+  if(peekObs){peekObs.disconnect();peekObs=null}
+  let bar=document.getElementById("peek");
+  if(!v||!("IntersectionObserver" in window)){if(bar)bar.remove();return}
+  if(!bar){bar=document.createElement("button");bar.id="peek";bar.type="button";bar.className="peek";bar.hidden=true;document.body.appendChild(bar)}
+  bar.innerHTML=`<span class="peek-t">${esc(v.querySelector(".vt")?.textContent||"")}</span><span class="peek-go">wynik ↓</span>`;
+  bar.setAttribute("aria-label","Przejdź do wyniku: "+(v.querySelector(".vt")?.textContent||""));
+  bar.classList.toggle("good",v.classList.contains("good"));bar.classList.toggle("bad",v.classList.contains("bad"));
+  bar.onclick=()=>v.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
+  peekObs=new IntersectionObserver(([e])=>{bar.hidden=e.isIntersecting||e.boundingClientRect.top<0},{threshold:0});
+  peekObs.observe(v);
+}
 // „Wyczyść ustawienia” z cofnięciem (kalkulator zamiany, Co kupić?, Mój portfel): id `${p}-reset` i `${p}-undo`
 const resetRowHtml=(p,isDef,undo,what)=>`<div class="row"><button type="button" class="btn" id="${p}-reset"${isDef?" disabled":""} title="${isDef?"Ustawienia są domyślne":"Przywróć ustawienia jak przy pierwszym wejściu: "+what}">↺ Wyczyść ustawienia</button>${undo?`<span class="small" role="status">Wyczyszczono. <button type="button" class="linkbtn" id="${p}-undo">Cofnij</button></span>`:""}</div>`;
 // stan widoku w state[key] (+ legenda wykresu state[visKey]); fresh() — stan domyślny; render() — przerysowanie

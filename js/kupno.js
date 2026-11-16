@@ -17,10 +17,14 @@ function buyFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="kupno"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const b=buyDefaults();
   const num=(k,d)=>q[k]!=null&&q[k]!==""&&!isNaN(+q[k])?+q[k]:d;
-  b.kw=num("kw",b.kw);if(BUY_H.includes(num("h",0)))b.h=+q.h;b.sv=num("sv",b.sv);b.nbp=num("nbp",b.nbp);
+  const warn=[];
+  b.kw=num("kw",b.kw);if(q.kw!=null&&(isNaN(+q.kw)||+q.kw<100||+q.kw>1e8)){warn.push(`Kwota „${q.kw}” poza zakresem (100 zł – 100 mln zł) — przyjęto 10 000 zł.`);b.kw=buyDefaults().kw}
+  if(BUY_H.includes(num("h",0)))b.h=+q.h;else if(q.h!=null)warn.push(`Okres ${q.h} mies. nie jest dostępny (do wyboru: ${BUY_H.map(buyHLabel).join(", ")}) — przyjęto ${buyHLabel(b.h)}.`);
+  b.sv=num("sv",b.sv);b.nbp=num("nbp",b.nbp);
   b.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";b.r8=q.r8==="1";b.val=q.val==="h"?"h":"l";
-  if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))b.sc=q.sc;
+  if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))b.sc=q.sc;else if(q.sc)warn.push(`Nieznany scenariusz inflacji „${q.sc}” — przyjęto bazowy (2,5%).`);
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)b.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
+  linkWarnSet("kupno",warn);
   return b;
 }
 function buyHash(b){
@@ -54,6 +58,7 @@ function renderBuy(main){
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 5 · co kupić</p><h2>Która seria da najwięcej <span class="acc">na rękę</span>?</h2><p class="desc">Porównuje serie z oferty na ${esc(mLabel(off.id))} dla tej samej kwoty i okresu: ile dostaniesz, wypłacając wszystko na koniec — po opłacie za przedterminowy wykup i podatku. Seria, która w tym czasie wykupi się w terminie, zamienia się na taką samą na dzisiejszych warunkach.</p></div>
       ${resetRowHtml("b",isDef,undo,"10 000 zł na 5 lat, inflacja 2,5%, zwykły rachunek")}</div>
+    ${linkWarnHtml("kupno")}
     <div class="calc-grid">
       <div class="card">
         <h3>Kwota i okres</h3>
@@ -94,7 +99,7 @@ function renderBuy(main){
   buyRecompute();
 }
 function buyRecompute(){
-  const out=$("#b-out");if(!out)return;const b=state.buy,off=buyOffer();
+  const out=$("#b-out");if(!out)return;queueMicrotask(()=>resultPeekBind("#b-out"));const b=state.buy,off=buyOffer();
   try{history.replaceState(null,"","#"+buyHash(b))}catch(e){}
   const errs=[];
   if(!(+b.kw>=100))errs.push("Podaj kwotę — co najmniej 100 zł.");

@@ -41,9 +41,14 @@ function pfForget(main){try{localStorage.removeItem(PF_KEY)}catch(e){}state.pfLi
 function pfFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="portfel"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const s=pfDefaults();
-  if(q.pf){const pos=[];for(const it of q.pf.split(",")){if(pos.length>=PF_MAX)break;const [code,n,pd]=it.split("~");const a=calcFromCode(code);
-      if(a&&CALC_TYPES.includes(a.type)&&+n>=1)pos.push({code:a.code,n:Math.floor(+n),pd:calcDayOk(pd)?+pd:1});}
+  const warn=[];
+  if(q.pf){const pos=[],bad=[],all=q.pf.split(",");for(const it of all){if(pos.length>=PF_MAX){warn.push(`„Mój portfel” mieści do ${PF_MAX} serii — pominięto ${all.length-all.indexOf(it)} z linku.`);break}
+      const [code,n,pd]=it.split("~");const a=calcFromCode(code);
+      if(a&&CALC_TYPES.includes(a.type)&&+n>=1)pos.push({code:a.code,n:Math.floor(+n),pd:calcDayOk(pd)?+pd:1});else bad.push(it);}
+    if(bad.length)warn.push(`Pominięto serie, których nie rozpoznano: ${bad.join(", ")} (nieznany kod serii albo zła liczba sztuk).`);
     s.pos=pos;}
+  if(q.sc&&!CPI_PRESETS[q.sc])warn.push(`Nieznany scenariusz inflacji „${q.sc}” — przyjęto bazowy (2,5%).`);
+  linkWarnSet("portfel",warn);
   if(calcDayOk(q.bd))s.bd=Math.min(+q.bd,calcDaysIn(pfNow()));
   s.acc=q.ike==="1"?"ike":"std";if(CPI_PRESETS[q.sc])s.sc=q.sc;
   return s;
@@ -83,6 +88,7 @@ function renderPortfolio(main){
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 6 · mój portfel</p><h2>Ile są warte <span class="acc">moje obligacje</span>?</h2><p class="desc">Wpisz serie, które masz: zobaczysz ich wartość na ${esc(pfDate(now,s.bd))}, ile dostaniesz na rękę po zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania. Bez zamiany — czy opłaca się zamienić je na nowe, sprawdzisz w kalkulatorze zamiany.</p></div>
       ${resetRowHtml("p",isDef,undo,"przykładowa seria EDO, wycena na dziś, zwykły rachunek")}</div>
+    ${linkWarnHtml("portfel")}
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}

@@ -76,31 +76,39 @@ function calcFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="zamiana"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const c=calcDefaults();
   const num=(k,d)=>q[k]!=null&&q[k]!==""&&!isNaN(+q[k])?+q[k]:d;
+  const warn=[];
   if(q.pf){
     // portfel: pozycje po przecinku; KOD~sztuki albo TYP~RRRR-MM~1.rok~marża~opłata~sztuki
     const pos=[];
-    for(const it of q.pf.split(",")){if(pos.length>=CALC_MAXPOS)break;const f=it.split("~"),n=+f[f.length-1];if(!(n>=1))continue;
+    const all=q.pf.split(","),bad=[];
+    for(const it of all){if(pos.length>=CALC_MAXPOS){warn.push(`Kalkulator liczy do ${CALC_MAXPOS} serii — pominięto ${all.length-all.indexOf(it)} z linku.`);break}
+      const f=it.split("~"),n=+f[f.length-1];if(!(n>=1)){bad.push(it);continue}
       const pd=f.length===3||f.length===7?+f[f.length-1]:1,n2=f.length===3||f.length===7?+f[f.length-2]:n;
-      if(f.length===3||f.length===7){if(!(n2>=1)||!calcDayOk(pd))continue;f.pop();}
-      if(f.length===2){const a=calcFromCode(f[0]);if(a)pos.push(Object.assign({n:n2,pd},a));}
-      else if(f.length===6&&CALC_TYPES.includes(f[0])&&/^\d{4}-\d{2}$/.test(f[1])&&f.slice(2,5).every(v=>v!==""&&!isNaN(+v)))pos.push({code:"",type:f[0],p:f[1],r1:+f[2],m:+f[3],f:+f[4],n:n2,pd});}
+      if(f.length===3||f.length===7){if(!(n2>=1)||!calcDayOk(pd)){bad.push(it);continue}f.pop();}
+      if(f.length===2){const a=calcFromCode(f[0]);if(a)pos.push(Object.assign({n:n2,pd},a));else bad.push(it);}
+      else if(f.length===6&&CALC_TYPES.includes(f[0])&&/^\d{4}-\d{2}$/.test(f[1])&&f.slice(2,5).every(v=>v!==""&&!isNaN(+v)))pos.push({code:"",type:f[0],p:f[1],r1:+f[2],m:+f[3],f:+f[4],n:n2,pd});
+      else bad.push(it);}
+    if(bad.length)warn.push(`Pominięto pozycje portfela, których nie rozpoznano: ${bad.join(", ")} (nieznana seria albo zły zapis).`);
     if(pos.length)c.pos=pos;
   }else{
     const o=c.pos[0];
-    if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(o,a);else o.code="";}else o.code="";
+    if(q.k){const a=calcFromCode(q.k);if(a)Object.assign(o,a);else{o.code="";warn.push(`Seria ${q.k} nie występuje w archiwum — wpisz jej parametry ręcznie (z listu emisyjnego) albo wybierz serię z listy.`)}}else o.code="";
     if(!o.code){if(q.t&&CALC_TYPES.includes(q.t))o.type=q.t;if(q.p&&/^\d{4}-\d{2}$/.test(q.p))o.p=q.p;
       o.r1=num("r1",o.r1);o.m=num("m",o.m);o.f=num("f",o.f);}
     o.n=num("n",o.n);if(calcDayOk(q.pd))o.pd=+q.pd;
   }
+  if(q.dm&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(q.dm))warn.push(`Nieprawidłowy miesiąc zerwania „${q.dm}” — przyjęto ${mLabel(calcArchiveNow())}.`);
   if(q.dm&&/^\d{4}-(0[1-9]|1[0-2])$/.test(q.dm)&&q.dm!==calcArchiveNow()){c.dm=q.dm;if(!c.tc)Object.assign(c,calcTargetFromOffer(c.tt,c.dm)||{})}
   c.cm=q.cm==="s"?"s":"a";
   c.tc=q.tc==="1";
+  if(q.tt&&!CALC_TYPES.includes(q.tt))warn.push(`Nieznana seria docelowa „${q.tt}” — przyjęto ${c.tt}.`);
   if(q.tt&&CALC_TYPES.includes(q.tt)){const o=calcTargetFromOffer(q.tt,c.dm);if(o&&!c.tc)Object.assign(c,o);else c.tt=q.tt;}
   if(c.tc){c.tr1=num("tr1",c.tr1);c.tm=num("tm",c.tm);c.tf=num("tf",c.tf);}
   if(q.rr1!=null&&q.rr1!==""&&!isNaN(+q.rr1))c.rr1=+q.rr1;
   c.h=q.h==="m"?"m":num("h",c.h);c.val=q.val==="l"?"liquidate":"hold";c.sv=num("sv",c.sv);c.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";c.ike=c.acc!=="std";c.nbp=num("nbp",c.nbp);if(calcDayOk(q.bd))c.bd=Math.min(+q.bd,calcDaysIn(calcNow()));
-  if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;
+  if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))c.sc=q.sc;else if(q.sc)warn.push(`Nieznany scenariusz inflacji „${q.sc}” — przyjęto bazowy (2,5%).`);
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)c.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
+  linkWarnSet("zamiana",warn);
   return c;
 }
 function calcHash(c){
@@ -183,6 +191,7 @@ function renderCalc(main){
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je${today?" dziś":""}</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii ${calcDo()} liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div>
       ${resetRowHtml("z",isDef,undo,"przykładowa seria, oferta z bieżącego miesiąca, inflacja 2,5%")}</div>
+    ${linkWarnHtml("zamiana")}
     <div class="calc-grid">
       <div class="card">
         <h3>Twoje obligacje${multi?` <small>portfel · ${c.pos.length} serii</small>`:""}</h3>
@@ -337,7 +346,7 @@ function calcBindShare(){$("#z-share").addEventListener("click",async()=>{const 
 const calcTgtCode=c=>c.tc?c.tt+" (własne parametry)":(calcTargetFromOffer(c.tt)?.tcode||c.tt);
 const calcHorizonTxt=(c,H,mat,multi)=>c.h==="m"?(multi?`do wykupu ostatniej serii (${mShort(mat)})`:null):"po "+(H%12?fmt(H/12,1):String(H/12))+(H===12?" roku":" latach");
 function calcRecompute(){
-  const out=$("#z-out");if(!out)return;const c=state.calc,now=calcNow();
+  const out=$("#z-out");if(!out)return;queueMicrotask(()=>resultPeekBind("#z-out"));const c=state.calc,now=calcNow();
   const note=$("#z-code-note");if(note)note.textContent=c.pos[0].code?`Parametry z listu emisyjnego ${c.pos[0].code}. Aby je zmienić, wybierz „inna, wpiszę ręcznie”.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
   try{history.replaceState(null,"","#"+calcHash(c))}catch(e){}
   const bdEl=$("#z-bdate");if(bdEl&&calcDayOk(c.bd))bdEl.textContent=calcBreakDate(c);

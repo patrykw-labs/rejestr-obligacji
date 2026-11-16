@@ -22,11 +22,20 @@ function delta(a,b){if(a==null||b==null)return'<span class="d-0">–</span>';con
 // na wąskim ekranie pasek zakładek się przewija — aktywna zakładka zawsze widoczna
 function tabIntoView(){const b=document.querySelector('nav.tabs button[aria-selected="true"]'),n=b&&b.parentElement;if(!n||n.scrollWidth<=n.clientWidth)return;
   const l=b.offsetLeft-n.offsetLeft,r=l+b.offsetWidth;if(l<n.scrollLeft)n.scrollLeft=l-8;else if(r>n.scrollLeft+n.clientWidth)n.scrollLeft=r-n.clientWidth+8}
-function setView(v){state.view=v;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===v)));tabIntoView();try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v==="portfel"&&state.pf?pfHash(state.pf):v==="seria"?seriaHash():v==="oferta"?offerHash():v))}catch(e){}render()}
+// zakładki (WAI-ARIA tabs): aktywna ma aria-selected i tabindex 0, pozostałe -1; panel <main> wskazuje aktywną zakładkę
+function syncTabs(v){document.querySelectorAll("nav.tabs button").forEach(b=>{const on=b.dataset.view===v;b.setAttribute("aria-selected",String(on));b.tabIndex=on?0:-1;b.setAttribute("aria-controls","main")});
+  const m=$("#main");if(m){m.setAttribute("role","tabpanel");m.setAttribute("aria-labelledby","tab-"+v)}}
+function setView(v){state.view=v;syncTabs(v);tabIntoView();try{history.replaceState(null,"","#"+(v==="zamiana"&&state.calc?calcHash(state.calc):v==="kupno"&&state.buy?buyHash(state.buy):v==="portfel"&&state.pf?pfHash(state.pf):v==="seria"?seriaHash():v==="oferta"?offerHash():v))}catch(e){}render()}
 document.querySelectorAll("nav.tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
+// klawiatura: strzałki w lewo/prawo, Home, End przełączają zakładki (fokus idzie za aktywną)
+document.querySelector("nav.tabs").addEventListener("keydown",e=>{const tabs=[...document.querySelectorAll("nav.tabs button")],i=tabs.indexOf(document.activeElement);if(i<0)return;
+  const j={ArrowRight:(i+1)%tabs.length,ArrowLeft:(i-1+tabs.length)%tabs.length,Home:0,End:tabs.length-1}[e.key];if(j==null)return;
+  e.preventDefault();tabs[j].focus();setView(tabs[j].dataset.view)});
+// linki do innej zakładki w treści (data-goto)
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest("a[data-goto]");if(!a)return;e.preventDefault();setView(a.dataset.goto);scrollTo(0,0)});
 
 function render(){
-  const main=$("#main");
+  const main=$("#main");syncTabs(state.view);resultPeekClear();
   if(!state.dbOk){main.innerHTML='<div class="empty"><strong>Nie udało się wczytać pliku data/months.json</strong>Sprawdź, czy plik istnieje w repozytorium i jest poprawnym JSON-em (python3 scripts/validate.py).</div>';return}
   if(!state.loaded)return;
   tabIntoView();
@@ -54,17 +63,20 @@ function renderOffer(main){
       <td class="r num">${zl(s.fee)}</td><td class="r num">${zl(s.swapPrice)}</td><td>${s.availability&&s.availability!=="wszyscy"?'<span class="pill p-part">'+esc(s.availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>':"wszyscy"}</td>
       <td>${src}</td></tr>`}).join("");
   const ranked=seriesKeys(rec).map(k=>[k,rec.series[k].rate1]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1]);
-  const best=ranked[0];
   const isOpen=k=>{const a=rec.series[k].availability;return !a||a==="wszyscy"};
+  // najwyższe oprocentowanie wśród serii dla wszystkich; wyższe w seriach tylko dla 800+ — osobną linijką
+  const best=ranked.find(x=>isOpen(x[0]))||ranked[0],top=ranked[0];
   const real=r=>{if(rec.cpi==null)return"";const d=Math.round((r-rec.cpi)*100)/100;return `realnie ${fmt(Math.abs(d))} p.p. ${d>=0?"ponad":"poniżej"} CPI`};
   const avail=k=>isOpen(k)?"":' <span class="pill p-part">'+esc(rec.series[k].availability.replace(/^tylko beneficjenci /,"tylko "))+'</span>';
-  const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`    +(rec.cpi!=null?`<br><span class="hint">„Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.</span>`:""):"";
+  const bestSub=best?`${esc(rec.series[best[0]].code||best[0])} · ${esc(rec.series[best[0]].term||"")}${avail(best[0])}${rec.cpi!=null?"<br>"+real(best[1]):""}`
+    +(top&&top!==best?`<br>${esc(rec.series[top[0]].availability.replace(/^tylko beneficjenci /,"dla beneficjentów "))}: ${esc(rec.series[top[0]].code||top[0])} ${pct(top[1])}`:"")
+    +`<span class="hint">To stawka tylko na 1. okres (dla OTS — 3 miesiące, dla ROD — 1. rok z 12 lat). Ile seria da na rękę w całym okresie, porównasz w <a href="#kupno" data-goto="kupno">„Co kupić?”</a>.${rec.cpi!=null?" „Realnie” = 1. okres minus ostatni odczyt CPI z rekordu; przed podatkiem Belki, wskaźnik orientacyjny.":""}</span>`:"";
   main.innerHTML=`<div class="vlist">
     <div class="sec-head"><div><p class="kicker">§ 1 · oferta miesiąca</p><h2>Oferta na <span class="acc">${mLabel(rec.id)}</span></h2><p class="desc">${seriesKeys(rec).length} serii w ofercie · rekord ${statusPill(rec.status)} · <a href="feed.xml" data-goatcounter-click="feed-oferta" title="Kanał Atom: każda nowa oferta trafi do Twojego czytnika RSS">subskrybuj nowe oferty (RSS)</a></p></div>${monthSelect(rec.id)}</div>
     <div class="stats">
       <div class="stat t-acc"><span class="k">Stopa referencyjna NBP</span><span class="v">${pct(rec.nbpRef)}</span><span class="s">${esc(rec.nbpNote||"obowiązująca 1. dnia miesiąca")}</span></div>
       <div class="stat t-red"><span class="k">Inflacja CPI r/r ${rec.cpiRefMonth?"za "+mShort(rec.cpiRefMonth):""}</span><span class="v v-red">${pct(rec.cpi)}</span><span class="s">${rec.cpiKind?'<span class="pill '+(rec.cpiKind==="finalny"?"p-ok":"p-warn")+'">'+esc(rec.cpiKind)+'</span> ':""}${esc(rec.cpiNote||"")}</span></div>
-      <div class="stat t-green"><span class="k">Najwyższe oprocentowanie 1. okresu</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${bestSub}</span></div>
+      <div class="stat t-green"><span class="k">Najwyższe oprocentowanie 1. okresu · dla wszystkich</span><span class="v v-green">${best?pct(best[1]):"–"}</span><span class="s">${bestSub}</span></div>
       <div class="stat t-gold"><span class="k">Porównanie z</span><span class="v sm">${prev?mLabel(prev.id):"brak rekordu"}</span><span class="s">Kolumna Δ m/m w tabeli: zmiana oprocentowania 1. okresu w p.p.</span></div>
     </div>
     ${rec.changeNote?`<div class="insight"><span class="t">zmiany m/m</span>${esc(rec.changeNote)}</div>`:""}
