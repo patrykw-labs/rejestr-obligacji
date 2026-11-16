@@ -41,6 +41,8 @@ const CASES = [
   ["#kupno&kw=25000&h=36&sc=high&sv=5&ike=1&r8=1", "Co kupić — 3 lata, IKE, 800+", "#b-out .verdict", "ROD"],
   ["#kupno&kw=5000&h=6&sc=custom&cpi=3,4&val=h", "Co kupić — pół roku, bez wypłaty", "#b-out .verdict", "bez wypłaty"],
   ["#kupno&kw=10000&h=60", "Co kupić — 5 lat: notka o momencie wypłaty (rocznica COI)", "#b-out .verdict", "moment wypłaty"],
+  ["#kupno&kw=10000&h=60&ike=2", "Co kupić — IKZE: notka o uldze w PIT", "#b-out .verdict", "ulga w PIT nie jest liczona"],
+  ["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12&ike=2", "Kalkulator — IKZE: notka o uldze w PIT", "#z-out .verdict", "kosztuje naprawdę 8800 zł"],
   ["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", "Kalkulator — EDO", "#z-out .verdict", "Jak to policzono"],
   ["#zamiana&k=XXX9999&n=10&tt=EDO&bd=12", "Kalkulator — nieznana seria w linku: komunikat", "main .insight.warn", "Seria XXX9999 nie występuje w archiwum"],
   ["#kupno&kw=1000000000&h=30", "Co kupić — kwota i okres spoza zakresu: komunikat", "main .insight.warn", "nie wszystko z linku dało się wczytać"],

@@ -25,6 +25,10 @@ for mid in ids:
         if miss: errors.append(f"{mid}/{k}: brak pól {sorted(miss)}")
         if not str(s.get("code","")).startswith(k):
             errors.append(f"{mid}/{k}: kod {s.get('code')!r} nie zaczyna się od {k}")
+        # opłata tekstem (np. „brak odsetek”) tylko dla OTS — kalkulatory traktują tekst jako 0 zł, więc opłata innej serii
+        # zapisana tekstem dałaby po cichu wykup bez opłaty
+        if not isinstance(s.get("fee"), (int, float)) and k != "OTS" and not (k in ("DOS", "TOZ") and s.get("fee") is None):
+            errors.append(f"{mid}/{k}: opłata {s.get('fee')!r} nie jest liczbą — tekst dozwolony tylko dla OTS")
         if s.get("verify"): pending = True
         elif not s.get("source") or not s.get("verifiedAt"):
             errors.append(f"{mid}/{k}: verify=false, ale brak source lub verifiedAt")

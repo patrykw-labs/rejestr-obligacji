@@ -141,8 +141,9 @@ function buyRecompute(){
   out.innerHTML=`<div class="vlist">
     <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: ${zl0(best.final)} ${liq?"na rękę":""}</div>
       <div class="vs">Zysk ${sgn(best.gain)} (${pct(best.annual)} rocznie${b.acc==="std"?" po podatku":""}), realnie ${zl0(best.finalReal)} w dzisiejszych złotych.${second?` Drugie miejsce: ${esc(second.c.code)} (${sgn(second.final-best.final)}).`:""} ${beTxt}</div></div>
+    ${b.acc==="ikze"?ikzeNoteHtml(+b.kw):""}
     ${momentTxt?`<div class="insight warn"><span class="t">moment wypłaty</span>${momentTxt}</div>`:""}
-    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div></div>
+    <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${b.acc==="ikze"?ikzeChartTxt:""}${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div></div>
       <div class="chart" id="b-chart"></div></div>
     <div class="card table-card"><div class="tc-head"><h3>Wszystkie serie z oferty</h3><p class="desc">Kwota ${zl0(+b.kw)}, okres ${esc(hTxt)}, ${calcTaxTxt({acc:b.acc})}. ${liq?"Wartość na koniec = wypłata wszystkiego (po opłacie i podatku) plus konto.":"Wartość na koniec bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty, plus konto."}</p></div>
       <div class="frame"><table><thead><tr><th>#</th><th>Seria</th><th>Oprocentowanie</th><th class="r">Na koniec</th><th class="r">Zysk</th><th class="r">Rocznie</th><th class="r">Realnie${calcTip("real",1)}</th><th>Uwagi</th></tr></thead><tbody>

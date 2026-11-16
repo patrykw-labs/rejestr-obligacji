@@ -4,6 +4,8 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- IKZE: przy wyniku (kalkulator zamiany, „Co kupić?”) i w opisie wykresu notka, że ulga w PIT przy wpłacie nie jest liczona — nie zmienia porównania, ale linie „wpłata + …”, zysk realny i roczny wypadają przez nią gorzej; z przykładem kosztu wpłaty po uldze 12% i 32%.
+- Walidacja: opłata za wykup zapisana tekstem dozwolona tylko dla OTS — opłata innej serii zapisana tekstem byłaby w kalkulatorach liczona jako 0 zł.
 - Skrót do wyniku: w kalkulatorze zamiany i w „Co kupić?” przyklejony pasek z werdyktem, dopóki wynik jest poniżej ekranu; kliknięcie przewija do wyniku.
 - Link z ustawieniami, których nie da się odtworzyć (nieznana seria, okres spoza listy, kwota poza zakresem), pokazuje komunikat zamiast po cichu przechodzić na ustawienia domyślne.
 - Oferta miesiąca: kafelek „Najwyższe oprocentowanie 1. okresu” wybiera serię dostępną dla wszystkich (serie dla 800+ osobną linijką) i odsyła do porównania na rękę w „Co kupić?”.
