@@ -4,12 +4,17 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+## v1.5.0 — 2026-11-16
+
+Portfel w pliku i w kalendarzu, zakup za pieniądze z wykupu, faktyczne oprocentowanie 2. roku na wykresie, wersja strony w pasku i kontrola CPI z tablicą GUS.
+
 - Kontrola rejestru (`check_offer.py`, 5. i 20. dnia): wartości CPI r/r i zmiany cen od grudnia porównywane z tablicą GUS — w rekordzie miesiąca przy odczycie finalnym i w całym archiwum od 2015 r. (rozbieżność > 0,05 p.p. = błąd); przy szybkim szacunku ostrzeżenie, gdy GUS ma już odczyt finalny; niedostępność GUS nie blokuje pozostałych kontroli. Test bez sieci w CI.
 - Wykres w czasie: miara „Faktyczne oprocentowanie 2. roku” — ile naprawdę płaciła seria z danego miesiąca w 2. roku (inflacja za miesiąc oferty + 10 + marża; TOS i DOS — stała stopa; DOR — średnia stopa NBP + marża z 2. roku), z rozpisaniem w dymku; zgodna z silnikiem kalkulatora. Zastępuje miarę „Oprocentowanie kolejnych okresów” (CPI z rekordu miesiąca + marża), która nie odpowiadała żadnej faktycznej stopie — CPI z rekordu to odczyt za poprzedni miesiąc, a okres odsetkowy korzysta z CPI sprzed dwóch miesięcy i zaczyna się rok po zakupie.
 - „Co kupić?”: opcja „Kupuję za pieniądze z wykupu w terminie” — zakup po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD bez ceny zamiany — po 100 zł), w adresie `sw=1`; w tabeli i „Jak to policzono” cena zakupu każdej serii.
 - „Mój portfel”: zapis portfela do pliku `.json` i „Wczytaj z pliku” — przeniesienie na inne urządzenie albo kopia zapasowa; nierozpoznane serie pomijane z komunikatem, wczytanie można cofnąć.
 - „Mój portfel”: kalendarz `.ics` z kuponami COI, odsetkami ROR/DOR, zmianami oprocentowania i wykupami każdej serii do terminu (z przypomnieniem dzień przed wykupem; kwoty prognozowane i wstępne oznaczone jak w widoku) — do zaimportowania w telefonie lub komputerze.
 - Wersja strony w pasku górnym (na telefonie w stopce): wydanie z `CHANGELOG.md` oraz liczba commitów na `main` po wydaniu i skrót ostatniego commita (np. „v1.4.0 +3 · a279333”, link do zmian na GitHubie); bez odpowiedzi API GitHuba — samo wydanie.
+
 ## v1.4.0 — 2026-11-16
 
 Poprawki obliczeń po zewnętrznym przeglądzie, łatwiejsza obsługa strony i czcionka z własnego serwera.
