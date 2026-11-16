@@ -278,8 +278,9 @@ const CASES = [
     await ctx.close();
   }
   // skrót do wyniku: pasek widoczny, gdy werdykt jest poniżej ekranu; kliknięcie przewija do wyniku i pasek znika
+  // reducedMotion: strona przewija wtedy bez animacji, więc pomiar nie zależy od szybkości maszyny (w CI płynne przewijanie trwało)
   for (const [hash, out] of [["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", "#z-out"], ["#kupno", "#b-out"]]) {
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
     const page = await ctx.newPage();
     await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
     let problem = null;
@@ -290,8 +291,9 @@ const CASES = [
       await page.click("#peek");
       await page.waitForSelector("#peek[hidden]", { state: "attached", timeout: 5000 });
       await page.waitForFunction(() => new Promise((ok) => { const y = scrollY; setTimeout(() => ok(scrollY === y), 150); }), null, { timeout: 5000 });
-      const top = await page.evaluate((s) => document.querySelector(s + " .verdict").getBoundingClientRect().top, out);
-      if (top < -5 || top > 300) problem = `po kliknięciu werdykt nie jest na górze ekranu (top ${Math.round(top)})`;
+      const [top, atEnd] = await page.evaluate((s) => [document.querySelector(s + " .verdict").getBoundingClientRect().top,
+        Math.ceil(scrollY + innerHeight) >= document.documentElement.scrollHeight - 2], out);
+      if (top < -5 || (top > 300 && !atEnd)) problem = `po kliknięciu werdykt nie jest na górze ekranu (top ${Math.round(top)})`;
       await page.click("#tab-oferta");
       if (await page.$("#peek")) problem = "pasek zostaje po zmianie zakładki";
     } catch (e) { problem = e.message.split("\n")[0]; }
