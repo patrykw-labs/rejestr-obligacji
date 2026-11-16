@@ -4,7 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
-- Wykres w czasie: miara „Faktyczne oprocentowanie 2. roku” — ile naprawdę płaciła seria z danego miesiąca w 2. roku (inflacja za miesiąc oferty + 10 + marża; TOS i DOS — stała stopa; DOR — średnia stopa NBP + marża z 2. roku), z rozpisaniem w dymku; zgodna z silnikiem kalkulatora.
+- Wykres w czasie: miara „Faktyczne oprocentowanie 2. roku” — ile naprawdę płaciła seria z danego miesiąca w 2. roku (inflacja za miesiąc oferty + 10 + marża; TOS i DOS — stała stopa; DOR — średnia stopa NBP + marża z 2. roku), z rozpisaniem w dymku; zgodna z silnikiem kalkulatora. Zastępuje miarę „Oprocentowanie kolejnych okresów” (CPI z rekordu miesiąca + marża), która nie odpowiadała żadnej faktycznej stopie — CPI z rekordu to odczyt za poprzedni miesiąc, a okres odsetkowy korzysta z CPI sprzed dwóch miesięcy i zaczyna się rok po zakupie.
 - „Co kupić?”: opcja „Kupuję za pieniądze z wykupu w terminie” — zakup po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD bez ceny zamiany — po 100 zł), w adresie `sw=1`; w tabeli i „Jak to policzono” cena zakupu każdej serii.
 - „Mój portfel”: zapis portfela do pliku `.json` i „Wczytaj z pliku” — przeniesienie na inne urządzenie albo kopia zapasowa; nierozpoznane serie pomijane z komunikatem, wczytanie można cofnąć.
 - „Mój portfel”: kalendarz `.ics` z kuponami COI, odsetkami ROR/DOR, zmianami oprocentowania i wykupami każdej serii do terminu (z przypomnieniem dzień przed wykupem; kwoty prognozowane i wstępne oznaczone jak w widoku) — do zaimportowania w telefonie lub komputerze.

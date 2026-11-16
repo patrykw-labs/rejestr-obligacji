@@ -12,7 +12,7 @@ const VIEW_TIPS={
   o_fee:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki, więc nie stracisz z wpłaconych 100 zł (wyjątek: ROR i DOR od 2. miesiąca).",
   o_swap:"Cena nowej obligacji przy zamianie w dniu wykupu starej — zwykle 99,90 zł zamiast 100 zł (OTS: 100,00 zł). ROS i ROD nie mają ceny zamiany.",
   o_avail:"Kto może kupić serię: wszyscy albo tylko beneficjenci programu 800+ (obligacje rodzinne ROS i ROD).",
-  mode:"Co pokazuje wykres: oprocentowanie 1. okresu z listów emisyjnych, samą marżę ponad wskaźnik, orientacyjne oprocentowanie kolejnych okresów (CPI lub stopa NBP z rekordu miesiąca + marża) albo faktyczne oprocentowanie 2. roku z późniejszych odczytów CPI i stóp NBP.",
+  mode:"Co pokazuje wykres: oprocentowanie 1. okresu z listów emisyjnych, samą marżę ponad wskaźnik albo faktyczne oprocentowanie 2. roku z późniejszych odczytów CPI i stóp NBP.",
   s_cpi:"Inflacja CPI r/r z GUS za miesiąc poprzedzający ofertę (ostatni odczyt znany w chwili emisji).",
   s_nbp:"Stopa referencyjna NBP obowiązująca 1. dnia miesiąca oferty.",
   s_real:"Oprocentowanie 1. okresu minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki — orientacyjnie, czy start był ponad inflacją.",

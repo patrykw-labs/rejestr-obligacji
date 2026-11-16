@@ -92,12 +92,12 @@ function renderChart(main){
   const chips=keys.map(k=>`<label class="chip"><input type="checkbox" id="c-${k}" data-k="${k}"${state.chartOn.has(k)?" checked":""}><span class="dot" style="background:${colorOf(k)}"></span>${k==="CPI"?"CPI r/r":k==="NBP"?"stopa NBP":k}${k==="DOS"||k==="TOZ"?' <span class="sub">(do 2022)</span>':""}</label>`).join("");
   main.innerHTML=`<div class="card">
     <div class="sec-head"><div><p class="kicker">§ 2 · wykres</p><h2>Oprocentowanie w czasie</h2><p class="desc">Wybrane serie miesiąc po miesiącu na tle inflacji (CPI r/r) i stopy referencyjnej NBP. Najedź na wykres, aby zobaczyć wartości.</p></div>
-      <label class="field"><span class="flabel">Miara${calcTip("mode")}</span><span class="sel"><select id="sel-mode"><option value="rate1"${state.chartMode==="rate1"?" selected":""}>Oprocentowanie 1. okresu</option><option value="margin"${state.chartMode==="margin"?" selected":""}>Marża (kolejne okresy)</option><option value="next"${state.chartMode==="next"?" selected":""}>Oprocentowanie kolejnych okresów</option><option value="year2"${state.chartMode==="year2"?" selected":""}>Faktyczne oprocentowanie 2. roku</option></select></span></label></div>
+      <label class="field"><span class="flabel">Miara${calcTip("mode")}</span><span class="sel"><select id="sel-mode"><option value="rate1"${state.chartMode==="rate1"?" selected":""}>Oprocentowanie 1. okresu</option><option value="margin"${state.chartMode==="margin"?" selected":""}>Marża (kolejne okresy)</option><option value="year2"${state.chartMode==="year2"?" selected":""}>Faktyczne oprocentowanie 2. roku</option></select></span></label></div>
     <div class="chips" style="margin-top:20px">${chips}</div>
     <div class="chart" id="chart"></div>
     <div class="notes">
-    <p class="small"><b>Faktyczne oprocentowanie 2. roku</b> – ile naprawdę płaciła seria z danego miesiąca w 2. roku: inflacja ogłoszona przed jego początkiem (CPI za miesiąc oferty + 10) + marża; TOS i DOS — stała stopa; DOR — średnia stopa NBP + marża z 12 miesięcy 2. roku. Serie z ostatnich miesięcy nie mają jeszcze punktu, bo ich 2. rok nie ma jeszcze odczytu; OTS i ROR trwają krócej niż 2 lata.</p>
-    <p class="small"><b>Oprocentowanie 1. okresu</b> – stawka z listu emisyjnego. <b>Marża</b> – sama nadwyżka ponad wskaźnik (bez CPI/NBP). <b>Oprocentowanie kolejnych okresów</b> – orientacyjnie: CPI z rekordu miesiąca (ujemne = 0) + marża dla serii inflacyjnych, stopa NBP + marża dla ROR/DOR, stała stawka dla OTS/DOS/TOS; TOZ (WIBOR6M) bez wartości, bo archiwum nie przechowuje WIBOR. Realne oprocentowanie 2. okresu zależy od CPI w chwili jego rozpoczęcia.</p>
+    <p class="small"><b>Faktyczne oprocentowanie 2. roku</b> – ile naprawdę płaciła seria z danego miesiąca w 2. roku: inflacja ogłoszona przed jego początkiem (CPI za miesiąc oferty + 10) + marża. Punkt stoi w miesiącu zakupu, a 2. rok zaczyna się 12 miesięcy później — dlatego nie porównuj go z linią CPI w tym samym miesiącu (np. EDO z 06.2021 dostała w 2. roku inflację za 04.2022, czyli 12,4% + 1,00); TOS i DOS — stała stopa; DOR — średnia stopa NBP + marża z 12 miesięcy 2. roku. Serie z ostatnich miesięcy nie mają jeszcze punktu, bo ich 2. rok nie ma jeszcze odczytu; OTS i ROR trwają krócej niż 2 lata.</p>
+    <p class="small"><b>Oprocentowanie 1. okresu</b> – stawka z listu emisyjnego. <b>Marża</b> – sama nadwyżka ponad wskaźnik (bez CPI/NBP).</p>
     <p class="small">Linie przerywane: CPI r/r (odczyt za miesiąc poprzedzający ofertę) i stopa referencyjna NBP. Przerwy w linii oznaczają brak danych w rekordzie, nie zero.</p></div></div>`;
   $("#sel-mode").addEventListener("change",e=>{state.chartMode=e.target.value;drawChart()});
   main.querySelectorAll(".chips input").forEach(i=>i.addEventListener("change",e=>{const k=e.target.dataset.k;e.target.checked?state.chartOn.add(k):state.chartOn.delete(k);drawChart()}));
@@ -119,22 +119,13 @@ function chartVal(m,k){const s=m.series?.[k];if(!s)return null;const mode=state.
   if(mode==="rate1")return s.rate1??null;
   if(mode==="year2"){const y=year2Info(m,k);return y?y.v:null}
   if(mode==="margin")return s.margin??null;
-  const r=s.rule||"";
-  if(r==="stałe")return s.rate1??null;
-  if(r==="CPI+marża")return(m.cpi!=null&&s.margin!=null)?Math.round((Math.max(m.cpi,0)+s.margin)*100)/100:null;
-  if(r==="NBP+marża")return(m.nbpRef!=null&&s.margin!=null)?Math.round((m.nbpRef+s.margin)*100)/100:null;
   return null}
 function tipDetail(m,k){
   if(k==="CPI")return m.cpiRefMonth?"odczyt za "+mShort(m.cpiRefMonth)+(m.cpiKind?", "+esc(m.cpiKind):""):"";
   if(k==="NBP")return "stopa referencyjna z 1. dnia miesiąca"+(m.nbpNote&&/od \d/.test(m.nbpNote)?"":"");
   const s=m.series?.[k];if(!s)return"";const mode=state.chartMode;let d=esc(s.code||k)+" · "+esc(s.term||"");
   if(mode==="year2"){const y=year2Info(m,k);if(y)d+=" · 1. rok "+pct(s.rate1)+" → 2. rok: "+y.how;return d}
-  if(mode==="next"){const r=s.rule;
-    if(r==="CPI+marża"&&m.cpi!=null&&s.margin!=null)d+=" · CPI "+fmt(Math.max(m.cpi,0))+" + marża "+fmt(s.margin);
-    else if(r==="NBP+marża"&&m.nbpRef!=null&&s.margin!=null)d+=" · NBP "+fmt(m.nbpRef)+" + marża "+fmt(s.margin);
-    else if(r==="stałe")d+=" · stałe";
-    d+=" · 1. okres "+pct(s.rate1)}
-  else if(mode==="margin")d+=" · "+ruleText(s)+" · 1. okres "+pct(s.rate1);
+  if(mode==="margin")d+=" · "+ruleText(s)+" · 1. okres "+pct(s.rate1);
   else d+=" · dalej: "+ruleText(s);
   return d}
 function attachHover(el,lines,x,y,W,L,R){
