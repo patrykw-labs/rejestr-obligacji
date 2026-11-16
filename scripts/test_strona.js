@@ -326,6 +326,36 @@ const CASES = [
     if (problem) { fail++; console.log(`✗ wersja strony (${label}): ${problem}`); } else pass++;
     await ctx.close();
   }
+  // wykres: miara „Faktyczne oprocentowanie 2. roku” — zgodna z silnikiem (Zamiana.periodRates), bez błędów JS
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    let problem = null;
+    try {
+      await page.goto(base + "#wykres");
+      await page.waitForSelector("#chart svg");
+      await page.selectOption("#sel-mode", "year2");
+      await page.waitForSelector("#chart svg path");
+      const bad = await page.evaluate(() => {
+        const out = [], cpiAt = Zamiana.makeCpiAt(calcCpiHist(), [0], "2100-01"), nbpAt = Zamiana.makeNbpAt(Zamiana.nbpHistoryFromMonths(state.raw), null, "2100-01");
+        for (const [ym, k] of [["2022-01", "EDO"], ["2021-03", "COI"], ["2023-05", "ROD"], ["2022-08", "TOS"], ["2023-01", "DOR"], ["2019-04", "DOS"]]) {
+          const m = state.months.find((x) => x.id === ym), s = m.series[k], v = chartVal(m, k);
+          const ref = Math.round(Zamiana.periodRates({ type: k, rate1: s.rate1, margin: s.margin || 0, purchase: ym }, cpiAt, nbpAt).slice(k === "DOR" ? 12 : 1, k === "DOR" ? 24 : 2).reduce((a, b) => a + b, 0) / (k === "DOR" ? 12 : 1) * 10000) / 100;
+          if (v == null || Math.abs(v - ref) > 0.006) out.push(`${k} ${ym}: wykres ${v}, silnik ${ref}`);
+        }
+        const last = state.months[state.months.length - 1];
+        if (chartVal(last, "EDO") !== null || chartVal(last, "OTS") !== null) out.push("seria z bieżącego miesiąca albo OTS ma punkt");
+        return out;
+      });
+      if (bad.length) problem = bad.join("; ");
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    if (problem) { fail++; console.log("✗ wykres — oprocentowanie 2. roku: " + problem); } else pass++;
+    await ctx.close();
+  }
   // zakładki z klawiatury: strzałka w prawo przełącza widok, aktywna zakładka ma tabindex 0
   {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
