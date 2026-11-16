@@ -345,6 +345,48 @@ const CASES = [
     if (problem) { fail++; console.log("✗ zakładki z klawiatury: " + problem); } else pass++;
     await ctx.close();
   }
+  // Mój portfel: zapis do pliku .json i wczytanie w innej przeglądarce (z nierozpoznaną serią), „Cofnij” po wczytaniu
+  {
+    let problem = null, fileText = null;
+    const ctxA = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+    const pa = await ctxA.newPage();
+    await pa.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      await pa.goto(base + "#portfel&pf=TOS1127~15,COI1129~5~20&bd=12&ike=1&sc=high");
+      await pa.waitForSelector("#p-json");
+      const [d] = await Promise.all([pa.waitForEvent("download"), pa.click("#p-json")]);
+      fileText = fs.readFileSync(await d.path(), "utf8");
+      const j = JSON.parse(fileText);
+      if (j.app !== "rejestr-obligacji" || j.pos.length !== 2 || j.acc !== "ike" || j.sc !== "high" || j.pos[1].pd !== 20) problem = "zły plik portfela: " + fileText;
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    await ctxA.close();
+    if (!problem) {
+      const ctxB = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      const pb = await ctxB.newPage();
+      const errors = [];
+      pb.on("pageerror", (e) => errors.push(e.message));
+      await pb.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+      try {
+        await pb.goto(base + "#portfel");
+        await pb.waitForSelector("#p-out .stats");
+        const j = JSON.parse(fileText); j.pos.push({ code: "ABC1234", n: 3, pd: 1 });
+        await pb.setInputFiles("#p-file", { name: "portfel.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(j)) });
+        await pb.waitForSelector("#p-import-undo");
+        const h = await pb.evaluate(() => location.hash), msg = await pb.textContent("main .insight");
+        if (!/pf=TOS1127~15,COI1129~5~20/.test(h) || !/ike=1/.test(h) || !/sc=high/.test(h)) problem = "portfel po wczytaniu: " + h;
+        else if (!/ABC1234/.test(msg)) problem = "brak informacji o pominiętej serii";
+        else if (!/TOS1127/.test(await pb.evaluate(() => localStorage.getItem("rejestr-obligacji:portfel") || ""))) problem = "wczytany portfel nie zapisał się w przeglądarce";
+        await pb.click("#p-import-undo");
+        await pb.waitForSelector("#p-out .stats");
+        if (/TOS1127/.test(await pb.evaluate(() => location.hash))) problem = "„Cofnij” nie przywróciło portfela sprzed wczytania";
+        await pb.setInputFiles("#p-file", { name: "zly.json", mimeType: "application/json", buffer: Buffer.from("to nie json") });
+        await pb.waitForSelector("text=nie udało się wczytać pliku");
+      } catch (e) { problem = e.message.split("\n")[0]; }
+      if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+      await ctxB.close();
+    }
+    if (problem) { fail++; console.log("✗ portfel — plik .json: " + problem); } else pass++;
+  }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();
     if (/<feed[\s>]/.test(xml) && (xml.match(/<entry>/g) || []).length >= 12) pass++; else { fail++; console.log("✗ feed.xml: brak wpisów"); }

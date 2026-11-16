@@ -26,6 +26,25 @@ function pfDefaults(){
 // zapamiętanie portfela w tej przeglądarce (localStorage, tylko na tym urządzeniu): serie, rachunek, scenariusz;
 // bez dnia wyceny (zawsze dziś). Adres z parametrami ma pierwszeństwo; brak dostępu do pamięci nie psuje strony.
 const PF_KEY="rejestr-obligacji:portfel";
+// plik portfela (JSON, ten sam format co zapis w przeglądarce): {app, v, savedAt, pos:[{code,n,pd}], acc, sc}
+function pfFileText(s){return JSON.stringify({app:"rejestr-obligacji",v:1,savedAt:new Date().toISOString().slice(0,10),pos:s.pos.map(o=>({code:o.code,n:Math.floor(+o.n),pd:+o.pd||1})),acc:s.acc,sc:s.sc},null,1)+"\n"}
+// odczyt pliku: znane serie, liczba sztuk ≥ 1, dzień 1–31; nierozpoznane pozycje pominięte (skipped); error — plik nie do odczytu
+function pfParseFile(text){
+  let j;try{j=JSON.parse(text)}catch(e){return {error:"To nie jest plik portfela (zły format JSON)."}}
+  if(!j||!Array.isArray(j.pos))return {error:"W pliku nie ma listy serii (pole „pos”)."};
+  const s=pfDefaults(),pos=[],skipped=[];
+  for(const o of j.pos){const a=o&&calcFromCode(o.code);const n=Math.floor(+(o&&o.n));
+    if(!a||!CALC_TYPES.includes(a.type)||!(n>=1)){skipped.push(o&&o.code?String(o.code):"?");continue}
+    if(pos.length>=PF_MAX){skipped.push(a.code+" (ponad "+PF_MAX+" serii)");continue}
+    pos.push({code:a.code,n,pd:calcDayOk(o.pd)?+o.pd:1})}
+  if(!pos.length)return {error:"Plik nie zawiera żadnej rozpoznanej serii"+(skipped.length?` (pominięto: ${skipped.join(", ")})`:"")+"."};
+  s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;
+  return {state:s,skipped};
+}
+// komunikat po wczytaniu pliku (z „Cofnij” — przywraca portfel sprzed wczytania)
+function pfImportHtml(){const m=state.pfImport;if(!m)return "";state.pfImport=null;
+  if(m.error)return `<div class="insight warn" role="status"><span class="t">nie udało się wczytać pliku</span>${esc(m.error)}</div>`;
+  return `<div class="insight${m.skipped.length?" warn":""}" role="status"><span class="t">wczytano portfel z pliku</span>${m.count} ${m.count===1?"seria":[2,3,4].includes(m.count%10)&&!(m.count>=12&&m.count<=14)?"serie":"serii"} z pliku ${esc(m.name)}${m.skipped.length?`; pominięto nierozpoznane: ${esc(m.skipped.join(", "))}`:""}. Portfel jest zapamiętany w tej przeglądarce. <button type="button" class="linkbtn" id="p-import-undo">Cofnij</button></div>`}
 function pfLoad(){try{const j=JSON.parse(localStorage.getItem(PF_KEY)||"null");if(!j||!Array.isArray(j.pos))return null;const s=pfDefaults();
     const pos=j.pos.slice(0,PF_MAX).map(o=>{const a=calcFromCode(o.code);return a&&CALC_TYPES.includes(a.type)&&+o.n>=1?{code:a.code,n:Math.floor(+o.n),pd:calcDayOk(o.pd)?+o.pd:1}:null}).filter(Boolean);
     if(!pos.length)return null;s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;return s}catch(e){return null}}
@@ -89,10 +108,11 @@ function renderPortfolio(main){
     <div class="sec-head"><div><p class="kicker">§ 6 · mój portfel</p><h2>Ile są warte <span class="acc">moje obligacje</span>?</h2><p class="desc">Wpisz serie, które masz: zobaczysz ich wartość na ${esc(pfDate(now,s.bd))}, ile dostaniesz na rękę po zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania. Bez zamiany — czy opłaca się zamienić je na nowe, sprawdzisz w kalkulatorze zamiany.</p></div>
       ${resetRowHtml("p",isDef,undo,"przykładowa seria EDO, wycena na dziś, zwykły rachunek")}</div>
     ${linkWarnHtml("portfel")}
+    ${pfImportHtml()}
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}
-        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span></div>
+        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span><button type="button" class="btn" id="p-load-file" title="Wczytaj portfel zapisany wcześniej do pliku (.json) — np. z innego urządzenia">Wczytaj z pliku</button><input type="file" id="p-file" accept=".json,application/json" hidden></div>
         <p class="small" id="p-store">${pfStoreNote()}</p></div>
       <div class="card"><h3>Wycena</h3>
         <div class="frow"><label class="field"><span class="flabel">Dzień wyceny${calcTip("pbd")}</span><input id="p-bd" type="number" min="1" max="${calcDaysIn(now)}" step="1" inputmode="numeric" value="${esc(s.bd)}"><span class="fnote">${esc(mLabel(now))}</span></label></div>
@@ -111,6 +131,14 @@ function renderPortfolio(main){
   main.querySelectorAll("button.chip[data-pacc]").forEach(b=>b.addEventListener("click",()=>{s.acc=b.dataset.pacc;renderPortfolio(main)}));
   main.querySelectorAll("button.chip[data-psc]").forEach(b=>b.addEventListener("click",()=>{s.sc=b.dataset.psc;renderPortfolio(main)}));
   viewResetBind("p","pf",null,pfDefaults,()=>renderPortfolio(main));
+  // wczytanie portfela z pliku: zastępuje bieżący (z możliwością cofnięcia), zapis w przeglądarce jak przy zmianie ręcznej
+  $("#p-load-file").addEventListener("click",()=>$("#p-file").click());
+  $("#p-file").addEventListener("change",async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+    let r;if(f.size>200000)r={error:"Plik jest za duży jak na portfel (ponad 200 KB)."};else{try{r=pfParseFile(await f.text())}catch(err){r={error:"Nie udało się odczytać pliku."}}}
+    if(r.error){state.pfImport={error:r.error};renderPortfolio(main);return}
+    state.pfImportUndo={pf:JSON.parse(JSON.stringify(state.pf)),link:!!state.pfLink};
+    state.pf=r.state;state.pfLink=false;state.pfImport={count:r.state.pos.length,skipped:r.skipped,name:f.name};renderPortfolio(main)});
+  const iu=$("#p-import-undo");if(iu)iu.addEventListener("click",()=>{const u=state.pfImportUndo;if(!u)return;state.pf=u.pf;state.pfLink=u.link;state.pfImportUndo=null;renderPortfolio(main)});
   calcBindTips(main.querySelector(".calc-grid"));
   pfRecompute();
 }
@@ -173,12 +201,13 @@ function pfRecompute(){
       <li>Przy wykupie w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki) plus kupony i odsetki należne od dziś do wykupu${tax?", wszystko po podatku":""}; bez ich oprocentowania na koncie, bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej. Stopy liczone z szybkiego szacunku CPI oznaczamy jako wstępne — odczyt finalny GUS może się nieco różnić.</li>
       <li>To wycena orientacyjna, nie wyciąg z rachunku. Wiążące są listy emisyjne i dane w serwisie, w którym kupiłeś obligacje.</li>
     </ul></details>
-    <div class="row"><span class="small">Pobierz:</span><button type="button" class="btn" id="p-csv" data-goatcounter-click="eksport-csv-p">serie i zdarzenia CSV</button><button type="button" class="btn" id="p-ics" data-goatcounter-click="eksport-ics-p" title="Kupony, odsetki, nowe oprocentowanie i wykupy do kalendarza w telefonie lub komputerze">kalendarz (.ics)</button></div>
+    <div class="row"><span class="small">Pobierz:</span><button type="button" class="btn" id="p-csv" data-goatcounter-click="eksport-csv-p">serie i zdarzenia CSV</button><button type="button" class="btn" id="p-json" data-goatcounter-click="eksport-json-p" title="Plik z listą serii — do przeniesienia portfela na inne urządzenie albo kopii zapasowej">portfel (.json)</button><button type="button" class="btn" id="p-ics" data-goatcounter-click="eksport-ics-p" title="Kupony, odsetki, nowe oprocentowanie i wykupy do kalendarza w telefonie lub komputerze">kalendarz (.ics)</button></div>
     ${calcShareHtml}
   </div>`;
   $("#p-calc").addEventListener("click",e=>{e.preventDefault();state.calc=null;try{history.replaceState(null,"","#"+calcH)}catch(_){}state.view="zamiana";
     document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view==="zamiana")));render();scrollTo(0,0)});
   // kalendarz: harmonogram każdej serii do wykupu (od dnia wyceny); kwoty prognozowane i wstępne oznaczone jak w widoku
+  $("#p-json").addEventListener("click",()=>downloadBlob(new Blob([pfFileText(s)],{type:"application/json"}),`moj-portfel-${new Date().toISOString().slice(0,10)}.json`));
   $("#p-ics").addEventListener("click",()=>{
     const today=`${now}-${String(s.bd).padStart(2,"0")}`,day=(ym,d)=>`${ym}-${String(Math.min(d,calcDaysIn(ym))).padStart(2,"0")}`;
     const mark=k=>k==="prelim"?" (wstępnie)":k?"":" (prognoza)",src="Szacunek z Rejestru ofert obligacji (patrykw-labs.github.io/rejestr-obligacji) — wiążące są listy emisyjne. Portfel: "+location.href;
