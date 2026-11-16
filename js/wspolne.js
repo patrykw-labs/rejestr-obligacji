@@ -18,7 +18,7 @@ const VIEW_TIPS={
   s_real:"Oprocentowanie 1. okresu minus ostatni odczyt CPI z rekordu miesiąca, przed podatkiem Belki — orientacyjnie, czy start był ponad inflacją.",
   so_val:"Ile jest warta obligacja kupiona za 100 zł w miesiącu emisji: przy wykupie w terminie albo dziś (seria w trakcie), z kuponami wypłaconymi po drodze (bez ich oprocentowania).",
   so_ann:"Średnia roczna stopa zwrotu w tym czasie (procent składany).",
-  so_infl:"Zmiana cen od miesiąca zakupu do wykupu albo do dziś — z poziomu cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”; dla roku od grudnia do grudnia to dokładnie oficjalna inflacja). Najnowsze miesiące bez odczytu GUS — z ostatniego wskaźnika r/r.",
+  so_infl:"Zmiana cen od miesiąca zakupu do wykupu albo do dziś — z poziomu cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”; dla roku od grudnia do grudnia to dokładnie oficjalna inflacja). Najnowsze miesiące bez odczytu GUS — z ostatniego wskaźnika r/r. W styczniu i lutym wynik może się różnić od wskaźnika r/r o kilka dziesiątych punktu, bo GUS co roku zmienia wagi koszyka.",
   so_real:"Wynik po uwzględnieniu inflacji: powyżej zera — obligacja pobiła inflację, poniżej — straciła siłę nabywczą."
 };
 // objaśnienia: pola kalkulatorów (CALC_TIPS, uzupełniane w kupno.js i portfel.js) i pozostałych widoków (VIEW_TIPS w app.js)

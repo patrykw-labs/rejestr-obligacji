@@ -4,6 +4,11 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Poprawka obliczeń: gdy okres porównania kończy się dokładnie w dniu wykupu, kwota trafia na konto zamiast w nowe obligacje po 99,90 zł wycenione od razu po 100 zł. Usuwa to sztuczny zysk ok. 0,08 zł na sztuce, który faworyzował serię z terminem na koniec okresu (w „Co kupić?”) i wariant „trzymam” przy domyślnym horyzoncie kalkulatora zamiany.
+- „Mój portfel”: „Przy wykupie w terminie” obejmuje kupony COI i odsetki ROR/DOR należne do wykupu (wcześniej tylko ostatni kupon), z rozbiciem w kafelku, tabeli i CSV. Stopy liczone z szybkiego szacunku CPI są oznaczone jako wstępne. Seria w miesiącu swojego wykupu jest na liście do dnia wykupu.
+- „Co kupić?”: notka, gdy przy okresie o miesiąc krótszym lub dłuższym wygrywa inna seria (np. COI bez opłaty przy wypłacie w rocznicę zakupu).
+- Objaśnienia: inflacja skumulowana a zmiana wag koszyka GUS; IKZE bez ulgi w PIT przy wpłacie (nie zmienia wyniku porównania).
+
 ## v1.3.0 — 2026-11-14
 
 Dokładniejsza inflacja skumulowana, zapamiętany portfel, ikona RSS i lepsza czytelność w obu motywach.

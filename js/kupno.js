@@ -117,8 +117,18 @@ function buyRecompute(){
     else{for(let i=0;i<40;i++){const m=(lo+hi)/2,fm=f(m);if(Math.sign(fm)===Math.sign(flo)){lo=m;flo=fm}else{hi=m;fhi=fm}}
       const be=(lo+hi)/2;beTxt=`${esc(best.c.code)} wygrywa z ${esc(second.c.code)}, dopóki stała inflacja jest ${f(-2)>0?"poniżej":"powyżej"} ${fmt(be,1)}%.`}
   }
-  const notes=x=>{const n=[];const term=Zamiana.TYPES[x.type].term;const w=x.events.filter(e=>e.kind==="wykup").length;
+  // wrażliwość na moment wypłaty: zwycięzca przy okresie o miesiąc krótszym i dłuższym (np. COI bez opłaty w rocznicę zakupu)
+  const winnerAt=h=>{if(h<1||h>BUY_H[BUY_H.length-1]+1)return null;try{return Zamiana.compareBuy(Object.assign(buyParams(b,cands),{horizonMonths:h})).ranking[0]}catch(e){return null}};
+  const wShort=winnerAt(H-1),wLong=winnerAt(H+1),codeOf=t=>cand[t]?.code||t;
+  let momentTxt="";
+  if((wShort&&wShort!==best.type)||(wLong&&wLong!==best.type)){
+    const parts=wShort&&wLong&&wShort===wLong?[`o miesiąc krótszym lub dłuższym wygrywa ${esc(codeOf(wShort))}`]
+      :[wShort?`o miesiąc krótszym wygrywa ${esc(codeOf(wShort))}`:"",wLong?`o miesiąc dłuższym — ${esc(codeOf(wLong))}`:""].filter(Boolean);
+    momentTxt=`Wynik zależy od dokładnego momentu wypłaty: przy okresie ${parts.join(", a przy okresie ")}.`+
+      (best.type==="COI"&&liq?" COI wypada najlepiej, gdy wypłata przypada w rocznicę zakupu: odsetki bieżącego roku wynoszą wtedy 0, więc nie ma opłaty za wcześniejszy wykup.":"");}
+  const notes=x=>{const n=[];const term=Zamiana.TYPES[x.type].term;const w=x.events.filter(e=>e.kind==="wykup"&&!e.final).length;
     if(w)n.push(w===1?"wykup w terminie i zamiana na nową":`${w}× wykup w terminie i zamiana`);
+    if(x.events.some(e=>e.kind==="wykup"&&e.final))n.push("wykup w terminie na koniec okresu — bez zamiany");
     if(liq&&H%term!==0)n.push(x.type==="OTS"?"na koniec przed wykupem — bez odsetek":`na koniec przed wykupem — opłata ${x.type==="ROR"||x.type==="DOR"?"":"do "}${fmt(x.c.fee)} zł/szt.`);
     if(x.c.availability!=="wszyscy")n.push("tylko 800+");
     if(x.type==="COI")n.push("kupony co rok na konto");if(x.type==="ROR"||x.type==="DOR")n.push("odsetki co miesiąc na konto");
@@ -126,6 +136,7 @@ function buyRecompute(){
   out.innerHTML=`<div class="vlist">
     <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: ${zl0(best.final)} ${liq?"na rękę":""}</div>
       <div class="vs">Zysk ${sgn(best.gain)} (${pct(best.annual)} rocznie${b.acc==="std"?" po podatku":""}), realnie ${zl0(best.finalReal)} w dzisiejszych złotych.${second?` Drugie miejsce: ${esc(second.c.code)} (${sgn(second.final-best.final)}).`:""} ${beTxt}</div></div>
+    ${momentTxt?`<div class="insight warn"><span class="t">moment wypłaty</span>${momentTxt}</div>`:""}
     <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div></div>
       <div class="chart" id="b-chart"></div></div>
     <div class="card table-card"><div class="tc-head"><h3>Wszystkie serie z oferty</h3><p class="desc">Kwota ${zl0(+b.kw)}, okres ${esc(hTxt)}, ${calcTaxTxt({acc:b.acc})}. ${liq?"Wartość na koniec = wypłata wszystkiego (po opłacie i podatku) plus konto.":"Wartość na koniec bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty, plus konto."}</p></div>

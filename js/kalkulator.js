@@ -3,7 +3,7 @@
 const CALC_ACC=[["std","Zwykły (podatek Belki)"],["ike","IKE"],["ikze","IKZE"]];
 const CALC_ACC_NOTE={std:"Podatek 19% od zysku przy zerwaniu, wykupie i od odsetek.",
   ike:"W IKE bez podatku Belki (przy wypłacie po 60. roku życia). Opłata za zerwanie w ramach konta zostaje.",
-  ikze:"W IKZE bez podatku Belki; przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty — wartości są po tym podatku. Opłata za zerwanie w ramach konta zostaje."};
+  ikze:"W IKZE bez podatku Belki; przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty — wartości są po tym podatku. Opłata za zerwanie w ramach konta zostaje. Ulgi w PIT przy wpłacie nie liczymy — jest taka sama w obu wariantach, więc nie zmienia wyniku porównania."};
 const calcTaxTxt=c=>({std:"po podatku Belki",ike:"bez podatku (IKE)",ikze:"w IKZE: bez podatku Belki, po 10% ryczałcie przy wypłacie"})[c.acc||"std"];
 const calcLiqTxt=c=>c.ike?`(wypłata z ${c.acc==="ikze"?"IKZE — bez opłaty za wykup, po 10% ryczałcie":"IKE — bez opłaty za wykup i bez podatku"})`:"(po opłacie i podatku)";
 const CALC_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR","OTS"];
@@ -37,13 +37,15 @@ function calcCpiHist(){return Object.assign({},calcPre().cpi?.values||{},Zamiana
 function calcYtdHist(){return Object.assign({},calcPre().cpi?.ytd||{},Zamiana.cpiYtdFromMonths(state.raw))}
 // najwcześniejszy miesiąc zakupu, dla którego mamy CPI do wszystkich okresów (odczyt za P−2 od 2. roku)
 function calcMinPurchase(){const k=Object.keys(calcCpiHist()).sort()[0]||"2018-12";return k<"2019-01"?Zamiana.addMonths(k,-10):"2019-01"}
-function calcOptions(now=calcNow()){
+// serie do wyboru: kupione co najmniej miesiąc temu i jeszcze niewykupione; maturing — także seria w miesiącu wykupu
+// (trwa do dnia wykupu; „Mój portfel”), w kalkulatorze zamiany bez niej
+function calcOptions(now=calcNow(),maturing=false){
   const out={};
   const pre=Object.entries(calcPre().series||{}).sort((a,b)=>a[1].purchase<b[1].purchase?-1:1);
   const rows=pre.map(([code,s])=>({id:s.purchase,series:{[s.type]:Object.assign({code},s)}})).concat(state.months);
   for(const m of rows)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
     const info=Zamiana.parseCode(s.code);if(!info)continue;const age=Zamiana.monthsBetween(info.purchase,now);
-    if(age<1||age>=Zamiana.TYPES[t].term)continue;(out[t]=out[t]||[]).push(s.code)}
+    if(age<1||age>Zamiana.TYPES[t].term||(age===Zamiana.TYPES[t].term&&!maturing))continue;(out[t]=out[t]||[]).push(s.code)}
   for(const t in out)out[t].reverse();
   return out;
 }
@@ -316,7 +318,7 @@ const CALC_TIPS={
   nbp:"Stała stopa referencyjna NBP w przyszłości — od niej zależy oprocentowanie ROR i DOR. Dla miesięcy z archiwum — rzeczywiste stopy NBP.",
   cpi:"Scenariusz inflacji (CPI r/r) w kolejnych latach. Od niego zależy oprocentowanie EDO, COI, ROS, ROD od 2. roku. Dla miesięcy z archiwum — rzeczywiste odczyty GUS.",
   cm:"Rzeczywiste: inflacja i stopa NBP po dacie zerwania z archiwum (jak to się naprawdę potoczyło). Tylko scenariusz: stan wiedzy z dnia decyzji.",
-  acc:"Zwykły rachunek — podatek 19% od zysku. IKE — bez podatku. IKZE — bez podatku Belki, ale 10% ryczałtu przy wypłacie.",
+  acc:"Zwykły rachunek — podatek 19% od zysku. IKE — bez podatku. IKZE — bez podatku Belki, ale 10% ryczałtu przy wypłacie; ulgi w PIT przy wpłacie nie liczymy (jest taka sama dla każdej porównywanej serii).",
   val:"Domyślnie wartość w czasie jest bez opłaty (nikt dalej nie zrywa). Ta opcja wycenia każdy miesiąc tak, jakbyś wypłacał wszystko, z opłatą.",
   real:"Kwota w dzisiejszych złotych (przy zerwaniu w przeszłości — w złotych z dnia zerwania): wartość nominalna podzielona przez skumulowaną inflację z Twojego scenariusza. Pokazuje siłę nabywczą, a nie to, co zobaczysz na koncie — np. 11 877 zł po 5 latach przy inflacji 2,5% to realnie ok. 10 498 zł.",
   range:"Od zakupu — cała historia. Od zerwania — oś tylko dla prognozy, linie są bardziej rozsunięte."
@@ -448,10 +450,10 @@ function calcEvents(r,o,tt,oldCode,tgtCode){
     const own=leg==="keep"&&e.spec.purchase===o.p,from=e.t===0||own?oldCode:calcCodeFor(e.spec.type,e.spec.purchase);
     // miesiąc wykupu: dla posiadanej serii faktyczny (zakup + okres), dla kolejnych — krok osi czasu
     const ym=own?Zamiana.addMonths(o.p,Zamiana.TYPES[o.type].term):Zamiana.addMonths(now,e.t);
-    const to=calcCodeFor(tt,ym);
+    const to=e.final?null:calcCodeFor(tt,ym);
     // odnawianie OTS co 3 miesiące pomijamy w tabeli i na wykresie (opisane w „Jak to policzono”)
     if(e.spec.type==="OTS"&&!own&&e.t>0)continue;
-    out.push({t:e.t,leg,src:from,ym,to,newCount:e.newCount,short:`wykup ${from}`,priceTxt:fmt(calcSwapPrice(tt)),text:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po ${calcSwapTxt(tt)} na ${e.newCount} szt. ${to}`});}
+    out.push({t:e.t,leg,src:from,ym,to,final:!!e.final,newCount:e.newCount,short:`wykup ${from}`,priceTxt:fmt(calcSwapPrice(tt)),text:e.final?`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) — koniec okresu porównania, kwota na konto`:`${leg==="keep"?"trzymam":"zamieniam"}: wykup ${from} w terminie (${zl2(e.proceeds)} na rękę) → zamiana po ${calcSwapTxt(tt)} na ${e.newCount} szt. ${to}`});}
   return out;
 }
 // kolory zdarzeń wykupu: każda wykupowana seria ma własny kolor (linia, etykieta, dymek, tabela)
@@ -530,7 +532,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
     ${histPath&&vis("hist")?`<path d="${histPath}" fill="none" stroke="var(--ink-2)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
     ${vis("keep")?`<path d="${line(P,n-1,"keep")}" fill="none" stroke="var(--muted)" stroke-width="2.4" stroke-linejoin="round"/>`:""}
     ${vis("swap")?`<path d="${line(P,n-1,"swap")}" fill="none" stroke="var(--accent)" stroke-width="2.8" stroke-linejoin="round"/>`:""}
-    ${evs.map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7;return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${D1}" style="stroke:${e.color};stroke-width:1.6;stroke-dasharray:3 3"/><text x="${right?xe-5:xe+5}" y="${M1-8-k*15}" text-anchor="${right?"end":"start"}" style="fill:${e.color};font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round">↻ ${esc(e.short)} → zamiana po ${e.priceTxt||"99,90"}</text>`}).join("")}
+    ${evs.map((e,k)=>{const i=P+e.t,xe=x(i),right=i>n*0.7;return `<line x1="${xe}" x2="${xe}" y1="${T}" y2="${D1}" style="stroke:${e.color};stroke-width:1.6;stroke-dasharray:3 3"/><text x="${right?xe-5:xe+5}" y="${M1-8-k*15}" text-anchor="${right?"end":"start"}" style="fill:${e.color};font-weight:700;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round">↻ ${esc(e.short)}${e.final?" — koniec okresu":` → zamiana po ${e.priceTxt||"99,90"}`}</text>`}).join("")}
     ${vis("hist")?buys.map(z=>`<circle cx="${x(z.i)}" cy="${y(pts[z.i].keep)}" r="5" style="fill:var(--surface);stroke:var(--ink-2);stroke-width:2.2"/>`).join(""):""}
     <line class="zhov" x1="0" x2="0" y1="${T}" y2="${D1}" style="stroke:var(--muted);stroke-dasharray:2 3;visibility:hidden"/><g class="zpts"></g></svg><div class="tip" hidden></div>`;
   calcBindTips(el);

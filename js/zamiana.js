@@ -196,13 +196,19 @@
         const roll = Object.assign({}, rollover, { purchase: addMonths(ctx.now, t) });
         // cena zamiany zależy od kupowanej serii (OTS 100,00 zł, pozostałe 99,90 zł), chyba że podano ją wprost
         const rollPrice = rollover.swapPrice || TYPES[rollover.type].swapPrice || swapPrice;
-        const n = Math.floor((proceeds + cash) / rollPrice);
-        events.push({ t, kind: "wykup", spec, count, proceeds, newCount: n });
+        // wykup na sam koniec okresu (t = H): wypłata na konto, bez zamiany — nowe obligacje po 99,90 zł wycenione
+        // od razu po 100 zł dawałyby zysk, którego w tym okresie nie ma
+        const final = t === H;
+        const n = final ? 0 : Math.floor((proceeds + cash) / rollPrice);
+        events.push({ t, kind: "wykup", spec, count, proceeds, newCount: n, final });
         cash = proceeds + cash - n * rollPrice;
-        // nowa seria kupiona w dniu wykupu (przy zerwaniu w środku miesiąca — ułamek miesiąca przed krokiem t)
-        boughtAt = boughtAt + term; age = Math.max(0, t - boughtAt);
-        spec = roll; count = n; rates = periodRates(spec, cpiAt, nbpAt);
-        costBasis = opts.taxBasisNominal ? NOMINAL : rollPrice; paidUpTo = 0;
+        if (final) count = 0;
+        else {
+          // nowa seria kupiona w dniu wykupu (przy zerwaniu w środku miesiąca — ułamek miesiąca przed krokiem t)
+          boughtAt = boughtAt + term; age = Math.max(0, t - boughtAt);
+          spec = roll; count = n; rates = periodRates(spec, cpiAt, nbpAt);
+          costBasis = opts.taxBasisNominal ? NOMINAL : rollPrice; paidUpTo = 0;
+        }
       }
 
       // wycena z końcem miesiąca t:
@@ -499,7 +505,9 @@
    *       cpiHistory, cpiFuture, nbpHistory, nbpFuture, tax, taxRate }
    * Dla każdej serii: wartość brutto (z narosłymi odsetkami), opłata i podatek przy zerwaniu dziś, wypłata na rękę,
    * odsetki wypłacone dotąd, bieżący okres (stopa, koniec), następny okres (stopa, czy znana z odczytów GUS/NBP),
-   * najbliższy kupon (COI, ROR, DOR) i wykup w terminie (wartość przy obecnych założeniach). Kwoty za wszystkie sztuki.
+   * najbliższy kupon (COI, ROR, DOR) i wykup w terminie (wartość przy obecnych założeniach) oraz kupony należne do wykupu
+   * (futureCoupons; toMaturity = wykup + kupony). p.cpiPrelim = {"RRRR-MM": true} — odczyty CPI z szybkiego szacunku GUS
+   * (stopy na ich podstawie: next.prelim, maturityPrelim). Kwoty za wszystkie sztuki.
    */
   function holdings(p) {
     const taxRate = p.taxRate != null ? p.taxRate : 0.19, tax = p.tax !== false;
@@ -514,11 +522,15 @@
       if (age < 0) return { spec: o, error: "future", maturity, age };
       if (age >= t.term - 1e-9) return { spec: o, matured: true, maturity, age };
       const rates = periodRates(o, cpiAt, nbpAt);
-      // stopa okresu idx znana z opublikowanych danych (CPI za P−2, stopa NBP na początek okresu)
+      // stopa okresu idx: "final" — z opublikowanych danych (CPI za P−2, stopa NBP na początek okresu); "prelim" — z szybkiego
+      // szacunku CPI (p.cpiPrelim[ym], odczyt finalny może się różnić); false — jeszcze nieznana (scenariusz)
       const known = (idx) => {
-        if (idx === 0 || (!t.indexed && !t.nbp)) return true;
+        if (idx === 0 || (!t.indexed && !t.nbp)) return "final";
         const start = addMonths(o.purchase, idx * P);
-        return t.nbp ? !!(p.nbpHistory && p.nbpHistory[start] != null) : !!(p.cpiHistory && p.cpiHistory[addMonths(start, -2)] != null);
+        if (t.nbp) return p.nbpHistory && p.nbpHistory[start] != null ? "final" : false;
+        const cm = addMonths(start, -2);
+        if (!(p.cpiHistory && p.cpiHistory[cm] != null)) return false;
+        return p.cpiPrelim && p.cpiPrelim[cm] ? "prelim" : "final";
       };
       const v = bondValue(o, age, rates, { roundPerBond: true });
       const gross = v.gross * n, fee = v.fee * n;
@@ -526,7 +538,7 @@
       const k = Math.floor(age / P + 1e-9);
       const periodEnd = addMonths(o.purchase, Math.min((k + 1) * P, t.term));
       const next = (k + 1) * P < t.term ? {
-        start: periodEnd, rate: rates[k + 1], known: known(k + 1),
+        start: periodEnd, rate: rates[k + 1], known: !!known(k + 1), prelim: known(k + 1) === "prelim",
         basis: t.nbp ? nbpAt(periodEnd) : t.indexed ? cpiAt(addMonths(periodEnd, -2)) : null,
         basisMonth: t.indexed ? addMonths(periodEnd, -2) : null,
       } : null;
@@ -538,14 +550,18 @@
       const atMaturity = t.coupon
         ? NOMINAL * n + couponAmount(o.type, rates[last], true) * n * (tax ? 1 - taxRate : 1)
         : mv.gross * n - taxOf((mv.gross - NOMINAL) * n);
-      let maturityKnown = true; for (let i = k + 1; i <= last; i++) if (!known(i)) maturityKnown = false;
+      let maturityKnown = true, maturityPrelim = false;
+      for (let i = k + 1; i <= last; i++) { const kn = known(i); if (!kn) maturityKnown = false; else if (kn === "prelim") maturityPrelim = true; }
+      // kupony (COI) i odsetki (ROR, DOR) należne od bieżącego okresu do przedostatniego — po podatku; ostatni jest w atMaturity
+      let futureCoupons = 0;
+      if (t.coupon) for (let i = k; i < last; i++) { const c = couponAmount(o.type, rates[i], true) * n; futureCoupons += c - taxOf(c); }
       return {
         spec: o, age, maturity, monthsToMaturity: t.term - age, rates,
         gross, fee, breakTax, payout: gross - fee - breakTax,
         hold: gross - taxOf(gross - NOMINAL * n),
         couponsPaid: net(v.coupons.reduce((s, c) => s + c.amount, 0) * n),
         rateNow: rates[k], periodIndex: k, periodEnd, next, coupon,
-        atMaturity, maturityKnown,
+        atMaturity, futureCoupons, toMaturity: atMaturity + futureCoupons, maturityKnown, maturityPrelim,
       };
     });
     return { now: p.now, breakDay: p.breakDay, items };

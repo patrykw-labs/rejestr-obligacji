@@ -227,8 +227,14 @@ eq("ROR: kupon miesięczny netto w wariancie „trzymam”", rc.months[1].keep -
 eq("ROR: kupony do dziś w wartości (6 mies.)", rc.paidCoupons, rc.oldRates.slice(0, 6).reduce((a, r) => a + Z.couponAmount("ROR", r, true), 0) * 100 * 0.81, 1e-9);
 eq("ROR: historia łączy się z dziś", rc.past[rc.past.length - 1].value, rc.months[0].keep, 1e-9);
 const rw = rc.keepEvents.filter((e) => e.kind === "wykup");
-eq("ROR: wykup w terminie po 6 mies. (100 zł/szt.) → zamiana po 99,90 razem z kuponami z konta", [rw.length, rw[0].t, rw[0].proceeds, rw[0].newCount],
-  [1, 6, 10000, Math.floor((10000 + rc.months[5].keep - 10000 + Z.couponAmount("ROR", rc.oldRates[11], true) * 100 * 0.81 - rc.paidCoupons) / 99.9)]);
+// koniec porównania w dniu wykupu: kwota na konto, bez zamiany po 99,90 (nowe obligacje wycenione od razu po 100 zł dawałyby zysk spoza okresu)
+eq("ROR: wykup w terminie na koniec okresu (6 mies.) — na konto, bez zamiany", [rw.length, rw[0].t, rw[0].proceeds, rw[0].newCount, rw[0].final], [1, 6, 10000, 0, true]);
+const rc12 = Z.compare(Object.assign({}, rorBase, { horizonMonths: 12 }));
+const rw12 = rc12.keepEvents.filter((e) => e.kind === "wykup");
+eq("ROR: wykup w trakcie okresu (6 z 12 mies.) → zamiana po 99,90 razem z kuponami z konta", [rw12[0].t, rw12[0].proceeds, rw12[0].final],  [6, 10000, false]);
+eq("ROR: liczba nowych sztuk = (wykup + konto) / 99,90", rw12[0].newCount,
+  Math.floor((10000 + rc12.months[5].keep - 10000 + Z.couponAmount("ROR", rc12.oldRates[11], true) * 100 * 0.81 - rc12.paidCoupons) / 99.9));
+eq("ROR: na koniec okresu wartość = wykup + konto (bez sztucznego zysku z ceny zamiany)", r2(rc.months[6].keep), r2(rc.months[5].keep + Z.couponAmount("ROR", rc.oldRates[11], true) * 100 * 0.81), 0.011);
 // zamiana EDO → ROR: kupony ROR co miesiąc na konto, stopa ze scenariusza NBP
 const toRor = Z.compare(Object.assign({}, rorBase, { old: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 10 },
   target: { type: "ROR", rate1: 4, margin: 0, fee: 0.5 }, nbpFuture: 2 }));
@@ -313,7 +319,11 @@ const otsHold = Z.compare({ now: "2026-11", old: Object.assign({ count: 100 }, o
   cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true });
 eq("OTS → EDO: zerwanie daje 10 000 zł, bez podatku", [otsHold.switchNow.proceeds, otsHold.switchNow.tax], [10000, 0]);
 const ow = otsHold.keepEvents.find((e) => e.kind === "wykup");
-eq("OTS → EDO: wykup za miesiąc, 10 050 zł − podatek 9,50 zł, zamiana na EDO po 99,90", [ow.t, ow.proceeds, ow.newCount], [1, 10040.5, Math.floor(10040.5 / 99.9)]);
+eq("OTS → EDO: wykup za miesiąc (koniec porównania), 10 050 zł − podatek 9,50 zł, na konto", [ow.t, ow.proceeds, ow.newCount, otsHold.months[1].keep], [1, 10040.5, 0, 10040.5]);
+const otsHold12 = Z.compare({ now: "2026-11", old: Object.assign({ count: 100 }, otsSpec), target: { type: "EDO", rate1: 5.35, margin: 2, fee: 3 },
+  cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true, horizonMonths: 12 });
+const ow12 = otsHold12.keepEvents.find((e) => e.kind === "wykup");
+eq("OTS → EDO: wykup w trakcie okresu → zamiana na EDO po 99,90", [ow12.t, ow12.newCount], [1, Math.floor(10040.5 / 99.9)]);
 const toOts = Z.compare({ now: "2026-11", old: { type: "EDO", rate1: 6.8, margin: 1.5, fee: 2, purchase: "2024-04", count: 10 },
   target: { type: "OTS", rate1: 2, margin: 0, fee: 0 }, cpiHistory: hist, cpiFuture: [2.5], savingsRate: 0, tax: true, horizonMonths: 12 });
 const tw = toOts.swapEvents.filter((e) => e.kind === "wykup");
@@ -364,8 +374,14 @@ eq("blog, scenariusz 2: po roku zamiana prowadzi", d2[0] > 0, true);
 eq("blog, scenariusz 2: przewaga zamiany maleje z każdym rokiem", d2.every((v, i) => i === 0 || v < d2[i - 1]), true);
 eq("blog, scenariusz 2: do wykupu wygrywa stara seria", d2[7] < 0, true);
 // konto autora wpisu: „po 8 latach zaledwie 101 zł do przodu” (scenariusz 1) — rząd wielkości dla ok. 370 szt.
-const sc3 = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4 }));
-eq("blog: kilkaset sztuk → po 8 latach ok. 100 zł", sc3.atHorizon.diff > 80 && sc3.atHorizon.diff < 120, true);
+// autor trzyma obligacje dalej (przy wykupie EDO0432 zamiana po 99,90), więc porównanie na dłuższym horyzoncie, miesiąc 96
+const sc3 = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4, horizonMonths: 144 }));
+eq("blog: kilkaset sztuk → po 8 latach ok. 100 zł (inwestor trzyma dalej)", sc3.months[96].diff > 80 && sc3.months[96].diff < 120, true);
+// koniec porównania dokładnie w dniu wykupu EDO0432: wariant „trzymam” bez zamiany — kwota na konto
+const sc3e = Z.compare(Object.assign({}, blogBase, { old: Object.assign({}, blogBase.old, { count: 370 }), cpiFuture: [2.5], savingsRate: 4 }));
+const sc3w = sc3e.keepEvents.find((e) => e.kind === "wykup");
+eq("blog: horyzont = wykup starej serii — bez zamiany na koniec okresu", [sc3e.horizonMonths, sc3w.t, sc3w.newCount, sc3w.final], [96, 96, 0, true]);
+eq("blog: różnica przy horyzoncie = wykup większa o zysk z ceny zamiany, którego w okresie nie ma", sc3e.atHorizon.diff > sc3.months[96].diff, true);
 
 // ---------------------------------------------------------------------------
 // 11. „Co kupić?” (compareBuy): ta sama kwota w każdą serię z oferty 11.2026, wypłata na koniec okresu
@@ -382,7 +398,8 @@ eq("kupno: EDO po roku — 105,35 − opłata 3 zł, podatek od 2,35 zł", bAt(1
 eq("kupno: TOS w IKE po 3 latach — zamiana na nowe TOS po 99,90", bAt(36, "TOS", { tax: false }).events.filter((e) => e.kind === "wykup").map((e) => e.t), [36]);
 const b120 = Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: 120 }));
 eq("kupno: ranking malejąco", b120.ranking.map((t) => b120.results.find((x) => x.type === t).final).every((v, i, a) => i === 0 || v <= a[i - 1]), true);
-eq("kupno: EDO po 10 latach = wykup w terminie, bez opłaty (zgodnie z compare)", Math.abs(bAt(120, "EDO").final - 14593) < 1, true);
+const e120 = bAt(120, "EDO"), e120w = e120.events.find((e) => e.kind === "wykup");
+eq("kupno: EDO po 10 latach = wykup w terminie na rękę, bez opłaty i bez zamiany", [e120w.t, e120w.final, e120w.newCount, r2(e120.final)], [120, true, 0, r2(e120w.proceeds + e120.cash0)]);
 eq("kupno: ROS/ROD bez ceny zamiany — przy wykupie nowe po 100 zł", bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].newCount,
   Math.floor(bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].proceeds / 100));
 eq("kupno: kwota 150 zł → 1 szt. i 50 zł na konto", [bAt(12, "TOS", { amount: 150 }).count, bAt(12, "TOS", { amount: 150 }).cash0], [1, 50]);
@@ -406,6 +423,15 @@ eq("portfel: COI — wykup = 2000 zł + ostatni kupon (CPI 2,5% + 1,5) po podatk
 eq("portfel: OTS — przy zerwaniu 100 zł bez odsetek", hld[2].payout, 1000, 1e-6);
 eq("portfel: OTS — wykup w terminie 10 × 100,50 minus podatek", hld[2].atMaturity, 1005 - 0.95, 1e-6);
 eq("portfel: seria po terminie wykupu oznaczona", hld[3].matured, true);
+eq("portfel: COI — kupony do wykupu: 81 (5%) + 2 × 64,80 (CPI 2,5% + 1,5) po podatku", hld[1].futureCoupons, 81 + 2 * 64.8, 1e-6);
+eq("portfel: COI — łącznie do wykupu = wykup + kupony", hld[1].toMaturity, 2064.8 + 81 + 2 * 64.8, 1e-6);
+eq("portfel: EDO (kapitalizacja) — bez kuponów, łącznie = wykup", [hld[0].futureCoupons, hld[0].toMaturity === hld[0].atMaturity], [0, true]);
+const hPre = Z.holdings({ now: "2026-11", positions: [{ type: "EDO", rate1: 6, margin: 2, fee: 2, purchase: "2025-12", count: 1 }],
+  cpiHistory: { "2026-10": 3.5 }, cpiPrelim: { "2026-10": true }, cpiFuture: [2.5], tax: true }).items[0];
+eq("portfel: stopa z szybkiego szacunku CPI — znana, ale wstępna", [hPre.next.start, hPre.next.known, hPre.next.prelim, r2(hPre.next.rate * 100)], ["2026-12", true, true, 5.5]);
+const hFin = Z.holdings({ now: "2026-11", positions: [{ type: "EDO", rate1: 6, margin: 2, fee: 2, purchase: "2025-12", count: 1 }],
+  cpiHistory: { "2026-10": 3.5 }, cpiFuture: [2.5], tax: true }).items[0];
+eq("portfel: odczyt finalny — stopa nie jest wstępna", hFin.next.prelim, false);
 
 // ---------------------------------------------------------------------------
 // 13. „Jak wypadła seria” (seriesOutcome): 100 zł od emisji do dziś albo do wykupu

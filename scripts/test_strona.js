@@ -40,6 +40,7 @@ const CASES = [
   ["#kupno", "Co kupić — domyślnie", "#b-out .verdict", "§ 5"],
   ["#kupno&kw=25000&h=36&sc=high&sv=5&ike=1&r8=1", "Co kupić — 3 lata, IKE, 800+", "#b-out .verdict", "ROD"],
   ["#kupno&kw=5000&h=6&sc=custom&cpi=3,4&val=h", "Co kupić — pół roku, bez wypłaty", "#b-out .verdict", "bez wypłaty"],
+  ["#kupno&kw=10000&h=60", "Co kupić — 5 lat: notka o momencie wypłaty (rocznica COI)", "#b-out .verdict", "moment wypłaty"],
   ["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", "Kalkulator — EDO", "#z-out .verdict", "Jak to policzono"],
   ["#zamiana&k=COI1129&n=50&tt=EDO&bd=12&ike=1", "Kalkulator — COI w IKE", "#z-out .verdict", "IKE"],
   ["#zamiana&k=DOR0627&n=30&tt=EDO&bd=12", "Kalkulator — DOR (stopa NBP)", "#z-out .verdict", "stopie referencyjnej NBP"],

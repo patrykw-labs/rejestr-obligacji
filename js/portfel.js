@@ -11,7 +11,7 @@ Object.assign(CALC_TIPS,{
   pcpi:"Inflacja w kolejnych latach — tylko do prognoz: oprocentowania okresów, dla których GUS nie opublikował jeszcze odczytu, i wartości przy wykupie.",
   pgross:"Wartość obligacji z odsetkami narosłymi do dnia wyceny, przed opłatą za przedterminowy wykup i podatkiem.",
   ppay:"Ile dostaniesz na konto, gdy zerwiesz obligacje w dniu wyceny: wartość minus opłata (nie mniej niż 100 zł za sztukę; ROR i DOR — stała opłata, OTS — bez odsetek) minus podatek od zysku.",
-  pmat:"Ile dostaniesz przy wykupie w terminie (po podatku), jeśli trzymasz do końca. Okresy, dla których nie ma jeszcze odczytu inflacji lub stopy NBP, liczymy ze scenariusza — to prognoza.",
+  pmat:"Ile dostaniesz, trzymając do wykupu w terminie: wykup (po podatku) plus kupony COI i odsetki ROR/DOR należne do tego czasu (po podatku, bez ich oprocentowania). Okresy bez odczytu inflacji lub stopy NBP liczymy ze scenariusza — to prognoza; stopy z szybkiego szacunku GUS oznaczamy jako wstępne.",
   prate:"Oprocentowanie bieżącego okresu odsetkowego (roku; dla ROR i DOR — miesiąca) i dzień, w którym się kończy."
 });
 const pfNow=()=>calcArchiveNow();
@@ -19,7 +19,7 @@ const pfDate=(ym,pd)=>`${String(Math.min(+pd||1,calcDaysIn(ym))).padStart(2,"0")
 const pfIn=m=>{m=Math.max(0,Math.round(m));const y=Math.floor(m/12),r=m%12;if(!y)return `${r} mies.`;const yt=y===1?"rok":[2,3,4].includes(y%10)&&!(y>=12&&y<=14)?"lata":"lat";return r?`${y} ${yt} i ${r} mies.`:`${y} ${yt}`};
 const pfPct=r=>fmt(r*100)+"%";
 function pfDefaults(){
-  const opts=calcOptions(pfNow()),now=pfNow();
+  const opts=calcOptions(pfNow(),true),now=pfNow();
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0]||"";
   return {pos:pick?[{code:pick,n:100,pd:1}]:[],bd:calcDefaultBreakDay(),acc:"std",sc:"base"};
 }
@@ -59,17 +59,19 @@ function pfCalcHash(s){
   return "zamiana&pf="+pos.map(o=>[o.code,o.n].concat(+o.pd!==1?[o.pd]:[]).join("~")).join(",")+tail;
 }
 function pfNext(s){
-  const opts=calcOptions(pfNow()),used=new Set(s.pos.map(o=>o.code)),types=new Set(s.pos.map(o=>Zamiana.parseCode(o.code)?.type));
+  const opts=calcOptions(pfNow(),true),used=new Set(s.pos.map(o=>o.code)),types=new Set(s.pos.map(o=>Zamiana.parseCode(o.code)?.type));
   const all=CALC_TYPES.flatMap(t=>opts[t]||[]).filter(x=>!used.has(x));
   return all.find(x=>!types.has(Zamiana.parseCode(x).type))||all[0]||"";
 }
 function pfParams(s){
   return {now:pfNow(),breakDay:+s.bd,positions:s.pos.map(o=>{const a=calcFromCode(o.code);return {code:o.code,type:a.type,rate1:+a.r1,margin:+a.m,fee:+a.f,purchase:a.p,purchaseDay:+o.pd||1,count:Math.floor(+o.n)}}),
-    cpiHistory:calcCpiHist(),cpiFuture:[CPI_PRESETS[s.sc].v],nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:calcNbpNow(),tax:s.acc==="std"};
+    cpiHistory:calcCpiHist(),cpiFuture:[CPI_PRESETS[s.sc].v],nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:calcNbpNow(),tax:s.acc==="std",
+    // odczyty CPI z szybkiego szacunku — stopy na ich podstawie są wstępne
+    cpiPrelim:Object.fromEntries(state.months.filter(m=>m.cpiKind==="szybki szacunek"&&m.cpiRefMonth).map(m=>[m.cpiRefMonth,true]))};
 }
 function renderPortfolio(main){
   if(!state.pf){const h=pfFromHash();if(h){state.pf=h;state.pfLink=true}else state.pf=pfLoad()||pfDefaults()}
-  const s=state.pf,now=pfNow(),opts=calcOptions(now);
+  const s=state.pf,now=pfNow(),opts=calcOptions(now,true);
   const undo=viewUndoShown("pf"),isDef=pfHash(s)===pfHash(pfDefaults());
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
   const posHtml=(o,i)=>{const a=calcFromCode(o.code),mat=a?Zamiana.addMonths(a.p,Zamiana.TYPES[a.type].term):null;
@@ -127,15 +129,15 @@ function pfRecompute(){
   let r;try{r=Zamiana.holdings(pfParams(s))}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
   const pd=i=>+s.pos[i].pd||1,live=r.items.map((x,i)=>Object.assign(x,{i,code:s.pos[i].code})).filter(x=>!x.matured&&!x.error);
   const done=r.items.filter(x=>x.matured);
-  const sum=k=>live.reduce((a,x)=>a+x[k],0),gross=sum("gross"),pay=sum("payout"),fee=sum("fee"),tx=sum("breakTax"),mat=sum("atMaturity"),paid=sum("couponsPaid");
-  const tax=s.acc==="std",lastMat=live.map(x=>x.maturity).sort().pop(),anyGuess=live.some(x=>!x.maturityKnown);
+  const sum=k=>live.reduce((a,x)=>a+x[k],0),gross=sum("gross"),pay=sum("payout"),fee=sum("fee"),tx=sum("breakTax"),mat=sum("toMaturity"),matFin=sum("atMaturity"),futC=sum("futureCoupons"),paid=sum("couponsPaid");
+  const tax=s.acc==="std",lastMat=live.map(x=>x.maturity).sort().pop(),anyGuess=live.some(x=>!x.maturityKnown),anyPrelim=live.some(x=>x.maturityPrelim);
   // najbliższe zdarzenia (12 miesięcy): kupony, nowe oprocentowanie, wykupy
   const ev=[];const within=ym=>Zamiana.monthsBetween(now,ym)<=12;
   for(const x of live){const t=x.spec.type,nbp=calcIsNbp(t);
     if(within(x.maturity))ev.push({ym:x.maturity,d:pd(x.i),code:x.code,kind:"wykup",text:`wykup w terminie: ok. ${zl0(x.atMaturity)}${tax?" na rękę (po podatku)":""}`});
     if(x.coupon&&x.coupon.ym!==x.maturity&&within(x.coupon.ym))ev.push({ym:x.coupon.ym,d:pd(x.i),code:x.code,kind:"kupon",text:`${nbp?"odsetki za miesiąc":"kupon"}: ${zl2(x.coupon.net)}${tax?" na rękę":""} (${pfPct(x.rateNow)})${nbp?" — dalej co miesiąc":""}`});
     if(x.next&&within(x.next.start)){const n=x.next;const why=nbp?`stopa NBP ${fmt(n.basis)}% + marża ${fmt(x.spec.margin)} p.p.${n.known?"":" — jeśli stopa się nie zmieni"}`:
-        t==="TOS"||t==="OTS"?"stałe":(n.known?`inflacja za ${mShort(n.basisMonth)}: ${fmt(Math.max(n.basis,0),1)}% + marża ${fmt(x.spec.margin)} p.p.`:`prognoza: inflacja ${fmt(CPI_PRESETS[s.sc].v,1)}% + marża ${fmt(x.spec.margin)} p.p. (GUS poda odczyt za ${mShort(n.basisMonth)})`);
+        t==="TOS"||t==="OTS"?"stałe":(n.known?`inflacja za ${mShort(n.basisMonth)}: ${fmt(Math.max(n.basis,0),1)}%${n.prelim?" (szybki szacunek GUS — wstępnie)":""} + marża ${fmt(x.spec.margin)} p.p.`:`prognoza: inflacja ${fmt(CPI_PRESETS[s.sc].v,1)}% + marża ${fmt(x.spec.margin)} p.p. (GUS poda odczyt za ${mShort(n.basisMonth)})`);
       if(Math.abs(n.rate-x.rateNow)>1e-9||!nbp)ev.push({ym:n.start,d:pd(x.i),code:x.code,kind:"stopa",text:`od tego dnia ${pfPct(n.rate)} zamiast ${pfPct(x.rateNow)} (${why})`});}}
   ev.sort((a,b)=>a.ym===b.ym?a.d-b.d:a.ym<b.ym?-1:1);
   const evHtml=ev.length?`<ul class="evlist">${ev.map(e=>`<li><span class="num"><b>${pfDate(e.ym,e.d)}</b></span> <b>${esc(e.code)}</b> — ${esc(e.text)}</li>`).join("")}</ul>`:`<p class="small">W ciągu 12 miesięcy nie ma kuponów, wykupów ani zmian oprocentowania.</p>`;
@@ -144,7 +146,7 @@ function pfRecompute(){
     <div class="stats">
       <div class="stat t-acc"><span class="k">Wartość ${s.bd==calcDefaultBreakDay()?"dziś":"na "+pfDate(now,s.bd)}${calcTip("pgross")}</span><span class="v">${zl0(gross)}</span><span class="s">z narosłymi odsetkami, przed opłatą i podatkiem${paid>0.005?`; do tego odsetki wypłacone dotąd: <b>${zl0(paid)}</b>`:""}</span></div>
       <div class="stat t-green"><span class="k">Na rękę po zerwaniu${calcTip("ppay")}</span><span class="v v-green">${zl0(pay)}</span><span class="s">opłaty ${zl0(fee)}${tax?`, podatek ${zl0(tx)}`:" (bez podatku)"} — koszt zerwania <b>${zl0(gross-pay)}</b></span></div>
-      <div class="stat t-gold"><span class="k">Przy wykupie w terminie${calcTip("pmat")}</span><span class="v">${zl0(mat)}</span><span class="s">${live.length>1?`ostatni wykup ${mShort(lastMat)}`:`wykup ${lastMat?mShort(lastMat):"–"}`}${anyGuess?` · prognoza przy inflacji ${fmt(CPI_PRESETS[s.sc].v,1)}%`:""}${tax?" · po podatku":""}</span></div>
+      <div class="stat t-gold"><span class="k">Przy wykupie w terminie${calcTip("pmat")}</span><span class="v">${zl0(mat)}</span><span class="s">${futC>0.005?`wykup <b>${zl0(matFin)}</b> + kupony i odsetki do wykupu <b>${zl0(futC)}</b> · `:""}${live.length>1?`ostatni wykup ${mShort(lastMat)}`:`wykup ${lastMat?mShort(lastMat):"–"}`}${anyGuess?` · prognoza przy inflacji ${fmt(CPI_PRESETS[s.sc].v,1)}%`:anyPrelim?" · stopy częściowo wstępne (szybki szacunek GUS)":""}${tax?" · po podatku":""}</span></div>
       <div class="stat t-red"><span class="k">Najbliższe zdarzenie</span><span class="v sm">${first?pfDate(first.ym,first.d):"–"}</span><span class="s">${first?`<b>${esc(first.code)}</b> — ${esc({wykup:"wykup w terminie",kupon:"wypłata odsetek",stopa:"nowe oprocentowanie"}[first.kind])}`:"brak w ciągu roku"}</span></div>
     </div>
     ${done.length?`<div class="insight warn"><span class="t">po terminie wykupu</span>${done.map(x=>esc(s.pos[r.items.indexOf(x)].code)).join(", ")} — wykupione ${done.length===1?"w":"przed"} ${esc(mLabel(now))}; nie liczymy ${done.length===1?"jej":"ich"} do sumy.</div>`:""}
@@ -153,7 +155,7 @@ function pfRecompute(){
       ${live.map(x=>`<tr><td><span class="dot" style="background:var(--s-${x.spec.type})"></span><span class="code">${esc(x.code)}</span></td><td class="r num">${x.spec.count}</td><td>${pfDate(x.spec.purchase,pd(x.i))}</td><td>${pfDate(x.maturity,pd(x.i))}<br><span class="small">za ${pfIn(x.monthsToMaturity)}</span></td>
         <td><b>${pfPct(x.rateNow)}</b><br><span class="small">${Zamiana.TYPES[x.spec.type].term>(calcIsNbp(x.spec.type)?1:12)&&x.next?`do ${pfDate(x.periodEnd,pd(x.i))}`:"do wykupu"}</span></td>
         <td class="r num">${zl2(x.gross)}${x.couponsPaid>0.005?`<br><span class="small">+ wypłacone ${zl0(x.couponsPaid)}</span>`:""}</td><td class="r num"><b>${zl2(x.payout)}</b><br><span class="small">${x.fee>0?`opłata ${zl2(x.fee)}`:"bez opłaty"}${x.breakTax>0?`, podatek ${zl2(x.breakTax)}`:""}</span></td>
-        <td class="r num">${zl0(x.atMaturity)}${x.maturityKnown?"":`<br><span class="small">prognoza</span>`}</td></tr>`).join("")}
+        <td class="r num">${zl0(x.toMaturity)}${x.futureCoupons>0.005?`<br><span class="small">w tym kupony ${zl0(x.futureCoupons)}</span>`:""}${x.maturityKnown?(x.maturityPrelim?`<br><span class="small">wstępnie</span>`:""):`<br><span class="small">prognoza</span>`}</td></tr>`).join("")}
       ${live.length>1?`<tr class="sum"><td><b>Razem</b></td><td class="r num">${live.reduce((a,x)=>a+x.spec.count,0)}</td><td></td><td></td><td></td><td class="r num"><b>${zl2(gross)}</b></td><td class="r num"><b>${zl2(pay)}</b></td><td class="r num"><b>${zl0(mat)}</b></td></tr>`:""}
       </tbody></table></div></div>
     <div class="card"><h3>Najbliższe 12 miesięcy <small>kupony, nowe oprocentowanie, wykupy</small></h3>${evHtml}</div>
@@ -162,7 +164,7 @@ function pfRecompute(){
       <li>Wartość na ${esc(pfDate(now,s.bd))}: 100 zł × kolejne okresy odsetkowe (kapitalizacja roczna w EDO, ROS, ROD, TOS) plus odsetki narosłe w bieżącym okresie, liczone od dnia zakupu co do dnia. W COI, ROR i DOR odsetki z zakończonych okresów zostały już wypłacone („wypłacone dotąd” — po podatku, bez oprocentowania).</li>
       <li>Na rękę po zerwaniu: wartość minus opłata za przedterminowy wykup (nie wyższa niż narosłe odsetki — wypłata nie mniej niż 100 zł za sztukę; ROR i DOR od 2. miesiąca: stała opłata; OTS: 100 zł bez odsetek)${tax?", minus 19% podatku od zysku":"; w IKE / IKZE bez podatku (przy wypłacie z konta opłata za wykup nie jest pobierana — tu pokazujemy zerwanie w ramach konta)"}.</li>
       <li>Oprocentowanie z listów emisyjnych. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt GUS za P−2) + marża; ROR i DOR — stopa referencyjna NBP + marża. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||now)} z archiwum, dalej scenariusz: inflacja ${fmt(CPI_PRESETS[s.sc].v,1)}%, stopa NBP ${fmt(calcNbpNow())}% (bez zmian).</li>
-      <li>Wykup w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki)${tax?" po podatku":""}; bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej.</li>
+      <li>Przy wykupie w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki) plus kupony i odsetki należne od dziś do wykupu${tax?", wszystko po podatku":""}; bez ich oprocentowania na koncie, bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej. Stopy liczone z szybkiego szacunku CPI oznaczamy jako wstępne — odczyt finalny GUS może się nieco różnić.</li>
       <li>To wycena orientacyjna, nie wyciąg z rachunku. Wiążące są listy emisyjne i dane w serwisie, w którym kupiłeś obligacje.</li>
     </ul></details>
     ${exportRowHtml("p",false,"serie i zdarzenia CSV")}
@@ -171,10 +173,10 @@ function pfRecompute(){
   $("#p-calc").addEventListener("click",e=>{e.preventDefault();state.calc=null;try{history.replaceState(null,"","#"+calcH)}catch(_){}state.view="zamiana";
     document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view==="zamiana")));render();scrollTo(0,0)});
   $("#p-csv").addEventListener("click",()=>{
-    const rows=live.map(x=>[x.code,x.spec.count,pfDate(x.spec.purchase,pd(x.i)),pfDate(x.maturity,pd(x.i)),csvNum(x.rateNow*100),pfDate(x.periodEnd,pd(x.i)),csvNum(x.gross),csvNum(x.fee),csvNum(x.breakTax),csvNum(x.payout),csvNum(x.couponsPaid),csvNum(x.atMaturity),x.maturityKnown?"znana":"prognoza"]);
-    if(live.length>1)rows.push(["Razem",live.reduce((a,x)=>a+x.spec.count,0),"","","","",csvNum(gross),csvNum(fee),csvNum(tx),csvNum(pay),csvNum(paid),csvNum(mat),""]);
+    const rows=live.map(x=>[x.code,x.spec.count,pfDate(x.spec.purchase,pd(x.i)),pfDate(x.maturity,pd(x.i)),csvNum(x.rateNow*100),pfDate(x.periodEnd,pd(x.i)),csvNum(x.gross),csvNum(x.fee),csvNum(x.breakTax),csvNum(x.payout),csvNum(x.couponsPaid),csvNum(x.atMaturity),csvNum(x.futureCoupons),csvNum(x.toMaturity),x.maturityKnown?(x.maturityPrelim?"wstępna":"znana"):"prognoza"]);
+    if(live.length>1)rows.push(["Razem",live.reduce((a,x)=>a+x.spec.count,0),"","","","",csvNum(gross),csvNum(fee),csvNum(tx),csvNum(pay),csvNum(paid),csvNum(matFin),csvNum(futC),csvNum(mat),""]);
     const evs=[[],["Data","Seria","Zdarzenie"],...ev.map(e=>[pfDate(e.ym,e.d),e.code,e.text])];
-    downloadCsv(`moj-portfel-${now}-${String(s.bd).padStart(2,"0")}.csv`,["Seria","Szt.","Zakup","Wykup","Oprocentowanie (%)","Koniec okresu","Wartość (zł)","Opłata przy zerwaniu (zł)","Podatek przy zerwaniu (zł)","Na rękę po zerwaniu (zł)","Odsetki wypłacone dotąd (zł)","Wykup w terminie (zł)","Wykup"],rows.concat(evs),
+    downloadCsv(`moj-portfel-${now}-${String(s.bd).padStart(2,"0")}.csv`,["Seria","Szt.","Zakup","Wykup","Oprocentowanie (%)","Koniec okresu","Wartość (zł)","Opłata przy zerwaniu (zł)","Podatek przy zerwaniu (zł)","Na rękę po zerwaniu (zł)","Odsetki wypłacone dotąd (zł)","Wykup w terminie (zł)","Kupony do wykupu (zł)","Łącznie do wykupu (zł)","Wartość przy wykupie"],rows.concat(evs),
       [["Wycena na",pfDate(now,s.bd)],["Rachunek",tax?"zwykły (podatek Belki)":"IKE / IKZE (bez podatku Belki)"],["Inflacja dalej (prognozy)",fmt(CPI_PRESETS[s.sc].v,1)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — wycena orientacyjna"]])});
   calcBindShare();calcBindTips(out);
 }
