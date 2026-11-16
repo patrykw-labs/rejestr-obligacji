@@ -4,8 +4,13 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+## v1.5.1 — 2026-11-16
+
+Wklejanie tabeli posiadanych obligacji z rachunku w „Mój portfel” i drobne poprawki tego widoku.
+
 - „Mój portfel”: „Wklej z rachunku” — tabela posiadanych obligacji skopiowana ze „Stanu rachunku rejestrowego” (albo z jego eksportu do arkusza): kod serii, liczba sztuk (dostępne + zablokowane) i dzień zakupu z daty wykupu; podgląd przed wczytaniem, pominięte wiersze z powodem, wczytanie można cofnąć; tekst zostaje w przeglądarce. „Wczytaj z pliku” przyjmuje też taką tabelę zapisaną jako tekst, CSV lub HTML; przy pliku Excela — wskazówka, jak go skopiować. Dymki „?” przy obu przyciskach opisują, skąd wziąć tabelę i co robi wczytanie pliku.
 - „Mój portfel”: na liście są też serie kupione w bieżącym miesiącu (zakup po dniu wyceny — komunikat); szersze pole liczby sztuk (mieści 4 cyfry).
+
 ## v1.5.0 — 2026-11-16
 
 Portfel w pliku i w kalendarzu, zakup za pieniądze z wykupu, faktyczne oprocentowanie 2. roku na wykresie, wersja strony w pasku i kontrola CPI z tablicą GUS.
