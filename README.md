@@ -35,7 +35,7 @@ Wyniki kalkulatora zamiany i „Co kupić?” można pobrać: wykres jako PNG, t
 - `scripts/validate.py`: walidacja schematu i statusów weryfikacji
 - `js/zamiana.js`: silnik kalkulatora zamiany; `scripts/test_zamiana.js`: jego testy (m.in. zgodność z niezależnym arkuszem kontrolnym i z zasadami z listów emisyjnych); `scripts/test_strona.js`: test strony w przeglądarce (wszystkie zakładki i linki kalkulatora, komputer i telefon). Wszystko uruchamiane w GitHub Actions
 - `.github/workflows/validate.yml`: uruchamia walidację po każdej zmianie danych
-- `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP, a 20. dnia sprawdza też, czy szybki szacunek CPI zastąpiono odczytem finalnym GUS; przy rozbieżności przebieg kończy się błędem
+- `scripts/check_offer.py` i `.github/workflows/check-offer.yml`: 5. dnia miesiąca porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i stopą NBP, a 20. dnia sprawdza też, czy szybki szacunek CPI zastąpiono odczytem finalnym GUS; wartości CPI r/r i zmiany cen od grudnia (rekord miesiąca i całe archiwum) porównuje z tablicą GUS (`scripts/test_check_offer.py` — test bez sieci); przy rozbieżności przebieg kończy się błędem
 - `assets/`: grafiki (baner)
 - `CHANGELOG.md`: historia zmian (sekcje są też notatkami do wydań na GitHubie)
 - `.claude/CLAUDE.md`: instrukcje dla Claude Code, w tym procedura dopisywania miesiąca
@@ -46,7 +46,7 @@ Dane aktualizują się automatycznie:
 
 - **4. dnia miesiąca** zadanie w chmurze (Claude Code) dopisuje rekord nowej oferty: każdą serię sprawdza w liście emisyjnym, dodaje stopę referencyjną NBP z 1. dnia miesiąca i szybki szacunek CPI z GUS, a w poprzednim rekordzie zamienia szybki szacunek na odczyt finalny. Po walidacji (`scripts/validate.py`) robi commit `oferta RRRR-MM`.
 - **17. dnia miesiąca** to samo zadanie zamienia szybki szacunek CPI w bieżącym rekordzie na odczyt finalny GUS (commit `CPI RRRR-MM finalny`).
-- **5. i 20. dnia miesiąca** GitHub Actions (`scripts/check_offer.py`) porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i archiwum stóp NBP, a od 18. dnia sprawdza, czy CPI jest już finalne. Przy rozbieżności przebieg kończy się błędem.
+- **5. i 20. dnia miesiąca** GitHub Actions (`scripts/check_offer.py`) porównuje rekord bieżącego miesiąca z ofertą, listami emisyjnymi i archiwum stóp NBP, a od 18. dnia sprawdza, czy CPI jest już finalne; wartości CPI w całym archiwum porównuje z tablicą GUS. Przy rozbieżności przebieg kończy się błędem.
 
 Ręcznie (np. gdy zadanie się nie powiodło): w folderze repozytorium napisz Claude Code „dopisz nowy miesiąc” albo „podmień CPI na finalny”. Procedury są opisane w [`.claude/CLAUDE.md`](.claude/CLAUDE.md).
 
