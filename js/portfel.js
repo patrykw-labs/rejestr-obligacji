@@ -5,6 +5,8 @@ const PF_MAX=20;
 const PF_ACC=[["std","Zwykły (podatek Belki)"],["ike","IKE / IKZE"]];
 Object.assign(CALC_TIPS,{
   pcode:"Seria, którą masz. Oprocentowanie, marża i opłata uzupełnią się z jej listu emisyjnego.",
+  ppaste_btn:"Szybkie uzupełnienie portfela z rachunku obligacji skarbowych. Zaloguj się na stronie zakupu obligacji, otwórz zakładkę „Stan rachunku rejestrowego”, zaznacz tabelę z seriami i skopiuj ją (Ctrl+C) — albo wyeksportuj ją do XLS, otwórz plik w arkuszu i skopiuj wiersze. Wklej tutaj: zobaczysz podgląd serii, liczby sztuk i dnia zakupu (bierzemy go z daty wykupu). Wczytanie zastępuje wpisane serie i można je cofnąć. Tekst nie opuszcza przeglądarki.",
+  pfile_btn:"Wczytuje portfel zapisany wcześniej przyciskiem „portfel (.json)” na dole wyniku — np. żeby przenieść go z komputera na telefon albo odtworzyć po wyczyszczeniu przeglądarki. Przyjmuje też tabelę z rachunku zapisaną jako tekst lub CSV. Pliku Excela (.xls, .xlsx) przeglądarka nie odczyta — otwórz go w arkuszu, skopiuj tabelę i użyj „Wklej z rachunku”.",
   ppaste:"Tabela posiadanych obligacji skopiowana z rachunku: w każdym wierszu kod serii (np. EDO1036), liczba sztuk i data wykupu. Sztuki zablokowane doliczamy do dostępnych. Kolumny mogą być rozdzielone tabulatorami, średnikami albo spacjami; kwoty nie są potrzebne.",
   ppd:"Dzień miesiąca zakupu. Od niego biegną okresy odsetkowe: rocznice (miesięcznice dla ROR i DOR), kupony i wykup.",
   pbd:"Dzień, na który liczymy wartość. Domyślnie dziś. Przy zerwaniu odsetki biegną do dnia wykupu — ok. 5 dni roboczych po dyspozycji.",
@@ -146,7 +148,7 @@ function renderPortfolio(main){
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}
-        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span><button type="button" class="btn" id="p-paste-open" aria-expanded="${!!state.pfPaste}" aria-controls="p-paste-box" title="Wklej tabelę posiadanych obligacji skopiowaną z rachunku">Wklej z rachunku</button><button type="button" class="btn" id="p-load-file" title="Wczytaj portfel zapisany wcześniej do pliku (.json) albo tabelę z rachunku zapisaną jako tekst lub CSV">Wczytaj z pliku</button><input type="file" id="p-file" accept=".json,application/json,.csv,.txt,.tsv,.htm,.html,.xls,.xlsx" hidden></div>
+        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span><button type="button" class="btn" id="p-paste-open" aria-expanded="${!!state.pfPaste}" aria-controls="p-paste-box" >Wklej z rachunku</button>${calcTip("ppaste_btn")}<button type="button" class="btn" id="p-load-file" >Wczytaj z pliku</button>${calcTip("pfile_btn")}<input type="file" id="p-file" accept=".json,application/json,.csv,.txt,.tsv,.htm,.html,.xls,.xlsx" hidden></div>
         ${pfPasteHtml()}
         <p class="small" id="p-store">${pfStoreNote()}</p></div>
       <div class="card"><h3>Wycena</h3>
@@ -174,7 +176,7 @@ function renderPortfolio(main){
     if(f.size>500000)return fail("Plik jest za duży jak na portfel (ponad 500 KB).");
     let buf;try{buf=new Uint8Array(await f.arrayBuffer())}catch(err){return fail("Nie udało się odczytać pliku.")}
     const hex=Array.from(buf.slice(0,4),b=>b.toString(16).padStart(2,"0")).join("");
-    if(hex==="d0cf11e0"||hex==="504b0304")return fail("To plik arkusza (Excel), którego nie odczytamy w przeglądarce. Otwórz go, zaznacz tabelę, skopiuj i wklej w „Wklej z rachunku”.");
+    if(hex==="d0cf11e0"||hex==="504b0304")return fail(`${f.name} to plik Excela — tego formatu nie odczytamy w przeglądarce. Otwórz go w arkuszu (Excel, LibreOffice, Arkusze Google), zaznacz tabelę z seriami, skopiuj (Ctrl+C) i wklej w „Wklej z rachunku” powyżej.`);
     let text=new TextDecoder("utf-8").decode(buf);if(text.includes("\ufffd"))text=new TextDecoder("windows-1250").decode(buf);
     if(/^\s*\{/.test(text)){const r=pfParseFile(text);if(r.error)return fail(r.error);return pfApplyImport(main,r.state.pos,{skipped:r.skipped,name:f.name,acc:r.state.acc,sc:r.state.sc})}
     const r=pfFromRegister(/<t[dh][\s>]/i.test(text)?pfHtmlToText(text):text);
