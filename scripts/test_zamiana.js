@@ -426,6 +426,11 @@ eq("portfel: seria po terminie wykupu oznaczona", hld[3].matured, true);
 eq("portfel: COI — kupony do wykupu: 81 (5%) + 2 × 64,80 (CPI 2,5% + 1,5) po podatku", hld[1].futureCoupons, 81 + 2 * 64.8, 1e-6);
 eq("portfel: COI — łącznie do wykupu = wykup + kupony", hld[1].toMaturity, 2064.8 + 81 + 2 * 64.8, 1e-6);
 eq("portfel: EDO (kapitalizacja) — bez kuponów, łącznie = wykup", [hld[0].futureCoupons, hld[0].toMaturity === hld[0].atMaturity], [0, true]);
+const schC = hld[1].schedule;
+eq("portfel: harmonogram COI — 3 kupony, 3 zmiany oprocentowania, wykup", [schC.filter((e) => e.kind === "kupon").length, schC.filter((e) => e.kind === "stopa").length, schC.filter((e) => e.kind === "wykup").length], [3, 3, 1]);
+eq("portfel: harmonogram COI — 1. kupon 01.2027 po podatku, nowa stopa od 01.2027", [schC[0].ym, schC[0].kind, schC[0].amount, schC[1].kind, r2(schC[1].rate * 100), schC[1].known], ["2027-01", "kupon", 81, "stopa", 4, false]);
+eq("portfel: harmonogram COI — wykup na końcu, kwota = wykup w terminie", [schC[schC.length - 1].ym, schC[schC.length - 1].amount], ["2030-01", hld[1].atMaturity]);
+eq("portfel: harmonogram OTS — tylko wykup", hld[2].schedule.map((e) => e.kind), ["wykup"]);
 const hPre = Z.holdings({ now: "2026-11", positions: [{ type: "EDO", rate1: 6, margin: 2, fee: 2, purchase: "2025-12", count: 1 }],
   cpiHistory: { "2026-10": 3.5 }, cpiPrelim: { "2026-10": true }, cpiFuture: [2.5], tax: true }).items[0];
 eq("portfel: stopa z szybkiego szacunku CPI — znana, ale wstępna", [hPre.next.start, hPre.next.known, hPre.next.prelim, r2(hPre.next.rate * 100)], ["2026-12", true, true, 5.5]);

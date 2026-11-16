@@ -4,6 +4,8 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- „Mój portfel”: kalendarz `.ics` z kuponami COI, odsetkami ROR/DOR, zmianami oprocentowania i wykupami każdej serii do terminu (z przypomnieniem dzień przed wykupem; kwoty prognozowane i wstępne oznaczone jak w widoku) — do zaimportowania w telefonie lub komputerze.
+- Wersja strony w pasku górnym (na telefonie w stopce): wydanie z `CHANGELOG.md` oraz liczba commitów na `main` po wydaniu i skrót ostatniego commita (np. „v1.4.0 +3 · a279333”, link do zmian na GitHubie); bez odpowiedzi API GitHuba — samo wydanie.
 ## v1.4.0 — 2026-11-16
 
 Poprawki obliczeń po zewnętrznym przeglądzie, łatwiejsza obsługa strony i czcionka z własnego serwera.

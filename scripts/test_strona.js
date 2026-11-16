@@ -189,7 +189,7 @@ const CASES = [
   }
   // eksport: PNG wykresu i CSV tabeli (komputer) oraz kanał Atom
   const DL = [["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12", ["z-png", "z-csv"]], ["#zamiana&pf=EDO0434~100~15,COI1129~50~20&tt=EDO&bd=12", ["z-png", "z-csv"]],
-    ["#kupno", ["b-png", "b-csv"]], ["#portfel&pf=EDO0434~100~15,COI1129~50~20&bd=12", ["p-csv"]]];
+    ["#kupno", ["b-png", "b-csv"]], ["#portfel&pf=EDO0434~100~15,COI1129~50~20&bd=12", ["p-csv", "p-ics"]]];
   for (const [hash, ids] of DL) {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
     const page = await ctx.newPage();
@@ -205,6 +205,13 @@ const CASES = [
         const buf = fs.readFileSync(await d.path());
         if (id.endsWith("png") && buf.slice(1, 4).toString() !== "PNG") problem = "plik nie jest PNG";
         if (id.endsWith("png") && buf.length < 20000) problem = `PNG za mały (${buf.length} B)`;
+        if (id.endsWith("ics")) {
+          const t = buf.toString("utf8"), lines = t.split("\r\n");
+          if (!t.startsWith("BEGIN:VCALENDAR\r\n") || !t.trimEnd().endsWith("END:VCALENDAR")) problem = "plik .ics bez VCALENDAR";
+          else if (lines.some((l) => Buffer.byteLength(l, "utf8") > 75)) problem = "wiersz .ics dłuższy niż 75 bajtów";
+          else if ((t.match(/BEGIN:VEVENT/g) || []).length < 5 || !/Wykup|wykup/.test(t) || !/BEGIN:VALARM/.test(t)) problem = "za mało wydarzeń w .ics albo brak wykupu/przypomnienia";
+          else if (/\n(?!\s)/.test(t.replace(/\r\n/g, ""))) problem = "znak nowej linii bez CR w .ics";
+        }
         if (id.endsWith("csv") && !(buf[0] === 0xef && buf.toString("utf8").split("\n").length > 3 && buf.toString("utf8").includes(";"))) problem = "zły CSV";
       } catch (e) { problem = e.message.split("\n")[0]; }
       if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
@@ -298,6 +305,24 @@ const CASES = [
       if (await page.$("#peek")) problem = "pasek zostaje po zmianie zakładki";
     } catch (e) { problem = e.message.split("\n")[0]; }
     if (problem) { fail++; console.log(`✗ skrót do wyniku ${hash}: ${problem}`); } else pass++;
+    await ctx.close();
+  }
+  // wersja strony: bez sieci — wydanie z CHANGELOG.md; z odpowiedzią API GitHuba — commity po wydaniu i skrót commita
+  for (const [label, mock, re] of [["bez API", false, /^wersja v\d+\.\d+\.\d+\+?$/], ["z API", true, /^wersja v\d+\.\d+\.\d+ \+2 · abcdef1$/]]) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await ctx.newPage();
+    await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    if (mock) await page.route(/^https:\/\/api\.github\.com\//, (r) => r.fulfill({ status: 200, contentType: "application/json",
+      body: JSON.stringify(/compare/.test(r.request().url()) ? { ahead_by: 2 } : { object: { sha: "abcdef1234567890" } }) }));
+    let problem = null;
+    try {
+      await page.goto(base + "#oferta");
+      await page.waitForSelector("#ver-foot:not([hidden])", { timeout: 10000 });
+      const [foot, top, vis] = await page.evaluate(() => [document.querySelector("#ver-foot a").textContent, document.querySelector("#ver").textContent, !document.querySelector("#ver").hidden]);
+      if (!re.test(foot)) problem = "stopka: " + foot;
+      else if (!vis || "wersja " + top !== foot) problem = "pasek górny: " + top;
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (problem) { fail++; console.log(`✗ wersja strony (${label}): ${problem}`); } else pass++;
     await ctx.close();
   }
   // zakładki z klawiatury: strzałka w prawo przełącza widok, aktywna zakładka ma tabindex 0

@@ -173,11 +173,27 @@ function pfRecompute(){
       <li>Przy wykupie w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki) plus kupony i odsetki należne od dziś do wykupu${tax?", wszystko po podatku":""}; bez ich oprocentowania na koncie, bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej. Stopy liczone z szybkiego szacunku CPI oznaczamy jako wstępne — odczyt finalny GUS może się nieco różnić.</li>
       <li>To wycena orientacyjna, nie wyciąg z rachunku. Wiążące są listy emisyjne i dane w serwisie, w którym kupiłeś obligacje.</li>
     </ul></details>
-    ${exportRowHtml("p",false,"serie i zdarzenia CSV")}
+    <div class="row"><span class="small">Pobierz:</span><button type="button" class="btn" id="p-csv" data-goatcounter-click="eksport-csv-p">serie i zdarzenia CSV</button><button type="button" class="btn" id="p-ics" data-goatcounter-click="eksport-ics-p" title="Kupony, odsetki, nowe oprocentowanie i wykupy do kalendarza w telefonie lub komputerze">kalendarz (.ics)</button></div>
     ${calcShareHtml}
   </div>`;
   $("#p-calc").addEventListener("click",e=>{e.preventDefault();state.calc=null;try{history.replaceState(null,"","#"+calcH)}catch(_){}state.view="zamiana";
     document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view==="zamiana")));render();scrollTo(0,0)});
+  // kalendarz: harmonogram każdej serii do wykupu (od dnia wyceny); kwoty prognozowane i wstępne oznaczone jak w widoku
+  $("#p-ics").addEventListener("click",()=>{
+    const today=`${now}-${String(s.bd).padStart(2,"0")}`,day=(ym,d)=>`${ym}-${String(Math.min(d,calcDaysIn(ym))).padStart(2,"0")}`;
+    const mark=k=>k==="prelim"?" (wstępnie)":k?"":" (prognoza)",src="Szacunek z Rejestru ofert obligacji (patrykw-labs.github.io/rejestr-obligacji) — wiążące są listy emisyjne. Portfel: "+location.href;
+    const evs=[];
+    for(const x of live){const t=x.spec.type,nbp=calcIsNbp(t),d=pd(x.i);
+      for(const e of x.schedule){const date=day(e.ym,d);if(date<today)continue;
+        const base={date,uid:`${x.code}-${d}-${e.ym}-${e.kind}@rejestr-obligacji`};
+        if(e.kind==="kupon")evs.push(Object.assign(base,{summary:`${x.code}: ${nbp?"odsetki":"kupon"} ${zl2(e.amount)}${tax?" na rękę":""}${mark(e.known)}`,
+          description:`${x.spec.count} szt. ${x.code}, ${nbp?"miesiąc":"rok"} ${e.period}: oprocentowanie ${pfPct(e.rate)}, ${nbp?"odsetki":"kupon"} ${zl2(e.amount)}${tax?" po podatku":""}. ${src}`}));
+        else if(e.kind==="stopa")evs.push(Object.assign(base,{summary:`${x.code}: nowe oprocentowanie ${pfPct(e.rate)}${mark(e.known)}`,
+          description:`${x.code} od tego dnia ${pfPct(e.rate)} zamiast ${pfPct(e.prev)} (${nbp?"miesiąc":"rok"} ${e.period}${nbp?"; stopa NBP + marża":"; inflacja + marża"}${e.known?"":", prognoza przy inflacji "+fmt(CPI_PRESETS[s.sc].v,1)+"%"}). ${src}`}));
+        else evs.push(Object.assign(base,{alarm:true,summary:`${x.code}: wykup w terminie — ok. ${zl0(e.amount)}${tax?" na rękę":""}${mark(e.known)}`,
+          description:`Wykup ${x.spec.count} szt. ${x.code} w terminie: ok. ${zl2(e.amount)}${tax?" po podatku":""}. Pieniądze możesz zamienić na nowe obligacje po cenie zamiany. ${src}`}));}}
+    evs.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+    downloadIcs(`moj-portfel-${now}-${String(s.bd).padStart(2,"0")}.ics`,"Mój portfel obligacji",evs)});
   $("#p-csv").addEventListener("click",()=>{
     const rows=live.map(x=>[x.code,x.spec.count,pfDate(x.spec.purchase,pd(x.i)),pfDate(x.maturity,pd(x.i)),csvNum(x.rateNow*100),pfDate(x.periodEnd,pd(x.i)),csvNum(x.gross),csvNum(x.fee),csvNum(x.breakTax),csvNum(x.payout),csvNum(x.couponsPaid),csvNum(x.atMaturity),csvNum(x.futureCoupons),csvNum(x.toMaturity),x.maturityKnown?(x.maturityPrelim?"wstępna":"znana"):"prognoza"]);
     if(live.length>1)rows.push(["Razem",live.reduce((a,x)=>a+x.spec.count,0),"","","","",csvNum(gross),csvNum(fee),csvNum(tx),csvNum(pay),csvNum(paid),csvNum(matFin),csvNum(futC),csvNum(mat),""]);

@@ -60,6 +60,24 @@ function pngWatermark(ctx,cx,cy,span,col,font){
   ctx.restore();
 }
 async function downloadChartPng(chartEl,name,title,subtitle){try{downloadBlob(await chartPngBlob(chartEl,title,subtitle),name)}catch(e){alert(e.message)}}
+// kalendarz iCalendar (RFC 5545): wydarzenia całodniowe {date:"RRRR-MM-DD", summary, description, uid, alarm(bool)};
+// CRLF, wiersze zawijane do 75 bajtów UTF-8 (bez dzielenia znaku), znaki specjalne cytowane; alarm — przypomnienie dzień wcześniej o 9:00
+const icsEsc=t=>String(t??"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
+function icsFold(line){const enc=new TextEncoder();if(enc.encode(line).length<=75)return line;
+  const out=[];let cur="",len=0;for(const ch of line){const b=enc.encode(ch).length,lim=out.length?74:75;if(len+b>lim){out.push(cur);cur="";len=0}cur+=ch;len+=b}
+  out.push(cur);return out.join("\r\n ")}
+function icsText(calName,events){
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,""),d8=d=>d.replace(/-/g,"");
+  const next=d=>{const t=new Date(d+"T00:00:00Z");t.setUTCDate(t.getUTCDate()+1);return t.toISOString().slice(0,10)};
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Rejestr ofert obligacji//Moj portfel//PL","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:"+icsEsc(calName)];
+  for(const e of events){L.push("BEGIN:VEVENT","UID:"+e.uid,"DTSTAMP:"+stamp,"DTSTART;VALUE=DATE:"+d8(e.date),"DTEND;VALUE=DATE:"+d8(next(e.date)),
+    "SUMMARY:"+icsEsc(e.summary),"DESCRIPTION:"+icsEsc(e.description),"TRANSP:TRANSPARENT");
+    if(e.alarm)L.push("BEGIN:VALARM","ACTION:DISPLAY","TRIGGER:-PT15H","DESCRIPTION:"+icsEsc(e.summary),"END:VALARM");
+    L.push("END:VEVENT")}
+  L.push("END:VCALENDAR");
+  return L.map(icsFold).join("\r\n")+"\r\n";
+}
+const downloadIcs=(name,calName,events)=>downloadBlob(new Blob([icsText(calName,events)],{type:"text/calendar;charset=utf-8"}),name);
 // przyciski eksportu (prefix id: z, b, p); png=false — tylko CSV
 const exportRowHtml=(p,png=true,csvLabel="tabela CSV")=>`<div class="row"><span class="small">Pobierz:</span>${png?`<button type="button" class="btn" id="${p}-png" data-goatcounter-click="eksport-png-${p}">wykres PNG</button>`:""}<button type="button" class="btn" id="${p}-csv" data-goatcounter-click="eksport-csv-${p}">${csvLabel}</button></div>`;
 const fileSafe=t=>String(t).normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ł/g,"l").replace(/Ł/g,"L").replace(/[^A-Za-z0-9.-]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");

@@ -555,8 +555,18 @@
       // kupony (COI) i odsetki (ROR, DOR) należne od bieżącego okresu do przedostatniego — po podatku; ostatni jest w atMaturity
       let futureCoupons = 0;
       if (t.coupon) for (let i = k; i < last; i++) { const c = couponAmount(o.type, rates[i], true) * n; futureCoupons += c - taxOf(c); }
+      // harmonogram do wykupu (kalendarz): kupon/odsetki na koniec okresu (bez ostatniego — jest w wykupie), nowe oprocentowanie
+      // od kolejnego okresu (EDO/COI/ROS/ROD co rok; ROR/DOR tylko przy zmianie stopy), wykup; known: "final" | "prelim" | false
+      const schedule = [];
+      for (let i = k; i <= last; i++) {
+        const endYm = addMonths(o.purchase, Math.min((i + 1) * P, t.term));
+        if (t.coupon && i < last) { const c = couponAmount(o.type, rates[i], true) * n; schedule.push({ ym: endYm, kind: "kupon", period: i + 1, rate: rates[i], amount: c - taxOf(c), known: known(i) }); }
+        if (i < last && (t.indexed || (t.nbp && Math.abs(rates[i + 1] - rates[i]) > 1e-12)))
+          schedule.push({ ym: endYm, kind: "stopa", period: i + 2, rate: rates[i + 1], prev: rates[i], known: known(i + 1) });
+      }
+      schedule.push({ ym: maturity, kind: "wykup", amount: atMaturity, known: maturityKnown ? (maturityPrelim ? "prelim" : "final") : false });
       return {
-        spec: o, age, maturity, monthsToMaturity: t.term - age, rates,
+        spec: o, age, maturity, monthsToMaturity: t.term - age, rates, schedule,
         gross, fee, breakTax, payout: gross - fee - breakTax,
         hold: gross - taxOf(gross - NOMINAL * n),
         couponsPaid: net(v.coupons.reduce((s, c) => s + c.amount, 0) * n),

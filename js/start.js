@@ -28,3 +28,27 @@ render();
   if(mq&&mq.addEventListener)mq.addEventListener("change",()=>{if(!root.dataset.theme){sync();render()}});
   sync();
 })();
+
+// wersja strony (bez kroku budowania): wydanie z CHANGELOG.md (ten sam serwer, pierwsza sekcja „## vX.Y.Z”) i liczba punktów
+// w „Nieopublikowane”; liczba commitów na main po wydaniu i skrót ostatniego commita z API GitHuba (pamięć 15 min w localStorage).
+// Bez odpowiedzi API — samo wydanie (z „+”, gdy są nieopublikowane zmiany). Pasek górny (komputer) i stopka.
+(async function showVersion(){
+  const REPO="patrykw-labs/rejestr-obligacji",KEY="rejestr-obligacji:wersja";
+  let rel=null,unrel=0;
+  try{const t=await (await fetch("CHANGELOG.md",{cache:"no-cache"})).text();const m=t.match(/^## (v\d+\.\d+\.\d+)/m);if(m)rel=m[1];
+    const sec=(t.split(/^## Nieopublikowane[ \t]*$/m)[1]||"").split(/^## v/m)[0];unrel=(sec.match(/^- /gm)||[]).length}catch(e){}
+  if(!rel)return;
+  let gh=null;
+  try{const c=JSON.parse(localStorage.getItem(KEY)||"null");if(c&&c.rel===rel&&Date.now()-c.t<15*60e3)gh=c}catch(e){}
+  if(!gh){try{const j=u=>fetch(u).then(r=>r.ok?r.json():Promise.reject(new Error(r.status)));
+      const [cmp,ref]=await Promise.all([j(`https://api.github.com/repos/${REPO}/compare/${rel}...main?per_page=1`),j(`https://api.github.com/repos/${REPO}/git/ref/heads/main`)]);
+      gh={rel,t:Date.now(),ahead:+cmp.ahead_by||0,sha:String(ref.object.sha).slice(0,7)};try{localStorage.setItem(KEY,JSON.stringify(gh))}catch(e){}}catch(e){gh=null}}
+  const relUrl=`https://github.com/${REPO}/releases/tag/${rel}`;
+  let text=rel,url=relUrl,title=`Wydanie ${rel}`;
+  if(gh&&gh.ahead>0){text=`${rel} +${gh.ahead} · ${gh.sha}`;url=`https://github.com/${REPO}/compare/${rel}...${gh.sha}`;
+    title=`Strona z gałęzi main: ${gh.ahead} ${gh.ahead===1?"commit":[2,3,4].includes(gh.ahead%10)&&!(gh.ahead>=12&&gh.ahead<=14)?"commity":"commitów"} po wydaniu ${rel} (ostatni: ${gh.sha}) — kliknij, aby zobaczyć zmiany`}
+  else if(gh)title=`Strona odpowiada wydaniu ${rel} (commit ${gh.sha})`;
+  else if(unrel){text=rel+"+";url=`https://github.com/${REPO}/blob/main/CHANGELOG.md`;title=`Wydanie ${rel} i zmiany opisane w CHANGELOG jako nieopublikowane`}
+  const top=$("#ver");if(top){top.textContent=text;top.href=url;top.title=title;top.setAttribute("aria-label","Wersja strony: "+title);top.hidden=false}
+  const foot=$("#ver-foot");if(foot){const a=foot.querySelector("a");a.textContent="wersja "+text;a.href=url;a.title=title;foot.hidden=false}
+})();
