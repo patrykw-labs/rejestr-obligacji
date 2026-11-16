@@ -705,6 +705,65 @@
     return h;
   }
 
+  /**
+   * Tabela posiadanych obligacji wklejona z rachunku: eksport „Stan rachunku rejestrowego” (EMISJA, DOSTĘPNA LICZBA
+   * OBLIGACJI, ZABLOKOWANA LICZBA OBLIGACJI, WARTOŚĆ NOMINALNA, WARTOŚĆ AKTUALNA, DATA WYKUPU) skopiowany z arkusza
+   * lub strony, z tabulatorami, średnikami albo spacjami. Z nagłówkiem kolumny rozpoznawane po nazwach
+   * (sztuki = dostępne + zablokowane); bez nagłówka pierwsza liczba całkowita po kodzie to liczba sztuk.
+   * Dzień zakupu = dzień z daty w miesiącu zakupu albo wykupu serii (wykup przypada w rocznicę zakupu).
+   * Ta sama seria i dzień → jedna pozycja (sztuki zsumowane), różne dni → osobne pozycje.
+   * Zwraca { rows: [{ code, n, blocked, day }], skipped: [{ line, reason }] }; day = null, gdy brak pasującej daty.
+   */
+  function parseRegister(text) {
+    const norm = (x) => String(x).replace(/[  ]/g, " ").replace(/\s+/g, " ").trim();
+    const intOf = (x) => { const t = norm(x || "").replace(/ /g, ""); return /^\d+$/.test(t) ? +t : null; };
+    const CODE = /\b([A-Za-z]{3}\d{4})\b/;
+    const rows = [], skipped = [], seen = new Map();
+    let cols = null;
+    for (const raw of String(text || "").replace(/\r/g, "").split("\n")) {
+      const line = norm(raw);
+      if (!line) continue;
+      const sep = raw.includes("\t") ? "\t" : raw.includes(";") ? ";" : null;
+      const fields = sep ? raw.split(sep).map(norm) : null;
+      const cm = CODE.exec(line);
+      if (!cm) {
+        const up = line.toUpperCase();
+        if (fields && /EMISJA|SERIA|KOD/.test(up) && /LICZBA|SZT|ILO/.test(up)) {
+          const find = (re, not) => fields.findIndex((f) => re.test(f.toUpperCase()) && !(not && not.test(f.toUpperCase())));
+          cols = { code: find(/EMISJA|SERIA|KOD/), n: find(/DOST/) >= 0 ? find(/DOST/) : find(/LICZBA|SZT|ILO/, /ZABLOK/),
+            blocked: find(/ZABLOK/) };
+        } else if (/\d/.test(line)) skipped.push({ line, reason: "brak kodu serii" });
+        continue;
+      }
+      const code = cm[1].toUpperCase(), info = parseCode(code);
+      if (!info) { skipped.push({ line, reason: `nieznany rodzaj obligacji ${code.slice(0, 3)}` }); continue; }
+      let n = null, blocked = 0;
+      if (fields && cols && cols.n >= 0 && fields[cols.code] && CODE.test(fields[cols.code])) {
+        n = intOf(fields[cols.n]);
+        if (cols.blocked >= 0) blocked = intOf(fields[cols.blocked]) || 0;
+      } else {
+        const after = fields ? fields.slice(fields.findIndex((f) => CODE.test(f)) + 1)
+          : line.slice(cm.index + cm[0].length).replace(/\d{4}-\d{2}-\d{2}|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}/g, " ").split(" ");
+        for (const f of after) { const v = intOf(f); if (v != null) { n = v; break; } }
+      }
+      if (n == null) { skipped.push({ line, reason: `${code}: nie znaleziono liczby sztuk` }); continue; }
+      const total = n + blocked;
+      if (!(total >= 1)) { skipped.push({ line, reason: `${code}: 0 sztuk` }); continue; }
+      let day = null;
+      const mat = addMonths(info.purchase, TYPES[info.type].term);
+      for (const d of line.matchAll(/(\d{4})-(\d{2})-(\d{2})|(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/g)) {
+        const ym = d[1] ? `${d[1]}-${d[2]}` : `${d[6]}-${String(d[5]).padStart(2, "0")}`, dd = +(d[3] || d[4]);
+        if ((ym === info.purchase || ym === mat) && dd >= 1 && dd <= 31) { day = dd; break; }
+      }
+      const key = code + "~" + day;
+      if (seen.has(key)) { const r = seen.get(key); r.n += total; r.blocked += blocked; continue; }
+      const r = { code, n: total, blocked, day };
+      seen.set(key, r);
+      rows.push(r);
+    }
+    return { rows, skipped };
+  }
+
   /** Parametry serii z archiwum po kodzie (np. "EDO0434"). */
   function seriesFromArchive(monthsObj, code) {
     const info = parseCode(code);
@@ -719,7 +778,7 @@
   }
 
   const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, holdings, seriesOutcome, breakEvenInflation, breakEvenNbp,
-    cpiHistoryFromMonths, cpiYtdFromMonths, makePriceLevel, makeInflationStep, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, addMonths, monthsBetween, simulateLeg, makeCpiAt };
+    cpiHistoryFromMonths, cpiYtdFromMonths, makePriceLevel, makeInflationStep, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, parseRegister, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

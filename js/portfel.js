@@ -5,6 +5,7 @@ const PF_MAX=20;
 const PF_ACC=[["std","Zwykły (podatek Belki)"],["ike","IKE / IKZE"]];
 Object.assign(CALC_TIPS,{
   pcode:"Seria, którą masz. Oprocentowanie, marża i opłata uzupełnią się z jej listu emisyjnego.",
+  ppaste:"Tabela posiadanych obligacji skopiowana z rachunku: w każdym wierszu kod serii (np. EDO1036), liczba sztuk i data wykupu. Sztuki zablokowane doliczamy do dostępnych. Kolumny mogą być rozdzielone tabulatorami, średnikami albo spacjami; kwoty nie są potrzebne.",
   ppd:"Dzień miesiąca zakupu. Od niego biegną okresy odsetkowe: rocznice (miesięcznice dla ROR i DOR), kupony i wykup.",
   pbd:"Dzień, na który liczymy wartość. Domyślnie dziś. Przy zerwaniu odsetki biegną do dnia wykupu — ok. 5 dni roboczych po dyspozycji.",
   pacc:"Zwykły rachunek — podatek 19% od zysku przy zerwaniu, wykupie i od kuponów. IKE / IKZE — bez podatku Belki (opłata za zerwanie w ramach konta zostaje).",
@@ -19,7 +20,7 @@ const pfDate=(ym,pd)=>`${String(Math.min(+pd||1,calcDaysIn(ym))).padStart(2,"0")
 const pfIn=m=>{m=Math.max(0,Math.round(m));const y=Math.floor(m/12),r=m%12;if(!y)return `${r} mies.`;const yt=y===1?"rok":[2,3,4].includes(y%10)&&!(y>=12&&y<=14)?"lata":"lat";return r?`${y} ${yt} i ${r} mies.`:`${y} ${yt}`};
 const pfPct=r=>fmt(r*100)+"%";
 function pfDefaults(){
-  const opts=calcOptions(pfNow(),true),now=pfNow();
+  const opts=calcOptions(pfNow(),true,true),now=pfNow();
   const pick=(opts.EDO||[]).find(c=>Zamiana.monthsBetween(Zamiana.parseCode(c).purchase,now)>=24)||(opts.EDO||[])[0]||Object.values(opts).flat()[0]||"";
   return {pos:pick?[{code:pick,n:100,pd:1}]:[],bd:calcDefaultBreakDay(),acc:"std",sc:"base"};
 }
@@ -41,10 +42,43 @@ function pfParseFile(text){
   s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;
   return {state:s,skipped};
 }
+// tabela z rachunku (wklejona albo plik arkusza zapisany jako tekst, CSV lub HTML) → serie portfela; parser w silniku
+// (Zamiana.parseRegister); serie spoza archiwum i ponad PF_MAX pominięte; brak daty → dzień 1 (noDay)
+function pfFromRegister(text){
+  const r=Zamiana.parseRegister(text),pos=[],skipped=r.skipped.map(x=>x.reason),noDay=[];let blocked=0;
+  for(const o of r.rows){const a=calcFromCode(o.code);
+    if(!a||!CALC_TYPES.includes(a.type)){skipped.push(o.code+": brak w archiwum");continue}
+    if(pos.length>=PF_MAX){skipped.push(o.code+` (ponad ${PF_MAX} serii)`);continue}
+    if(o.day==null)noDay.push(o.code);blocked+=o.blocked;
+    pos.push({code:a.code,n:o.n,pd:o.day||1})}
+  return {pos,skipped,noDay,blocked};
+}
+// tabela HTML (np. plik .xls zapisany przez serwis jako strona) → wiersze rozdzielone tabulatorami
+const pfHtmlToText=h=>h.replace(/<\/t[dh]>/gi,"\t").replace(/<\/tr>|<br\s*\/?>/gi,"\n").replace(/<[^>]+>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&");
+const pfSeriesWord=n=>n===1?"seria":[2,3,4].includes(n%10)&&!(n>=12&&n<=14)?"serie":"serii";
+// podgląd wklejonej tabeli (przed wczytaniem)
+function pfPastePreview(t){
+  if(!t||!t.trim())return `<p class="small">Wklej tabelę — tu pojawi się podgląd rozpoznanych serii.</p>`;
+  const r=pfFromRegister(t);
+  const list=r.pos.map(o=>{const a=calcFromCode(o.code);return `<li><b>${esc(o.code)}</b> × ${o.n} szt. · zakup ${esc(pfDate(a.p,o.pd))}${r.noDay.includes(o.code)?" (dnia nie rozpoznano — przyjęto 1.)":""}</li>`}).join("");
+  return (r.pos.length?`<p class="small"><b>Rozpoznano ${r.pos.length} ${pfSeriesWord(r.pos.length)}:</b></p><ul class="small evlist">${list}</ul>`:`<p class="small"><b>Nie rozpoznano żadnej serii.</b> Potrzebny jest kod serii (np. EDO1036) i liczba sztuk w tym samym wierszu.</p>`)
+    +(r.blocked?`<p class="small">W tym ${r.blocked} szt. zablokowanych (np. zlecenie wykupu albo zamiany w toku) — liczone razem z dostępnymi.</p>`:"")
+    +(r.skipped.length?`<p class="small">Pominięto: ${esc(r.skipped.join("; "))}.</p>`:"");
+}
+function pfPasteHtml(){if(!state.pfPaste)return "";const t=state.pfPasteText||"";
+  return `<div class="paste" id="p-paste-box"><label class="field"><span class="flabel">Tabela z rachunku${calcTip("ppaste")}</span><textarea id="p-paste" rows="6" spellcheck="false" autocomplete="off" placeholder="EMISJA  DOSTĘPNA LICZBA OBLIGACJI  …  DATA WYKUPU&#10;EDO1036  200  0  …  2036-10-16">${esc(t)}</textarea></label>
+    <p class="small">Na stronie zakupu obligacji skarbowych otwórz „Stan rachunku rejestrowego” i skopiuj tabelę (albo wyeksportuj ją do XLS, otwórz plik w arkuszu i skopiuj wiersze). Wystarczą kod serii, liczba sztuk i data wykupu — z niej bierzemy dzień zakupu. 🔒 Tekst zostaje w tej przeglądarce, nie wysyłamy go nigdzie.</p>
+    <div id="p-paste-prev">${pfPastePreview(t)}</div>
+    <div class="row"><button type="button" class="btn solid" id="p-paste-ok"${t.trim()&&pfFromRegister(t).pos.length?"":" disabled"}>Wczytaj do portfela</button><button type="button" class="btn" id="p-paste-cancel">Anuluj</button><span class="small">zastąpi obecne serie (można cofnąć)</span></div></div>`}
+// wczytanie serii (z pliku albo z wklejonej tabeli): zastępuje bieżące serie, rachunek i scenariusz zostają; „Cofnij” przywraca
+function pfApplyImport(main,pos,info){
+  state.pfImportUndo={pf:JSON.parse(JSON.stringify(state.pf)),link:!!state.pfLink};
+  const s=JSON.parse(JSON.stringify(state.pf));s.pos=pos;if(info.acc)s.acc=info.acc;if(info.sc)s.sc=info.sc;
+  state.pf=s;state.pfLink=false;state.pfImport=Object.assign({count:pos.length},info);renderPortfolio(main)}
 // komunikat po wczytaniu pliku (z „Cofnij” — przywraca portfel sprzed wczytania)
 function pfImportHtml(){const m=state.pfImport;if(!m)return "";state.pfImport=null;
-  if(m.error)return `<div class="insight warn" role="status"><span class="t">nie udało się wczytać pliku</span>${esc(m.error)}</div>`;
-  return `<div class="insight${m.skipped.length?" warn":""}" role="status"><span class="t">wczytano portfel z pliku</span>${m.count} ${m.count===1?"seria":[2,3,4].includes(m.count%10)&&!(m.count>=12&&m.count<=14)?"serie":"serii"} z pliku ${esc(m.name)}${m.skipped.length?`; pominięto nierozpoznane: ${esc(m.skipped.join(", "))}`:""}. Portfel jest zapamiętany w tej przeglądarce. <button type="button" class="linkbtn" id="p-import-undo">Cofnij</button></div>`}
+  if(m.error)return `<div class="insight warn" role="status"><span class="t">nie udało się wczytać</span>${esc(m.error)}</div>`;
+  return `<div class="insight${m.skipped.length?" warn":""}" role="status"><span class="t">wczytano portfel</span>${m.count} ${pfSeriesWord(m.count)} ${m.name?"z pliku "+esc(m.name):"z wklejonej tabeli"}${m.skipped.length?`; pominięto: ${esc(m.skipped.join("; "))}`:""}.${m.noDay&&m.noDay.length?` Bez daty (przyjęto dzień 1. — popraw w polu „Dzień”): ${esc(m.noDay.join(", "))}.`:""} Portfel jest zapamiętany w tej przeglądarce. <button type="button" class="linkbtn" id="p-import-undo">Cofnij</button></div>`}
 function pfLoad(){try{const j=JSON.parse(localStorage.getItem(PF_KEY)||"null");if(!j||!Array.isArray(j.pos))return null;const s=pfDefaults();
     const pos=j.pos.slice(0,PF_MAX).map(o=>{const a=calcFromCode(o.code);return a&&CALC_TYPES.includes(a.type)&&+o.n>=1?{code:a.code,n:Math.floor(+o.n),pd:calcDayOk(o.pd)?+o.pd:1}:null}).filter(Boolean);
     if(!pos.length)return null;s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;return s}catch(e){return null}}
@@ -83,7 +117,7 @@ function pfCalcHash(s){
   return "zamiana&pf="+pos.map(o=>[o.code,o.n].concat(+o.pd!==1?[o.pd]:[]).join("~")).join(",")+tail;
 }
 function pfNext(s){
-  const opts=calcOptions(pfNow(),true),used=new Set(s.pos.map(o=>o.code)),types=new Set(s.pos.map(o=>Zamiana.parseCode(o.code)?.type));
+  const opts=calcOptions(pfNow(),true,true),used=new Set(s.pos.map(o=>o.code)),types=new Set(s.pos.map(o=>Zamiana.parseCode(o.code)?.type));
   const all=CALC_TYPES.flatMap(t=>opts[t]||[]).filter(x=>!used.has(x));
   return all.find(x=>!types.has(Zamiana.parseCode(x).type))||all[0]||"";
 }
@@ -95,7 +129,7 @@ function pfParams(s){
 }
 function renderPortfolio(main){
   if(!state.pf){const h=pfFromHash();if(h){state.pf=h;state.pfLink=true}else state.pf=pfLoad()||pfDefaults()}
-  const s=state.pf,now=pfNow(),opts=calcOptions(now,true);
+  const s=state.pf,now=pfNow(),opts=calcOptions(now,true,true);
   const undo=viewUndoShown("pf"),isDef=pfHash(s)===pfHash(pfDefaults());
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
   const posHtml=(o,i)=>{const a=calcFromCode(o.code),mat=a?Zamiana.addMonths(a.p,Zamiana.TYPES[a.type].term):null;
@@ -112,7 +146,8 @@ function renderPortfolio(main){
     <div class="calc-grid">
       <div class="card"><h3>Moje obligacje <small>${s.pos.length} ${s.pos.length===1?"seria":[2,3,4].includes(s.pos.length%10)&&!(s.pos.length>=12&&s.pos.length<=14)?"serie":"serii"}</small></h3>
         ${s.pos.map(posHtml).join("")}
-        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span><button type="button" class="btn" id="p-load-file" title="Wczytaj portfel zapisany wcześniej do pliku (.json) — np. z innego urządzenia">Wczytaj z pliku</button><input type="file" id="p-file" accept=".json,application/json" hidden></div>
+        <div class="row"><button type="button" class="btn" id="p-add"${s.pos.length>=PF_MAX?" disabled":""}>+ dodaj serię</button><span class="small">do ${PF_MAX} serii</span><button type="button" class="btn" id="p-paste-open" aria-expanded="${!!state.pfPaste}" aria-controls="p-paste-box" title="Wklej tabelę posiadanych obligacji skopiowaną z rachunku">Wklej z rachunku</button><button type="button" class="btn" id="p-load-file" title="Wczytaj portfel zapisany wcześniej do pliku (.json) albo tabelę z rachunku zapisaną jako tekst lub CSV">Wczytaj z pliku</button><input type="file" id="p-file" accept=".json,application/json,.csv,.txt,.tsv,.htm,.html,.xls,.xlsx" hidden></div>
+        ${pfPasteHtml()}
         <p class="small" id="p-store">${pfStoreNote()}</p></div>
       <div class="card"><h3>Wycena</h3>
         <div class="frow"><label class="field"><span class="flabel">Dzień wyceny${calcTip("pbd")}</span><input id="p-bd" type="number" min="1" max="${calcDaysIn(now)}" step="1" inputmode="numeric" value="${esc(s.bd)}"><span class="fnote">${esc(mLabel(now))}</span></label></div>
@@ -133,11 +168,25 @@ function renderPortfolio(main){
   viewResetBind("p","pf",null,pfDefaults,()=>renderPortfolio(main));
   // wczytanie portfela z pliku: zastępuje bieżący (z możliwością cofnięcia), zapis w przeglądarce jak przy zmianie ręcznej
   $("#p-load-file").addEventListener("click",()=>$("#p-file").click());
-  $("#p-file").addEventListener("change",async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
-    let r;if(f.size>200000)r={error:"Plik jest za duży jak na portfel (ponad 200 KB)."};else{try{r=pfParseFile(await f.text())}catch(err){r={error:"Nie udało się odczytać pliku."}}}
-    if(r.error){state.pfImport={error:r.error};renderPortfolio(main);return}
-    state.pfImportUndo={pf:JSON.parse(JSON.stringify(state.pf)),link:!!state.pfLink};
-    state.pf=r.state;state.pfLink=false;state.pfImport={count:r.state.pos.length,skipped:r.skipped,name:f.name};renderPortfolio(main)});
+  // plik portfela (.json) albo tabela z rachunku zapisana jako tekst / CSV / HTML; prawdziwy plik Excela (.xls/.xlsx) — prośba o skopiowanie
+  $("#p-file").addEventListener("change",async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;e.target.value="";
+    const fail=msg=>{state.pfImport={error:msg};renderPortfolio(main)};
+    if(f.size>500000)return fail("Plik jest za duży jak na portfel (ponad 500 KB).");
+    let buf;try{buf=new Uint8Array(await f.arrayBuffer())}catch(err){return fail("Nie udało się odczytać pliku.")}
+    const hex=Array.from(buf.slice(0,4),b=>b.toString(16).padStart(2,"0")).join("");
+    if(hex==="d0cf11e0"||hex==="504b0304")return fail("To plik arkusza (Excel), którego nie odczytamy w przeglądarce. Otwórz go, zaznacz tabelę, skopiuj i wklej w „Wklej z rachunku”.");
+    let text=new TextDecoder("utf-8").decode(buf);if(text.includes("\ufffd"))text=new TextDecoder("windows-1250").decode(buf);
+    if(/^\s*\{/.test(text)){const r=pfParseFile(text);if(r.error)return fail(r.error);return pfApplyImport(main,r.state.pos,{skipped:r.skipped,name:f.name,acc:r.state.acc,sc:r.state.sc})}
+    const r=pfFromRegister(/<t[dh][\s>]/i.test(text)?pfHtmlToText(text):text);
+    if(!r.pos.length)return fail(`W pliku ${f.name} nie ma portfela ani tabeli z kodami serii${r.skipped.length?` (pominięto: ${r.skipped.slice(0,5).join("; ")})`:""}.`);
+    pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay,name:f.name})});
+  // wklejenie tabeli z rachunku: podgląd na żywo (bez przerysowania widoku), wczytanie z „Cofnij”
+  $("#p-paste-open").addEventListener("click",()=>{state.pfPaste=!state.pfPaste;renderPortfolio(main);const ta=$("#p-paste");if(ta)ta.focus()});
+  const ta=$("#p-paste");
+  if(ta){ta.addEventListener("input",()=>{state.pfPasteText=ta.value;$("#p-paste-prev").innerHTML=pfPastePreview(ta.value);$("#p-paste-ok").disabled=!pfFromRegister(ta.value).pos.length});
+    $("#p-paste-cancel").addEventListener("click",()=>{state.pfPaste=false;state.pfPasteText="";renderPortfolio(main)});
+    $("#p-paste-ok").addEventListener("click",()=>{const r=pfFromRegister(ta.value);if(!r.pos.length)return;state.pfPaste=false;state.pfPasteText="";
+      pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay})})}
   const iu=$("#p-import-undo");if(iu)iu.addEventListener("click",()=>{const u=state.pfImportUndo;if(!u)return;state.pf=u.pf;state.pfLink=u.link;state.pfImportUndo=null;renderPortfolio(main)});
   calcBindTips(main.querySelector(".calc-grid"));
   pfRecompute();
@@ -157,7 +206,7 @@ function pfRecompute(){
   const changed=pfSave(s);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote(changed);pfBindStore()}
   const errs=[];
   if(!s.pos.length)errs.push("Dodaj co najmniej jedną serię.");
-  s.pos.forEach((o,i)=>{if(!(Math.floor(+o.n)>=1))errs.push(`Seria ${i+1}: podaj liczbę sztuk.`);if(!calcDayOk(o.pd))errs.push(`Seria ${i+1}: dzień zakupu od 1 do 31.`)});
+  s.pos.forEach((o,i)=>{if(!(Math.floor(+o.n)>=1))errs.push(`Seria ${i+1}: podaj liczbę sztuk.`);if(!calcDayOk(o.pd))errs.push(`Seria ${i+1}: dzień zakupu od 1 do 31.`);else if(calcFromCode(o.code)?.p===now&&+o.pd>+s.bd)errs.push(`Seria ${i+1} (${o.code}): zakup ${o.pd}. dnia jest po dniu wyceny (${s.bd}.) — ustaw dzień wyceny na dziś albo popraw dzień zakupu.`)});
   if(!(calcDayOk(s.bd)&&+s.bd<=calcDaysIn(now)))errs.push(`Dzień wyceny: od 1 do ${calcDaysIn(now)}.`);
   if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
   let r;try{r=Zamiana.holdings(pfParams(s))}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}

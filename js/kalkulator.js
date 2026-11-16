@@ -43,13 +43,14 @@ function calcYtdHist(){return Object.assign({},calcPre().cpi?.ytd||{},Zamiana.cp
 function calcMinPurchase(){const k=Object.keys(calcCpiHist()).sort()[0]||"2018-12";return k<"2019-01"?Zamiana.addMonths(k,-10):"2019-01"}
 // serie do wyboru: kupione co najmniej miesiąc temu i jeszcze niewykupione; maturing — także seria w miesiącu wykupu
 // (trwa do dnia wykupu; „Mój portfel”), w kalkulatorze zamiany bez niej
-function calcOptions(now=calcNow(),maturing=false){
+// fresh — także serie kupione w bieżącym miesiącu (portfel); kalkulator zamiany zaczyna od serii co najmniej miesięcznych
+function calcOptions(now=calcNow(),maturing=false,fresh=false){
   const out={};
   const pre=Object.entries(calcPre().series||{}).sort((a,b)=>a[1].purchase<b[1].purchase?-1:1);
   const rows=pre.map(([code,s])=>({id:s.purchase,series:{[s.type]:Object.assign({code},s)}})).concat(state.months);
   for(const m of rows)for(const t of CALC_TYPES){const s=m.series?.[t];if(!s||!s.code)continue;
     const info=Zamiana.parseCode(s.code);if(!info)continue;const age=Zamiana.monthsBetween(info.purchase,now);
-    if(age<1||age>Zamiana.TYPES[t].term||(age===Zamiana.TYPES[t].term&&!maturing))continue;(out[t]=out[t]||[]).push(s.code)}
+    if(age<(fresh?0:1)||age>Zamiana.TYPES[t].term||(age===Zamiana.TYPES[t].term&&!maturing))continue;(out[t]=out[t]||[]).push(s.code)}
   for(const t in out)out[t].reverse();
   return out;
 }

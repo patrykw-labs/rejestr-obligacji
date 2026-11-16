@@ -411,12 +411,64 @@ const CASES = [
         await pb.waitForSelector("#p-out .stats");
         if (/TOS1127/.test(await pb.evaluate(() => location.hash))) problem = "„Cofnij” nie przywróciło portfela sprzed wczytania";
         await pb.setInputFiles("#p-file", { name: "zly.json", mimeType: "application/json", buffer: Buffer.from("to nie json") });
-        await pb.waitForSelector("text=nie udało się wczytać pliku");
+        await pb.waitForSelector("text=nie udało się wczytać");
       } catch (e) { problem = e.message.split("\n")[0]; }
       if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
       await ctxB.close();
     }
     if (problem) { fail++; console.log("✗ portfel — plik .json: " + problem); } else pass++;
+  }
+  // „Mój portfel”: tabela wklejona z rachunku (eksport „Stan rachunku rejestrowego”), plik HTML z tabelą, plik Excela; telefon
+  {
+    let problem = "";
+    const REG = "EMISJA\tDOSTĘPNA LICZBA OBLIGACJI\tZABLOKOWANA LICZBA OBLIGACJI\tWARTOŚĆ NOMINALNA\tWARTOŚĆ AKTUALNA\tDATA WYKUPU\n" +
+      "EDO1036\t200\t0\t20 000,00\t\t2036-10-16\nEDO1136\t24\t0\t2 400,00\t\t2036-11-03\nROD1038\t126\t0\t12 690,00\t\t2038-10-05\n" +
+      "ROD1138\t16\t0\t1 600,00\t\t2038-11-03\nXYZ1234\t5\t0\n";
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    const pg = await ctx.newPage();
+    const errors = [];
+    pg.on("pageerror", (e) => errors.push(e.message));
+    await pg.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      await pg.goto(base + "#portfel");
+      await pg.waitForSelector("#p-out .stats");
+      await pg.click("#p-paste-open");
+      await pg.fill("#p-paste", REG);
+      const prev = await pg.textContent("#p-paste-prev");
+      const wide = await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+      if (!/Rozpoznano 4 serie/.test(prev) || !/EDO1036 × 200 szt\. · zakup 16\.10\.2026/.test(prev) || !/XYZ/.test(prev)) problem = "podgląd wklejonej tabeli: " + prev;
+      else if (wide) problem = "pole wklejania: poziome przewijanie na telefonie";
+      else {
+        await pg.click("#p-paste-ok");
+        await pg.waitForSelector("#p-import-undo");
+        const h = await pg.evaluate(() => location.hash);
+        if (!/pf=EDO1036~200~16,EDO1136~24~3,ROD1038~126~5,ROD1138~16~3(&|$)/.test(h)) problem = "portfel po wklejeniu: " + h;
+        else if (await pg.$("#p-paste")) problem = "pole wklejania nie zamknęło się po wczytaniu";
+        else {
+          await pg.click("#p-import-undo");
+          await pg.waitForSelector("#p-out .stats");
+          if (/EDO1036~200/.test(await pg.evaluate(() => location.hash))) problem = "„Cofnij” po wklejeniu nie przywróciło portfela";
+          const html = "<html><body><table><tr><th>EMISJA</th><th>DOSTĘPNA LICZBA OBLIGACJI</th><th>ZABLOKOWANA LICZBA OBLIGACJI</th><th>DATA WYKUPU</th></tr>" +
+            "<tr><td>EDO1036</td><td>7</td><td>1</td><td>2036-10-16</td></tr></table></body></html>";
+          await pg.setInputFiles("#p-file", { name: "stan.xls", mimeType: "application/vnd.ms-excel", buffer: Buffer.from(html) });
+          await pg.waitForSelector("#p-import-undo");
+          if (!problem && !/pf=EDO1036~8~16(&|$)/.test(await pg.evaluate(() => location.hash))) problem = "plik z tabelą HTML: " + await pg.evaluate(() => location.hash);
+          await pg.setInputFiles("#p-file", { name: "stan.xls", mimeType: "application/vnd.ms-excel", buffer: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0, 0, 0, 0]) });
+          await pg.waitForSelector("text=Wklej z rachunku”");
+          // seria z bieżącego miesiąca: na liście serii, a zakup po dniu wyceny → komunikat zamiast wyniku
+          const mj = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "data", "months.json"), "utf8"));
+          const cur = mj[Object.keys(mj).sort().pop()].series.EDO.code;
+          await pg.goto("about:blank");
+          await pg.goto(base + `#portfel&pf=${cur}~10~20&bd=16`);
+          await pg.waitForSelector("text=po dniu wyceny");
+          if (!(await pg.$(`select[data-pk=code] option[value=${cur}]:not([selected])`)) && !(await pg.$eval("select[data-pk=code]", (e) => e.selectedOptions[0].textContent)).includes("zakup"))
+            problem = `seria z bieżącego miesiąca (${cur}) bez opisu na liście serii`;
+        }
+      }
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    await ctx.close();
+    if (problem) { fail++; console.log("✗ portfel — wklejanie z rachunku: " + problem); } else pass++;
   }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();

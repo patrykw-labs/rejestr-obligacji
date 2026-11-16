@@ -488,5 +488,31 @@ eq("dane GUS: EDO z 04.2023 — inflacja do dziś = P(10.2026) / P(03.2023)", so
 const stepR = Z.makeInflationStep(ytdR, Z.makeCpiAt(cpiR, [2.5], "2026-11"));
 eq("krok inflacji: miesiąc bez odczytu → scenariusz (2,5% rocznie)", stepR("2027-03"), Math.pow(1.025, 1 / 12), 1e-12);
 
+// ---------------------------------------------------------------------------
+// 15. Wklejona tabela z rachunku („Stan rachunku rejestrowego”, eksport do arkusza; kwoty usunięte)
+// ---------------------------------------------------------------------------
+const REG = "EMISJA\tDOSTĘPNA LICZBA OBLIGACJI\tZABLOKOWANA LICZBA OBLIGACJI\tWARTOŚĆ NOMINALNA\tWARTOŚĆ AKTUALNA\tDATA WYKUPU\n" +
+  "EDO1036\t200\t0\t20 000,00\t\t2036-10-16\nEDO1136\t24\t0\t2 400,00\t\t2036-11-03\n" +
+  "ROD1038\t126\t0\t12 690,00\t\t2038-10-05\nROD1138\t16\t0\t1 600,00\t\t2038-11-03\n";
+const regExp = [{ code: "EDO1036", n: 200, blocked: 0, day: 16 }, { code: "EDO1136", n: 24, blocked: 0, day: 3 },
+  { code: "ROD1038", n: 126, blocked: 0, day: 5 }, { code: "ROD1138", n: 16, blocked: 0, day: 3 }];
+eq("rachunek: tabela z tabulatorami — seria, sztuki, dzień z daty wykupu", Z.parseRegister(REG), { rows: regExp, skipped: [] });
+eq("rachunek: Windows (CRLF) i twarde spacje w kwotach", Z.parseRegister(REG.replace(/\n/g, "\r\n").replace(/ 0/g, " 0")).rows, regExp);
+eq("rachunek: kolumny rozdzielone spacjami (kopia ze strony)", Z.parseRegister(REG.replace(/\t+/g, "  ")).rows, regExp);
+eq("rachunek: bez nagłówka", Z.parseRegister(REG.split("\n").slice(1).join("\n")).rows, regExp);
+eq("rachunek: CSV ze średnikami", Z.parseRegister(REG.replace(/\t/g, ";")).rows, regExp);
+eq("rachunek: daty DD.MM.RRRR", Z.parseRegister(REG.replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3.$2.$1")).rows, regExp);
+const regB = Z.parseRegister("EMISJA\tDOSTĘPNA LICZBA\tZABLOKOWANA LICZBA\tDATA WYKUPU\nCOI1129\t1 200\t30\t2029-11-07\n");
+eq("rachunek: tysiące ze spacją, sztuki zablokowane doliczone", regB.rows, [{ code: "COI1129", n: 1230, blocked: 30, day: 7 }]);
+const regD = Z.parseRegister("EDO0434\t10\t0\t2034-04-02\nEDO0434\t5\t0\t2034-04-20\nEDO0434\t1\t0\t2034-04-02\n");
+eq("rachunek: ta sama seria — różne dni osobno, ten sam dzień zsumowany", regD.rows,
+  [{ code: "EDO0434", n: 11, blocked: 0, day: 2 }, { code: "EDO0434", n: 5, blocked: 0, day: 20 }]);
+eq("rachunek: data zakupu też rozpoznana (miesiąc zakupu)", Z.parseRegister("TOS1126 15 15.11.2026").rows, [{ code: "TOS1126", n: 15, blocked: 0, day: 15 }]);
+eq("rachunek: data spoza miesiąca zakupu/wykupu → dzień nieznany", Z.parseRegister("EDO1036\t3\t0\t2030-01-01").rows[0].day, null);
+const regS = Z.parseRegister("Razem\t366\t0\nXYZ1234\t5\nEDO1036\t0\t0\t2036-10-16\nEDO1136\tbrak\n");
+eq("rachunek: pominięte wiersze z powodem", regS.skipped.map((x) => x.reason),
+  ["brak kodu serii", "nieznany rodzaj obligacji XYZ", "EDO1036: 0 sztuk", "EDO1136: nie znaleziono liczby sztuk"]);
+eq("rachunek: pusty tekst", Z.parseRegister(""), { rows: [], skipped: [] });
+
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);
