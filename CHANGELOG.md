@@ -4,17 +4,26 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
-- IKZE: przy wyniku (kalkulator zamiany, „Co kupić?”) i w opisie wykresu notka, że ulga w PIT przy wpłacie nie jest liczona — nie zmienia porównania, ale linie „wpłata + …”, zysk realny i roczny wypadają przez nią gorzej; z przykładem kosztu wpłaty po uldze 12% i 32%.
-- Walidacja: opłata za wykup zapisana tekstem dozwolona tylko dla OTS — opłata innej serii zapisana tekstem byłaby w kalkulatorach liczona jako 0 zł.
+## v1.4.0 — 2026-11-16
+
+Poprawki obliczeń po zewnętrznym przeglądzie, łatwiejsza obsługa strony i czcionka z własnego serwera.
+
+**Obliczenia**
+- Gdy okres porównania kończy się dokładnie w dniu wykupu, kwota trafia na konto zamiast w nowe obligacje po 99,90 zł wycenione od razu po 100 zł. Usuwa to sztuczny zysk ok. 0,08 zł na sztuce, który faworyzował serię z terminem na koniec okresu (w „Co kupić?”) i wariant „trzymam” przy domyślnym horyzoncie kalkulatora zamiany.
+- „Mój portfel”: „Przy wykupie w terminie” obejmuje kupony COI i odsetki ROR/DOR należne do wykupu (wcześniej tylko ostatni kupon), z rozbiciem w kafelku, tabeli i CSV. Stopy liczone z szybkiego szacunku CPI są oznaczone jako wstępne. Seria w miesiącu swojego wykupu jest na liście do dnia wykupu.
+- „Co kupić?”: notka, gdy przy okresie o miesiąc krótszym lub dłuższym wygrywa inna seria (np. COI bez opłaty przy wypłacie w rocznicę zakupu).
+- IKZE: przy wyniku i w opisie wykresu notka, że ulga w PIT przy wpłacie nie jest liczona — nie zmienia porównania, ale linie „wpłata + …”, zysk realny i roczny wypadają przez nią gorzej; z przykładem kosztu wpłaty po uldze 12% i 32%.
+- Objaśnienie, dlaczego inflacja skumulowana w styczniu i lutym może się różnić od wskaźnika r/r (coroczna zmiana wag koszyka GUS).
+
+**Obsługa strony**
 - Skrót do wyniku: w kalkulatorze zamiany i w „Co kupić?” przyklejony pasek z werdyktem, dopóki wynik jest poniżej ekranu; kliknięcie przewija do wyniku.
 - Link z ustawieniami, których nie da się odtworzyć (nieznana seria, okres spoza listy, kwota poza zakresem), pokazuje komunikat zamiast po cichu przechodzić na ustawienia domyślne.
 - Oferta miesiąca: kafelek „Najwyższe oprocentowanie 1. okresu” wybiera serię dostępną dla wszystkich (serie dla 800+ osobną linijką) i odsyła do porównania na rękę w „Co kupić?”.
 - Dostępność: zakładki z `aria-controls` i panelem `tabpanel`, przełączanie strzałkami, Home i End.
 - Prywatność: czcionka Plus Jakarta Sans z własnego serwera (`assets/fonts`, licencja SIL OFL) zamiast Google Fonts — adres IP odwiedzających nie trafia do zewnętrznych serwerów czcionek.
-- Poprawka obliczeń: gdy okres porównania kończy się dokładnie w dniu wykupu, kwota trafia na konto zamiast w nowe obligacje po 99,90 zł wycenione od razu po 100 zł. Usuwa to sztuczny zysk ok. 0,08 zł na sztuce, który faworyzował serię z terminem na koniec okresu (w „Co kupić?”) i wariant „trzymam” przy domyślnym horyzoncie kalkulatora zamiany.
-- „Mój portfel”: „Przy wykupie w terminie” obejmuje kupony COI i odsetki ROR/DOR należne do wykupu (wcześniej tylko ostatni kupon), z rozbiciem w kafelku, tabeli i CSV. Stopy liczone z szybkiego szacunku CPI są oznaczone jako wstępne. Seria w miesiącu swojego wykupu jest na liście do dnia wykupu.
-- „Co kupić?”: notka, gdy przy okresie o miesiąc krótszym lub dłuższym wygrywa inna seria (np. COI bez opłaty przy wypłacie w rocznicę zakupu).
-- Objaśnienia: inflacja skumulowana a zmiana wag koszyka GUS; IKZE bez ulgi w PIT przy wpłacie (nie zmienia wyniku porównania).
+
+**Jakość**
+- Walidacja: opłata za wykup zapisana tekstem dozwolona tylko dla OTS — opłata innej serii zapisana tekstem byłaby w kalkulatorach liczona jako 0 zł.
 
 ## v1.3.0 — 2026-11-14
 
