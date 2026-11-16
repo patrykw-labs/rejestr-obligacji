@@ -473,7 +473,8 @@
    * horyzontu; przy wykupie w terminie zamiana na tę samą serię na dzisiejszych warunkach (cena zamiany serii,
    * a gdy jej nie ma — 100 zł). Reszta poniżej 100 zł i kupony na koncie.
    * p = { now, amount, horizonMonths, candidates: [{type, rate1, margin, fee, swapPrice?}], cpiHistory, cpiFuture,
-   *       nbpHistory, nbpFuture, savingsRate, tax, withdrawalTax, valuation: "liquidate" (domyślnie — wypłata
+   *       nbpHistory, nbpFuture, savingsRate, tax, withdrawalTax, swapBuy (zakup po cenie zamiany — pieniądze z wykupu
+   *       w terminie; ROS/ROD bez ceny zamiany — po 100 zł), valuation: "liquidate" (domyślnie — wypłata
    *       wszystkiego na koniec, z opłatą i podatkiem) | "hold" }
    */
   function compareBuy(p) {
@@ -484,14 +485,16 @@
       const spec = { type: c.type, rate1: +c.rate1, margin: +(c.margin || 0), fee: +(c.fee || 0), purchase: p.now };
       const roll = Object.assign({}, spec, { swapPrice: c.swapPrice || TYPES[c.type].swapPrice || NOMINAL });
       delete roll.purchase;
-      const { ctx, future, buyPrice } = buildCtx(Object.assign({}, p, { valuation: p.valuation === "hold" ? "hold" : "liquidate",
+      const { ctx, future, buyPrice, opts } = buildCtx(Object.assign({}, p, { valuation: p.valuation === "hold" ? "hold" : "liquidate",
         target: spec, rollover: roll }), H);
-      const count = Math.floor(amount / buyPrice + 1e-9), cash0 = amount - count * buyPrice;
+      // swapBuy: pieniądze z wykupu w terminie — zakup po cenie zamiany serii (99,90 zł; OTS 100,00 zł; ROS/ROD bez ceny zamiany — 100 zł)
+      const price = p.swapBuy ? (c.swapPrice || TYPES[c.type].swapPrice || buyPrice) : buyPrice;
+      const count = Math.floor(amount / price + 1e-9), cash0 = amount - count * price;
       const defl = deflator(future, H);
-      const leg = simulateLeg({ spec, count, ageAt0: 0, cash0, costBasis: buyPrice }, ctx);
+      const leg = simulateLeg({ spec, count, ageAt0: 0, cash0, costBasis: opts.taxBasisNominal ? NOMINAL : price }, ctx);
       const series = leg.series.map((x, t) => ({ t, ym: x.ym, total: x.total * wk, real: x.total * wk / defl[t] }));
       const last = series[H];
-      return { type: c.type, count, cash0, series, events: leg.events, final: last.total, finalReal: last.real,
+      return { type: c.type, count, cash0, buyPrice: price, series, events: leg.events, final: last.total, finalReal: last.real,
         gain: last.total - amount, annual: amount > 0 && last.total > 0 ? Math.pow(last.total / amount, 12 / H) - 1 : null,
         rates: periodRates(spec, ctx.cpiAt, ctx.nbpAt) };
     });

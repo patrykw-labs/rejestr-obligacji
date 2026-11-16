@@ -4,6 +4,7 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- „Co kupić?”: opcja „Kupuję za pieniądze z wykupu w terminie” — zakup po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD bez ceny zamiany — po 100 zł), w adresie `sw=1`; w tabeli i „Jak to policzono” cena zakupu każdej serii.
 - „Mój portfel”: zapis portfela do pliku `.json` i „Wczytaj z pliku” — przeniesienie na inne urządzenie albo kopia zapasowa; nierozpoznane serie pomijane z komunikatem, wczytanie można cofnąć.
 - „Mój portfel”: kalendarz `.ics` z kuponami COI, odsetkami ROR/DOR, zmianami oprocentowania i wykupami każdej serii do terminu (z przypomnieniem dzień przed wykupem; kwoty prognozowane i wstępne oznaczone jak w widoku) — do zaimportowania w telefonie lub komputerze.
 - Wersja strony w pasku górnym (na telefonie w stopce): wydanie z `CHANGELOG.md` oraz liczba commitów na `main` po wydaniu i skrót ostatniego commita (np. „v1.4.0 +3 · a279333”, link do zmian na GitHubie); bez odpowiedzi API GitHuba — samo wydanie.

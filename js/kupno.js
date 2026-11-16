@@ -10,9 +10,10 @@ Object.assign(CALC_TIPS,{
   kw:"Ile chcesz zainwestować. Kupujesz pełne obligacje po 100 zł, reszta trafia na konto.",
   bh:"Po jakim czasie chcesz wypłacić pieniądze. Seria, która wykupi się wcześniej, zamienia się na taką samą na dzisiejszych warunkach.",
   r8:"ROS i ROD mogą kupić tylko beneficjenci programu 800+ (do wysokości otrzymanych świadczeń).",
+  bsw:"Masz w tym miesiącu wykup obligacji w terminie? Za te pieniądze kupisz nowe po cenie zamiany: 99,90 zł zamiast 100 zł (OTS — 100,00 zł). ROS i ROD nie mają ceny zamiany — kupujesz je po 100 zł.",
   bval:"Domyślnie liczymy, ile dostaniesz, wypłacając wszystko na koniec okresu — z opłatą za przedterminowy wykup i podatkiem. Ta opcja pokazuje wartość bez wypłaty."
 });
-function buyDefaults(){return {kw:10000,h:60,sc:"base",cpi:Array(12).fill(2.5),sv:4,acc:"std",nbp:calcNbpNow(),r8:false,val:"l"}}
+function buyDefaults(){return {kw:10000,h:60,sc:"base",cpi:Array(12).fill(2.5),sv:4,acc:"std",nbp:calcNbpNow(),r8:false,val:"l",sw:false}}
 function buyFromHash(){
   const parts=(location.hash||"").slice(1).split("&");if(parts[0]!=="kupno"||parts.length<2)return null;
   const q=Object.fromEntries(parts.slice(1).map(x=>x.split("=").map(decodeURIComponent)));const b=buyDefaults();
@@ -21,7 +22,7 @@ function buyFromHash(){
   b.kw=num("kw",b.kw);if(q.kw!=null&&(isNaN(+q.kw)||+q.kw<100||+q.kw>1e8)){warn.push(`Kwota „${q.kw}” poza zakresem (100 zł – 100 mln zł) — przyjęto 10 000 zł.`);b.kw=buyDefaults().kw}
   if(BUY_H.includes(num("h",0)))b.h=+q.h;else if(q.h!=null)warn.push(`Okres ${q.h} mies. nie jest dostępny (do wyboru: ${BUY_H.map(buyHLabel).join(", ")}) — przyjęto ${buyHLabel(b.h)}.`);
   b.sv=num("sv",b.sv);b.nbp=num("nbp",b.nbp);
-  b.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";b.r8=q.r8==="1";b.val=q.val==="h"?"h":"l";
+  b.acc=q.ike==="1"?"ike":q.ike==="2"?"ikze":"std";b.r8=q.r8==="1";b.val=q.val==="h"?"h":"l";b.sw=q.sw==="1";
   if(q.sc&&(CPI_PRESETS[q.sc]||q.sc==="custom"))b.sc=q.sc;else if(q.sc)warn.push(`Nieznany scenariusz inflacji „${q.sc}” — przyjęto bazowy (2,5%).`);
   if(q.cpi){const a=q.cpi.split(",").map(Number).filter(v=>!isNaN(v));if(a.length)b.cpi=Array.from({length:12},(_,i)=>a[Math.min(i,a.length-1)]);}
   linkWarnSet("kupno",warn);
@@ -29,7 +30,7 @@ function buyFromHash(){
 }
 function buyHash(b){
   const q={kw:b.kw,h:b.h,sc:b.sc,sv:b.sv,ike:{std:0,ike:1,ikze:2}[b.acc]};
-  if(b.sc==="custom")q.cpi=b.cpi.join(",");if(b.r8)q.r8=1;if(b.val==="h")q.val="h";
+  if(b.sc==="custom")q.cpi=b.cpi.join(",");if(b.r8)q.r8=1;if(b.val==="h")q.val="h";if(b.sw)q.sw=1;
   if(+b.nbp!==calcNbpNow())q.nbp=b.nbp;
   return "kupno&"+Object.entries(q).map(([k,v])=>k+"="+encodeURIComponent(v).replace(/%2C/g,",")).join("&");
 }
@@ -42,7 +43,7 @@ function buyParams(b,cands,cpiOverride){
   return {now:calcArchiveNow(),amount:+b.kw,horizonMonths:+b.h,candidates:cands,cpiHistory:calcCpiHist(),
     cpiFuture:cpiOverride!=null?[cpiOverride]:(b.sc==="custom"?b.cpi.slice():[CPI_PRESETS[b.sc].v]),
     nbpHistory:Zamiana.nbpHistoryFromMonths(state.raw),nbpFuture:+b.nbp,savingsRate:+b.sv,
-    tax:b.acc==="std",withdrawalTax:b.acc==="ikze"?0.1:0,valuation:b.val==="h"?"hold":"liquidate"};
+    tax:b.acc==="std",withdrawalTax:b.acc==="ikze"?0.1:0,valuation:b.val==="h"?"hold":"liquidate",swapBuy:!!b.sw};
 }
 // opis zasady oprocentowania serii z oferty
 function buyRuleTxt(c){
@@ -66,6 +67,7 @@ function renderBuy(main){
           <label class="field wide"><span class="flabel">Kwota, zł${calcTip("kw")}</span><input id="b-kw" type="number" min="100" step="100" inputmode="numeric" value="${esc(b.kw)}"></label>
           <label class="field"><span class="flabel">Okres${calcTip("bh")}</span><span class="sel"><select id="b-h">${selOpts(BUY_H.map(m=>[m,buyHLabel(m)]),b.h)}</select></span></label>
         </div>
+        <label class="check"><input id="b-sw" type="checkbox"${b.sw?" checked":""}> Kupuję za pieniądze z wykupu w terminie (zamiana po 99,90 zł)${calcTip("bsw")}</label>
         <label class="check"><input id="b-r8" type="checkbox"${b.r8?" checked":""}> Mam prawo do obligacji rodzinnych (800+) — pokaż ROS i ROD${calcTip("r8")}</label>
         <label class="check"><input id="b-val" type="checkbox"${b.val==="h"?" checked":""}> Wyceniaj bez wypłaty (bez opłaty za wykup)${calcTip("bval")}</label>
       </div>
@@ -90,6 +92,7 @@ function renderBuy(main){
   inp("#b-kw","kw");inp("#b-sv","sv");inp("#b-nbp","nbp");
   $("#b-h").addEventListener("change",e=>{b.h=+e.target.value;renderBuy(main)});
   $("#b-r8").addEventListener("change",e=>{b.r8=e.target.checked;buyRecompute()});
+  $("#b-sw").addEventListener("change",e=>{b.sw=e.target.checked;buyRecompute()});
   $("#b-val").addEventListener("change",e=>{b.val=e.target.checked?"h":"l";buyRecompute()});
   main.querySelectorAll("button.chip[data-bsc]").forEach(x=>x.addEventListener("click",()=>{if(x.dataset.bsc==="custom"&&b.sc!=="custom"){const v=CPI_PRESETS[b.sc]?.v??2.5;b.cpi=Array(12).fill(v)}b.sc=x.dataset.bsc;renderBuy(main)}));
   main.querySelectorAll("button.chip[data-bacc]").forEach(x=>x.addEventListener("click",()=>{b.acc=x.dataset.bacc;renderBuy(main)}));
@@ -135,6 +138,7 @@ function buyRecompute(){
     if(w)n.push(w===1?"wykup w terminie i zamiana na nową":`${w}× wykup w terminie i zamiana`);
     if(x.events.some(e=>e.kind==="wykup"&&e.final))n.push("wykup w terminie na koniec okresu — bez zamiany");
     if(liq&&H%term!==0)n.push(x.type==="OTS"?"na koniec przed wykupem — bez odsetek":`na koniec przed wykupem — opłata ${x.type==="ROR"||x.type==="DOR"?"":"do "}${fmt(x.c.fee)} zł/szt.`);
+    if(b.sw)n.push(x.buyPrice<100?`zakup po ${fmt(x.buyPrice)} zł (zamiana), ${x.count} szt.`:x.type==="OTS"?"zamiana na OTS po 100,00 zł":"bez ceny zamiany — zakup po 100 zł");
     if(x.c.availability!=="wszyscy")n.push("tylko 800+");
     if(x.type==="COI")n.push("kupony co rok na konto");if(x.type==="ROR"||x.type==="DOR")n.push("odsetki co miesiąc na konto");
     return n.join("; ")};
@@ -150,7 +154,7 @@ function buyRecompute(){
       ${rank.map((x,i)=>`<tr><td>${i+1}</td><td><b style="color:var(--s-${x.type})">${esc(x.c.code)}</b> <span class="small">${esc(Zamiana.TYPES[x.type].label)}</span></td><td>${esc(buyRuleTxt(x.c))}</td><td class="r num"><b>${zl0(x.final)}</b></td><td class="r num"><span class="${x.gain>0?"d-up":x.gain<0?"d-down":"d-0"}">${sgn(x.gain)}</span></td><td class="r num">${pct(x.annual)}</td><td class="r num">${zl0(x.finalReal)}</td><td class="small">${esc(notes(x))}</td></tr>`).join("")}
       </tbody></table></div></div>
     <details class="how"><summary>Jak to policzono</summary><ul>
-      <li>Za ${zl0(+b.kw)} kupujesz pełne obligacje po 100 zł (${Math.floor(+b.kw/100)} szt.), reszta trafia na konto (${fmt(+b.sv,1)}%${b.acc==="std"?" przed podatkiem":""}).</li>
+      <li>${b.sw?`Za ${zl0(+b.kw)} z wykupu w terminie kupujesz pełne obligacje po cenie zamiany: 99,90 zł (${Math.floor(+b.kw/99.9+1e-9)} szt.), OTS po 100,00 zł, a ROS i ROD — bez ceny zamiany — po 100 zł (${Math.floor(+b.kw/100)} szt.). Podatek liczymy od kosztu zakupu (99,90 zł), reszta trafia na konto`:`Za ${zl0(+b.kw)} kupujesz pełne obligacje po 100 zł (${Math.floor(+b.kw/100)} szt.), reszta trafia na konto`} (${fmt(+b.sv,1)}%${b.acc==="std"?" przed podatkiem":""}).</li>
       <li>Oprocentowanie z listów emisyjnych oferty ${esc(mLabel(off.id))}. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt za P−2) + marża (EDO, COI, ROS, ROD) albo stopa referencyjna NBP + marża (ROR, DOR); do ${mShort(off.cpiRefMonth||off.id)} z archiwum GUS i NBP, dalej Twój scenariusz (inflacja ${b.sc==="custom"?"rok po roku":fmt(CPI_PRESETS[b.sc].v,1)+"%"}, stopa NBP ${fmt(+b.nbp)}%).</li>
       <li>Kupony COI i odsetki ROR/DOR trafiają na konto po podatku. Seria, która w tym okresie wykupi się w terminie, zamienia się na taką samą serię na dzisiejszych warunkach po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD — bez ceny zamiany, po 100 zł).</li>
       <li>${liq?`Na koniec okresu wypłacasz wszystko: przed terminem wykupu z opłatą za przedterminowy wykup (nie wyższą niż narosłe odsetki; ROR i DOR od 2. miesiąca — stałą; OTS — bez odsetek) i z podatkiem 19% od zysku${b.acc!=="std"?" (w IKE/IKZE bez podatku i bez opłaty przy wypłacie z konta)":""}.`:"Wartość bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty."}${b.acc==="ikze"?" W IKZE wartości są po 10% ryczałcie przy wypłacie po 65. roku życia.":""}</li>

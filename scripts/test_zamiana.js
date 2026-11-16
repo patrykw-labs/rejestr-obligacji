@@ -402,6 +402,12 @@ const e120 = bAt(120, "EDO"), e120w = e120.events.find((e) => e.kind === "wykup"
 eq("kupno: EDO po 10 latach = wykup w terminie na rękę, bez opłaty i bez zamiany", [e120w.t, e120w.final, e120w.newCount, r2(e120.final)], [120, true, 0, r2(e120w.proceeds + e120.cash0)]);
 eq("kupno: ROS/ROD bez ceny zamiany — przy wykupie nowe po 100 zł", bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].newCount,
   Math.floor(bAt(144, "ROS").events.filter((e) => e.kind === "wykup")[0].proceeds / 100));
+const swB = (t) => Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: 12, swapBuy: true })).results.find((x) => x.type === t);
+eq("kupno po cenie zamiany: EDO 10 000 zł po 99,90 → 100 szt. + 10 zł na konto", [swB("EDO").buyPrice, swB("EDO").count, r2(swB("EDO").cash0)], [99.9, 100, 10]);
+eq("kupno po cenie zamiany: OTS po 100,00 zł", [swB("OTS").buyPrice, swB("OTS").count], [100, 100]);
+eq("kupno po cenie zamiany: ROS bez ceny zamiany — po 100 zł", [swB("ROS").buyPrice, swB("ROS").count], [100, 100]);
+eq("kupno po cenie zamiany: EDO po roku — zysk wyższy o różnicę ceny (podatek od kosztu 99,90)", swB("EDO").final > bAt(12, "EDO").final, true);
+eq("kupno: bez opcji — zakup po 100 zł jak dotąd", bAt(12, "EDO").buyPrice, 100);
 eq("kupno: kwota 150 zł → 1 szt. i 50 zł na konto", [bAt(12, "TOS", { amount: 150 }).count, bAt(12, "TOS", { amount: 150 }).cash0], [1, 50]);
 
 // ---------------------------------------------------------------------------
