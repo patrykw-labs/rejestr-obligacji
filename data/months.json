@@ -12882,8 +12882,8 @@
  "2026-11": {
   "changeNote": "Bez zmian względem października: oprocentowanie 1. okresu, marże, opłaty i ceny zamiany identyczne we wszystkich 8 seriach (nowe kody serii listopadowych). CPI spadł z 4,1% (IX, finalny) do 3,5% (X, szybki szacunek).",
   "cpi": 3.5,
-  "cpiKind": "szybki szacunek",
-  "cpiNote": "GUS, Szybki szacunek wskaźnika cen towarów i usług konsumpcyjnych w październiku 2026 (publikacja 30.10.2026), publikacje.new.stat.gov.pl; odczyt finalny ok. połowy listopada",
+  "cpiKind": "finalny",
+  "cpiNote": "GUS, Wskaźniki cen towarów i usług konsumpcyjnych w październiku 2026 (odczyt finalny, tablica „Miesięczne wskaźniki cen towarów i usług konsumpcyjnych od 1982 roku”); wartość bez zmian względem szybkiego szacunku (3,5% r/r; 3,3% od grudnia 2025)",
   "cpiRefMonth": "2026-10",
   "cpiYtd": 3.3,
   "macroVerify": false,
@@ -13020,7 +13020,7 @@
    }
   },
   "status": "zweryfikowany",
-  "updatedAt": "2026-11-12",
+  "updatedAt": "2026-11-17",
   "verifyNote": null
  }
 }
