@@ -4,10 +4,15 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+## v1.5.2 — 2026-11-17
+
+Poprawki po kolejnym przeglądzie: link wklejony do otwartej karty, dokładniejsze wklejanie tabeli z rachunku, poprawione objaśnienia.
+
 - Link wklejony do już otwartej karty działa: strona czyta adres od nowa po zmianie części po „#” (wcześniej trzeba było odświeżyć stronę).
 - „Wklej z rachunku”: liczba sztuk sprawdzana z wartością nominalną (sztuki × 100 zł) — przy kolumnach rozdzielonych spacjami poprawnie czyta tysiące („1 000”) i doliczane sztuki zablokowane także bez nagłówka; przy niezgodności ostrzeżenie w podglądzie i po wczytaniu.
 - Objaśnienia: inflacja skumulowana może się różnić od wskaźnika r/r w każdym miesiącu poza grudniem (najbardziej na początku roku), nie tylko w styczniu i lutym; „Jak to policzono” — odsetki bieżącego okresu za pełne miesiące i część miesiąca (różnica 1–2 gr na sztuce wobec liczenia co do dnia); IKZE — także ulga 19% przy podatku liniowym.
 - `.gitattributes`: końce wierszy LF w plikach strony i skryptach (zgodne skróty `?v=…` także przy pracy na Windows).
+
 ## v1.5.1 — 2026-11-16
 
 Wklejanie tabeli posiadanych obligacji z rachunku w „Mój portfel” i drobne poprawki tego widoku.
