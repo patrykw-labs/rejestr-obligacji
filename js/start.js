@@ -1,5 +1,13 @@
 /* Rejestr ofert obligacji — start: zakładka z adresu, wczytanie danych, przełącznik motywu. Ładowany przez index.html (bez kroku budowania). */
-(function(){const h=(location.hash||"").slice(1).split("&")[0];if(["oferta","wykres","seria","zamiana","kupno","portfel"].includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
+const VIEWS=["oferta","wykres","seria","zamiana","kupno","portfel"];
+(function(){const h=(location.hash||"").slice(1).split("&")[0];if(VIEWS.includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();
+// link wklejony do już otwartej karty: zmienia się tylko część po „#”, więc przeglądarka nie przeładowuje strony — czytamy adres
+// od nowa (stan widoków z adresu kasujemy, każdy widok odczyta go jak przy starcie). Strona sama zmienia adres przez
+// history.replaceState, które nie wywołuje hashchange — bez ryzyka zapętlenia; zapamiętany portfel w przeglądarce zostaje.
+window.addEventListener("hashchange",()=>{const h=(location.hash||"").slice(1).split("&")[0];
+  state.calc=null;state.buy=null;state.pf=null;state.pfLink=false;state.pfImport=null;state.linkWarn=null;
+  state.ofHashRead=false;state.month=null;state.serHashRead=false;state.serie="EDO";state.serTab=null;
+  state.view=VIEWS.includes(h)?h:"oferta";render();scrollTo(0,0)});
 let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(state.view==="wykres")drawChart();if(state.view==="zamiana")calcRecompute();if(state.view==="kupno")buyRecompute()},150)});
 
 (async()=>{

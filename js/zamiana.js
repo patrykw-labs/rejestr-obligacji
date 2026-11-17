@@ -717,7 +717,37 @@
   function parseRegister(text) {
     const norm = (x) => String(x).replace(/[  ]/g, " ").replace(/\s+/g, " ").trim();
     const intOf = (x) => { const t = norm(x || "").replace(/ /g, ""); return /^\d+$/.test(t) ? +t : null; };
-    const CODE = /\b([A-Za-z]{3}\d{4})\b/;
+    const CODE = /\b([A-Za-z]{3}\d{4})\b/, DATES = /\d{4}-\d{2}-\d{2}|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}/g;
+    const zl = (v) => v.toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " zł";
+    // kwota z groszami („20 000,00”) → liczba; null, gdy to nie kwota
+    const amountOf = (x) => { const t = norm(x || ""); return /^\d{1,3}( \d{3})*,\d{2}$|^\d+,\d{2}$/.test(t) ? +t.replace(/ /g, "").replace(",", ".") : null; };
+    // tokeny jednej liczby z tysiącami rozdzielonymi spacją: pierwszy 1–3 cyfry, kolejne po 3 (albo jeden token dowolnej długości)
+    const grp = (t) => !t.length ? null : t.length === 1 ? (/^\d+$/.test(t[0]) ? +t[0] : null)
+      : /^\d{1,3}$/.test(t[0]) && t.slice(1).every((x) => /^\d{3}$/.test(x)) ? +t.join("") : null;
+    // tokeny po kodzie (spacje): [sztuki dostępne] [zablokowane] [wartość nominalna z groszami] … — wybór podziału, przy którym
+    // (dostępne + zablokowane) × 100 zł = wartość nominalna; bez kwoty — pierwsza i druga liczba (tysiące sklejone, uncertain)
+    const spaceCounts = (toks) => {
+      const k = toks.findIndex((t) => /^\d+,\d{2}$/.test(t)), lead = [];
+      for (const t of (k < 0 ? toks : toks.slice(0, k))) { if (/^\d+$/.test(t)) lead.push(t); else break; }
+      let cnt = lead, nominal = null;
+      if (k >= 0 && lead.length === k) {
+        const [ip, gr] = toks[k].split(",");
+        for (let s = k; s >= 1; s--) {
+          const v = grp([...lead.slice(s), ip]);
+          if (v == null) continue;
+          const nom = v + +gr / 100, c = lead.slice(0, s);
+          if (nominal == null || s < cnt.length) { nominal = nom; cnt = c; } // najdłuższa poprawna kwota — do ostrzeżenia
+          for (let j = 1; j <= s; j++) {
+            const a = grp(c.slice(0, j)), b = j < s ? grp(c.slice(j)) : 0;
+            if (a != null && b != null && Math.abs((a + b) * 100 - nom) < 0.005) return { n: a, blocked: b, nominal: nom };
+          }
+        }
+      }
+      if (!cnt.length) return null;
+      const take = (i) => { let j = i + 1; while (j < cnt.length && /^\d{3}$/.test(cnt[j]) && /^\d{1,3}$/.test(cnt[i])) j++; return [grp(cnt.slice(i, j)), j]; };
+      const [a, i2] = take(0), [b] = i2 < cnt.length ? take(i2) : [0];
+      return { n: a, blocked: b || 0, nominal, uncertain: nominal == null && cnt.length > 1 && (i2 > 1 || cnt.length > 2) };
+    };
     const rows = [], skipped = [], seen = new Map();
     let cols = null;
     for (const raw of String(text || "").replace(/\r/g, "").split("\n")) {
@@ -731,23 +761,33 @@
         if (fields && /EMISJA|SERIA|KOD/.test(up) && /LICZBA|SZT|ILO/.test(up)) {
           const find = (re, not) => fields.findIndex((f) => re.test(f.toUpperCase()) && !(not && not.test(f.toUpperCase())));
           cols = { code: find(/EMISJA|SERIA|KOD/), n: find(/DOST/) >= 0 ? find(/DOST/) : find(/LICZBA|SZT|ILO/, /ZABLOK/),
-            blocked: find(/ZABLOK/) };
+            blocked: find(/ZABLOK/), nom: find(/NOMINAL/) };
         } else if (/\d/.test(line)) skipped.push({ line, reason: "brak kodu serii" });
         continue;
       }
       const code = cm[1].toUpperCase(), info = parseCode(code);
       if (!info) { skipped.push({ line, reason: `nieznany rodzaj obligacji ${code.slice(0, 3)}` }); continue; }
-      let n = null, blocked = 0;
+      let n = null, blocked = 0, nominal = null, warn = null;
       if (fields && cols && cols.n >= 0 && fields[cols.code] && CODE.test(fields[cols.code])) {
         n = intOf(fields[cols.n]);
         if (cols.blocked >= 0) blocked = intOf(fields[cols.blocked]) || 0;
+        nominal = amountOf(cols.nom >= 0 ? fields[cols.nom] : fields.find((f) => amountOf(f) != null));
+      } else if (fields) {
+        // kolumny rozdzielone tabulatorem/średnikiem, bez nagłówka: sztuki dostępne, zablokowane, wartość nominalna…
+        const after = fields.slice(fields.findIndex((f) => CODE.test(f)) + 1), ints = [];
+        for (const f of after) { const v = intOf(f); if (v == null) break; ints.push(v); }
+        if (ints.length) { n = ints[0]; blocked = ints[1] || 0; }
+        nominal = amountOf(after.find((f) => amountOf(f) != null));
       } else {
-        const after = fields ? fields.slice(fields.findIndex((f) => CODE.test(f)) + 1)
-          : line.slice(cm.index + cm[0].length).replace(/\d{4}-\d{2}-\d{2}|\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}/g, " ").split(" ");
-        for (const f of after) { const v = intOf(f); if (v != null) { n = v; break; } }
+        // kolumny rozdzielone spacjami: „1 000” może być tysiącem albo dwiema kolumnami — rozstrzyga wartość nominalna
+        const toks = line.slice(cm.index + cm[0].length).replace(DATES, " ").split(" ").filter(Boolean);
+        const r = spaceCounts(toks);
+        if (r) { n = r.n; blocked = r.blocked; nominal = r.nominal; if (r.uncertain) warn = `${code}: sprawdź liczbę sztuk — kolumny rozdzielone spacjami nie są jednoznaczne`; }
       }
       if (n == null) { skipped.push({ line, reason: `${code}: nie znaleziono liczby sztuk` }); continue; }
       const total = n + blocked;
+      if (nominal != null && Math.abs(total * 100 - nominal) > 0.005 && Math.abs(n * 100 - nominal) > 0.005)
+        warn = `${code}: ${total} szt., a wartość nominalna ${zl(nominal)} (${total} szt. × 100 zł = ${zl(total * 100)}) — sprawdź liczbę sztuk`;
       if (!(total >= 1)) { skipped.push({ line, reason: `${code}: 0 sztuk` }); continue; }
       let day = null;
       const mat = addMonths(info.purchase, TYPES[info.type].term);
@@ -756,8 +796,9 @@
         if ((ym === info.purchase || ym === mat) && dd >= 1 && dd <= 31) { day = dd; break; }
       }
       const key = code + "~" + day;
-      if (seen.has(key)) { const r = seen.get(key); r.n += total; r.blocked += blocked; continue; }
+      if (seen.has(key)) { const r = seen.get(key); r.n += total; r.blocked += blocked; if (warn) r.warn = r.warn ? r.warn + "; " + warn : warn; continue; }
       const r = { code, n: total, blocked, day };
+      if (warn) r.warn = warn;
       seen.set(key, r);
       rows.push(r);
     }

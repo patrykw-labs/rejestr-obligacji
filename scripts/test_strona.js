@@ -422,7 +422,7 @@ const CASES = [
   {
     let problem = "";
     const REG = "EMISJA\tDOSTĘPNA LICZBA OBLIGACJI\tZABLOKOWANA LICZBA OBLIGACJI\tWARTOŚĆ NOMINALNA\tWARTOŚĆ AKTUALNA\tDATA WYKUPU\n" +
-      "EDO1036\t200\t0\t20 000,00\t\t2036-10-16\nEDO1136\t24\t0\t2 400,00\t\t2036-11-03\nROD1038\t126\t0\t12 690,00\t\t2038-10-05\n" +
+      "EDO1036\t200\t0\t20 000,00\t\t2036-10-16\nEDO1136\t24\t0\t2 400,00\t\t2036-11-03\nROD1038\t126\t0\t12 600,00\t\t2038-10-05\n" +
       "ROD1138\t16\t0\t1 600,00\t\t2038-11-03\nXYZ1234\t5\t0\n";
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     const pg = await ctx.newPage();
@@ -436,7 +436,11 @@ const CASES = [
       await pg.fill("#p-paste", REG);
       const prev = await pg.textContent("#p-paste-prev");
       const wide = await pg.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
-      if (!/Rozpoznano 4 serie/.test(prev) || !/EDO1036 × 200 szt\. · zakup 16\.10\.2026/.test(prev) || !/XYZ/.test(prev)) problem = "podgląd wklejonej tabeli: " + prev;
+      await pg.fill("#p-paste", REG.replace("12 600,00", "12 690,00"));
+      if (!/sprawdź przed wczytaniem[\s\S]*ROD1038: 126 szt\., a wartość nominalna 12 690,00 zł/.test(await pg.textContent("#p-paste-prev"))) problem = "brak ostrzeżenia o wartości nominalnej w podglądzie";
+      await pg.fill("#p-paste", REG);
+      if (problem) {}
+      else if (!/Rozpoznano 4 serie/.test(prev) || !/EDO1036 × 200 szt\. · zakup 16\.10\.2026/.test(prev) || !/XYZ/.test(prev)) problem = "podgląd wklejonej tabeli: " + prev;
       else if (wide) problem = "pole wklejania: poziome przewijanie na telefonie";
       else {
         await pg.click("#p-paste-ok");
@@ -469,6 +473,32 @@ const CASES = [
     if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
     await ctx.close();
     if (problem) { fail++; console.log("✗ portfel — wklejanie z rachunku: " + problem); } else pass++;
+  }
+  // link wklejony do już otwartej karty (zmiana tylko po „#”, bez przeładowania) — widok czyta adres od nowa
+  {
+    let problem = "";
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const pg = await ctx.newPage();
+    const errors = [];
+    pg.on("pageerror", (e) => errors.push(e.message));
+    await pg.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      await pg.goto(base + "#portfel");
+      await pg.waitForSelector("#p-out .stats");
+      await pg.evaluate(() => { location.hash = "#kupno&kw=7300&h=36"; });
+      await pg.waitForSelector("#b-out .verdict");
+      if ((await pg.inputValue("#b-kw")) !== "7300") problem = "„Co kupić” nie wczytało kwoty z nowego adresu";
+      await pg.evaluate(() => { location.hash = "#portfel&pf=TOS1127~15&bd=12"; });
+      await pg.waitForSelector("#p-out .stats");
+      const v = await pg.$eval("select[data-pk=code]", (e) => e.value), store = await pg.textContent("#p-store");
+      if (!problem && (v !== "TOS1127" || !/otwarto z linku/.test(store))) problem = `portfel z nowego adresu: ${v}, ${store}`;
+      await pg.evaluate(() => { location.hash = "#seria&s=COI&w=1"; });
+      await pg.waitForFunction(() => /COI/.test(document.querySelector("main h2")?.textContent || ""));
+      if (!problem && !/s=COI&w=1/.test(await pg.evaluate(() => location.hash))) problem = "Historia serii: adres po odczycie " + await pg.evaluate(() => location.hash);
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    await ctx.close();
+    if (problem) { fail++; console.log("✗ link wklejony do otwartej karty: " + problem); } else pass++;
   }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();

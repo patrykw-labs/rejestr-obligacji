@@ -493,7 +493,7 @@ eq("krok inflacji: miesiąc bez odczytu → scenariusz (2,5% rocznie)", stepR("2
 // ---------------------------------------------------------------------------
 const REG = "EMISJA\tDOSTĘPNA LICZBA OBLIGACJI\tZABLOKOWANA LICZBA OBLIGACJI\tWARTOŚĆ NOMINALNA\tWARTOŚĆ AKTUALNA\tDATA WYKUPU\n" +
   "EDO1036\t200\t0\t20 000,00\t\t2036-10-16\nEDO1136\t24\t0\t2 400,00\t\t2036-11-03\n" +
-  "ROD1038\t126\t0\t12 690,00\t\t2038-10-05\nROD1138\t16\t0\t1 600,00\t\t2038-11-03\n";
+  "ROD1038\t126\t0\t12 600,00\t\t2038-10-05\nROD1138\t16\t0\t1 600,00\t\t2038-11-03\n";
 const regExp = [{ code: "EDO1036", n: 200, blocked: 0, day: 16 }, { code: "EDO1136", n: 24, blocked: 0, day: 3 },
   { code: "ROD1038", n: 126, blocked: 0, day: 5 }, { code: "ROD1138", n: 16, blocked: 0, day: 3 }];
 eq("rachunek: tabela z tabulatorami — seria, sztuki, dzień z daty wykupu", Z.parseRegister(REG), { rows: regExp, skipped: [] });
@@ -512,6 +512,16 @@ eq("rachunek: data spoza miesiąca zakupu/wykupu → dzień nieznany", Z.parseRe
 const regS = Z.parseRegister("Razem\t366\t0\nXYZ1234\t5\nEDO1036\t0\t0\t2036-10-16\nEDO1136\tbrak\n");
 eq("rachunek: pominięte wiersze z powodem", regS.skipped.map((x) => x.reason),
   ["brak kodu serii", "nieznany rodzaj obligacji XYZ", "EDO1036: 0 sztuk", "EDO1136: nie znaleziono liczby sztuk"]);
+// kolumny rozdzielone spacjami: tysiące i sztuki zablokowane rozstrzyga wartość nominalna (sztuki × 100 zł)
+const sp = (t) => Z.parseRegister(t).rows[0];
+eq("rachunek (spacje): „1 000” sztuk → 1000, nie 1", sp("EDO0434 1 000 0 100 000,00 2034-04-02"), { code: "EDO0434", n: 1000, blocked: 0, day: 2 });
+eq("rachunek (spacje): zablokowane doliczone bez nagłówka (50 + 5)", sp("EDO0434  50  5  5 500,00  2034-04-02"), { code: "EDO0434", n: 55, blocked: 5, day: 2 });
+eq("rachunek (spacje): 999 + 1 przy nominale 100 000,00", sp("EDO0434 999 1 100 000,00 2034-04-02").n, 1000);
+eq("rachunek (tabulatory, bez nagłówka): zablokowane w 2. kolumnie", sp("EDO0434\t50\t5\t5 500,00\t\t2034-04-02").n, 55);
+eq("rachunek: liczba sztuk niezgodna z wartością nominalną → ostrzeżenie", sp("ROD1038\t126\t0\t12 690,00\t\t2038-10-05").warn,
+  "ROD1038: 126 szt., a wartość nominalna 12 690,00 zł (126 szt. × 100 zł = 12 600,00 zł) — sprawdź liczbę sztuk");
+eq("rachunek (spacje) bez kwoty: sklejone tysiące z ostrzeżeniem", [sp("EDO0434 1 000 0").n, !!sp("EDO0434 1 000 0").warn], [1000, true]);
+eq("rachunek (spacje) bez kwoty: 200 i 0 — bez ostrzeżenia", [sp("EDO0434 200 0 2034-04-02").n, sp("EDO0434 200 0 2034-04-02").warn], [200, undefined]);
 eq("rachunek: pusty tekst", Z.parseRegister(""), { rows: [], skipped: [] });
 
 console.log(`${pass} OK, ${fail} błędów`);

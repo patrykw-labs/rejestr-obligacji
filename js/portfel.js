@@ -47,13 +47,13 @@ function pfParseFile(text){
 // tabela z rachunku (wklejona albo plik arkusza zapisany jako tekst, CSV lub HTML) → serie portfela; parser w silniku
 // (Zamiana.parseRegister); serie spoza archiwum i ponad PF_MAX pominięte; brak daty → dzień 1 (noDay)
 function pfFromRegister(text){
-  const r=Zamiana.parseRegister(text),pos=[],skipped=r.skipped.map(x=>x.reason),noDay=[];let blocked=0;
+  const r=Zamiana.parseRegister(text),pos=[],skipped=r.skipped.map(x=>x.reason),noDay=[],warns=[];let blocked=0;
   for(const o of r.rows){const a=calcFromCode(o.code);
     if(!a||!CALC_TYPES.includes(a.type)){skipped.push(o.code+": brak w archiwum");continue}
     if(pos.length>=PF_MAX){skipped.push(o.code+` (ponad ${PF_MAX} serii)`);continue}
-    if(o.day==null)noDay.push(o.code);blocked+=o.blocked;
+    if(o.day==null)noDay.push(o.code);if(o.warn)warns.push(o.warn);blocked+=o.blocked;
     pos.push({code:a.code,n:o.n,pd:o.day||1})}
-  return {pos,skipped,noDay,blocked};
+  return {pos,skipped,noDay,blocked,warns};
 }
 // tabela HTML (np. plik .xls zapisany przez serwis jako strona) → wiersze rozdzielone tabulatorami
 const pfHtmlToText=h=>h.replace(/<\/t[dh]>/gi,"\t").replace(/<\/tr>|<br\s*\/?>/gi,"\n").replace(/<[^>]+>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&");
@@ -64,6 +64,7 @@ function pfPastePreview(t){
   const r=pfFromRegister(t);
   const list=r.pos.map(o=>{const a=calcFromCode(o.code);return `<li><b>${esc(o.code)}</b> × ${o.n} szt. · zakup ${esc(pfDate(a.p,o.pd))}${r.noDay.includes(o.code)?" (dnia nie rozpoznano — przyjęto 1.)":""}</li>`}).join("");
   return (r.pos.length?`<p class="small"><b>Rozpoznano ${r.pos.length} ${pfSeriesWord(r.pos.length)}:</b></p><ul class="small evlist">${list}</ul>`:`<p class="small"><b>Nie rozpoznano żadnej serii.</b> Potrzebny jest kod serii (np. EDO1036) i liczba sztuk w tym samym wierszu.</p>`)
+    +(r.warns.length?`<div class="insight warn" role="status"><span class="t">sprawdź przed wczytaniem</span>${r.warns.map(esc).join("<br>")}</div>`:"")
     +(r.blocked?`<p class="small">W tym ${r.blocked} szt. zablokowanych (np. zlecenie wykupu albo zamiany w toku) — liczone razem z dostępnymi.</p>`:"")
     +(r.skipped.length?`<p class="small">Pominięto: ${esc(r.skipped.join("; "))}.</p>`:"");
 }
@@ -80,7 +81,7 @@ function pfApplyImport(main,pos,info){
 // komunikat po wczytaniu pliku (z „Cofnij” — przywraca portfel sprzed wczytania)
 function pfImportHtml(){const m=state.pfImport;if(!m)return "";state.pfImport=null;
   if(m.error)return `<div class="insight warn" role="status"><span class="t">nie udało się wczytać</span>${esc(m.error)}</div>`;
-  return `<div class="insight${m.skipped.length?" warn":""}" role="status"><span class="t">wczytano portfel</span>${m.count} ${pfSeriesWord(m.count)} ${m.name?"z pliku "+esc(m.name):"z wklejonej tabeli"}${m.skipped.length?`; pominięto: ${esc(m.skipped.join("; "))}`:""}.${m.noDay&&m.noDay.length?` Bez daty (przyjęto dzień 1. — popraw w polu „Dzień”): ${esc(m.noDay.join(", "))}.`:""} Portfel jest zapamiętany w tej przeglądarce. <button type="button" class="linkbtn" id="p-import-undo">Cofnij</button></div>`}
+  return `<div class="insight${m.skipped.length||(m.warns&&m.warns.length)?" warn":""}" role="status"><span class="t">wczytano portfel</span>${m.count} ${pfSeriesWord(m.count)} ${m.name?"z pliku "+esc(m.name):"z wklejonej tabeli"}${m.skipped.length?`; pominięto: ${esc(m.skipped.join("; "))}`:""}.${m.warns&&m.warns.length?` Sprawdź: ${esc(m.warns.join("; "))}.`:""}${m.noDay&&m.noDay.length?` Bez daty (przyjęto dzień 1. — popraw w polu „Dzień”): ${esc(m.noDay.join(", "))}.`:""} Portfel jest zapamiętany w tej przeglądarce. <button type="button" class="linkbtn" id="p-import-undo">Cofnij</button></div>`}
 function pfLoad(){try{const j=JSON.parse(localStorage.getItem(PF_KEY)||"null");if(!j||!Array.isArray(j.pos))return null;const s=pfDefaults();
     const pos=j.pos.slice(0,PF_MAX).map(o=>{const a=calcFromCode(o.code);return a&&CALC_TYPES.includes(a.type)&&+o.n>=1?{code:a.code,n:Math.floor(+o.n),pd:calcDayOk(o.pd)?+o.pd:1}:null}).filter(Boolean);
     if(!pos.length)return null;s.pos=pos;s.acc=j.acc==="ike"?"ike":"std";if(CPI_PRESETS[j.sc])s.sc=j.sc;return s}catch(e){return null}}
@@ -181,14 +182,14 @@ function renderPortfolio(main){
     if(/^\s*\{/.test(text)){const r=pfParseFile(text);if(r.error)return fail(r.error);return pfApplyImport(main,r.state.pos,{skipped:r.skipped,name:f.name,acc:r.state.acc,sc:r.state.sc})}
     const r=pfFromRegister(/<t[dh][\s>]/i.test(text)?pfHtmlToText(text):text);
     if(!r.pos.length)return fail(`W pliku ${f.name} nie ma portfela ani tabeli z kodami serii${r.skipped.length?` (pominięto: ${r.skipped.slice(0,5).join("; ")})`:""}.`);
-    pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay,name:f.name})});
+    pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay,warns:r.warns,name:f.name})});
   // wklejenie tabeli z rachunku: podgląd na żywo (bez przerysowania widoku), wczytanie z „Cofnij”
   $("#p-paste-open").addEventListener("click",()=>{state.pfPaste=!state.pfPaste;renderPortfolio(main);const ta=$("#p-paste");if(ta)ta.focus()});
   const ta=$("#p-paste");
   if(ta){ta.addEventListener("input",()=>{state.pfPasteText=ta.value;$("#p-paste-prev").innerHTML=pfPastePreview(ta.value);$("#p-paste-ok").disabled=!pfFromRegister(ta.value).pos.length});
     $("#p-paste-cancel").addEventListener("click",()=>{state.pfPaste=false;state.pfPasteText="";renderPortfolio(main)});
     $("#p-paste-ok").addEventListener("click",()=>{const r=pfFromRegister(ta.value);if(!r.pos.length)return;state.pfPaste=false;state.pfPasteText="";
-      pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay})})}
+      pfApplyImport(main,r.pos,{skipped:r.skipped,noDay:r.noDay,warns:r.warns})})}
   const iu=$("#p-import-undo");if(iu)iu.addEventListener("click",()=>{const u=state.pfImportUndo;if(!u)return;state.pf=u.pf;state.pfLink=u.link;state.pfImportUndo=null;renderPortfolio(main)});
   calcBindTips(main.querySelector(".calc-grid"));
   pfRecompute();
@@ -246,7 +247,7 @@ function pfRecompute(){
     <div class="card"><h3>Najbliższe 12 miesięcy <small>kupony, nowe oprocentowanie, wykupy</small></h3>${evHtml}</div>
     <div class="row"><a class="btn" id="p-calc" href="#${esc(calcH)}">Czy opłaca się zamienić te serie na nowe? → kalkulator zamiany</a>${s.pos.length>CALC_MAXPOS?`<span class="small">(pierwsze ${CALC_MAXPOS} serii)</span>`:""}</div>
     <details class="how"><summary>Jak to policzono</summary><ul>
-      <li>Wartość na ${esc(pfDate(now,s.bd))}: 100 zł × kolejne okresy odsetkowe (kapitalizacja roczna w EDO, ROS, ROD, TOS) plus odsetki narosłe w bieżącym okresie, liczone od dnia zakupu co do dnia. W COI, ROR i DOR odsetki z zakończonych okresów zostały już wypłacone („wypłacone dotąd” — po podatku, bez oprocentowania).</li>
+      <li>Wartość na ${esc(pfDate(now,s.bd))}: 100 zł × kolejne okresy odsetkowe (kapitalizacja roczna w EDO, ROS, ROD, TOS) plus odsetki narosłe w bieżącym okresie: za pełne miesiące od rocznicy (miesięcznicy) zakupu i część bieżącego miesiąca do dnia wyceny — list emisyjny liczy je za faktyczną liczbę dni, więc wynik może się różnić o 1–2 gr na sztuce. W COI, ROR i DOR odsetki z zakończonych okresów zostały już wypłacone („wypłacone dotąd” — po podatku, bez oprocentowania).</li>
       <li>Na rękę po zerwaniu: wartość minus opłata za przedterminowy wykup (nie wyższa niż narosłe odsetki — wypłata nie mniej niż 100 zł za sztukę; ROR i DOR od 2. miesiąca: stała opłata; OTS: 100 zł bez odsetek)${tax?", minus 19% podatku od zysku":"; w IKE / IKZE bez podatku (przy wypłacie z konta opłata za wykup nie jest pobierana — tu pokazujemy zerwanie w ramach konta)"}.</li>
       <li>Oprocentowanie z listów emisyjnych. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt GUS za P−2) + marża; ROR i DOR — stopa referencyjna NBP + marża. Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||now)} z archiwum, dalej scenariusz: inflacja ${fmt(CPI_PRESETS[s.sc].v,1)}%, stopa NBP ${fmt(calcNbpNow())}% (bez zmian).</li>
       <li>Przy wykupie w terminie: wartość końcowa (COI, ROR, DOR: 100 zł + ostatnie odsetki) plus kupony i odsetki należne od dziś do wykupu${tax?", wszystko po podatku":""}; bez ich oprocentowania na koncie, bez zamiany na nowe obligacje i bez odsetek wypłaconych wcześniej. Stopy liczone z szybkiego szacunku CPI oznaczamy jako wstępne — odczyt finalny GUS może się nieco różnić.</li>
