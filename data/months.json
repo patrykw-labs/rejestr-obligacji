@@ -12880,7 +12880,7 @@
   "verifyNote": null
  },
  "2026-11": {
-  "changeNote": "Bez zmian względem października: oprocentowanie 1. okresu, marże, opłaty i ceny zamiany identyczne we wszystkich 8 seriach (nowe kody serii listopadowych). CPI spadł z 4,1% (IX, finalny) do 3,5% (X, szybki szacunek).",
+  "changeNote": "Bez zmian względem października: oprocentowanie 1. okresu, marże, opłaty i ceny zamiany identyczne we wszystkich 8 seriach (nowe kody serii listopadowych). CPI spadł z 4,1% (IX, finalny) do 3,5% (X, finalny).",
   "cpi": 3.5,
   "cpiKind": "finalny",
   "cpiNote": "GUS, Wskaźniki cen towarów i usług konsumpcyjnych w październiku 2026 (odczyt finalny, tablica „Miesięczne wskaźniki cen towarów i usług konsumpcyjnych od 1982 roku”); wartość bez zmian względem szybkiego szacunku (3,5% r/r; 3,3% od grudnia 2025)",

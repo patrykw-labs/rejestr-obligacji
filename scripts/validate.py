@@ -9,8 +9,13 @@ SERIES_KEYS = {"code","term","rate1","rule","margin","capitalization","payout","
 MONTH_KEYS = {"series","nbpRef","cpi","cpiRefMonth","cpiKind","macroVerify","changeNote","status","verifyNote","updatedAt"}
 errors, warnings = [], []
 
-data = json.loads(PATH.read_text(encoding="utf-8"))
+RAW = PATH.read_text(encoding="utf-8")
+data = json.loads(RAW)
 ids = sorted(data)
+# zapis skryptem: indent=1, sort_keys=True, ensure_ascii=False i znak nowej linii na końcu (inaczej zbędne zmiany w diffie)
+if RAW != json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False) + "\n":
+    errors.append("months.json: zły format zapisu — zapisz przez json.dumps(data, indent=1, sort_keys=True, "
+                  "ensure_ascii=False) + \"\\n\" (z nową linią na końcu)")
 for mid in ids:
     m = data[mid]
     if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", mid):
