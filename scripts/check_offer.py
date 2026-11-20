@@ -6,7 +6,9 @@ Niczego nie zapisuje. Sprawdza:
   - czy kody serii zgadzają się z ofertą na obligacjeskarbowe.pl,
   - oprocentowanie 1. okresu, marżę, opłatę za przedterminowy wykup i cenę zamiany
     każdej serii z listem emisyjnym (PDF, odczyt przez pdftotext),
-  - stopę referencyjną NBP obowiązującą 1. dnia miesiąca (archiwum XML NBP),
+  - stopę referencyjną NBP obowiązującą 1. dnia miesiąca (archiwum XML NBP) oraz to, czy dla miesięcy od 06.2022
+    równa się stopie z 10. dnia roboczego przed miesiącem (od niej list liczy ROR/DOR, silnik — od nbpRef);
+    różnica w kontrolowanym rekordzie = błąd, w archiwum = ostrzeżenie,
   - czy CPI w rekordzie dotyczy poprzedniego miesiąca, a od 18. dnia miesiąca
     (i zawsze dla wcześniejszych miesięcy) czy jest już odczytem finalnym GUS
     (szybki szacunek GUS zastępuje odczytem finalnym ok. 15. dnia); przy odczycie finalnym także cpiYtd
@@ -19,7 +21,7 @@ Niczego nie zapisuje. Sprawdza:
 Kod wyjścia 1, gdy coś się nie zgadza albo nie da się tego odczytać.
 Użycie: python3 scripts/check_offer.py [RRRR-MM]
 Zmienna CHECK_TODAY=RRRR-MM-DD podmienia dzisiejszą datę (do testów),
-CHECK_GUS_CSV=ścieżka — tablicę GUS z pliku zamiast pobierania (do testów).
+CHECK_GUS_CSV=ścieżka — tablicę GUS z pliku zamiast pobierania (do testów), CHECK_NBP_XML=ścieżka — archiwum NBP z pliku.
 """
 import datetime as dt
 import json
@@ -99,18 +101,84 @@ def parse_letter(t):
     return {"rate1": rate1, "margin": None if fixed else margin, "fee": fee, "swapPrice": swap, "fixed": fixed}
 
 
+_NBP = []
+
+
+def nbp_ref_history():
+    """Stopa referencyjna NBP: [(obowiązuje_od "RRRR-MM-DD", %)] rosnąco (archiwum XML, raz na przebieg; CHECK_NBP_XML = plik)."""
+    if not _NBP:
+        raw = Path(os.environ["CHECK_NBP_XML"]).read_bytes() if os.environ.get("CHECK_NBP_XML") else fetch(NBP_XML, binary=True)
+        hist = {}
+        for poz in ET.fromstring(raw).iter("pozycje"):
+            since = poz.get("obowiazuje_od")
+            for q in poz.iter("pozycja"):
+                if since and q.get("id") == "ref":
+                    hist[since] = num(q.get("oprocentowanie"))
+        _NBP.extend(sorted(hist.items()))
+    return _NBP
+
+
 def nbp_ref_on(day):
-    root = ET.fromstring(fetch(NBP_XML, binary=True))
     best = None
-    for poz in root.iter("pozycje"):
-        since = poz.get("obowiazuje_od")
-        if not since or since > day.isoformat():
-            continue
-        for p in poz.iter("pozycja"):
-            if p.get("id") == "ref":
-                if best is None or since > best[0]:
-                    best = (since, num(p.get("oprocentowanie")))
+    for since, rate in nbp_ref_history():
+        if since <= day.isoformat():
+            best = (since, rate)
     return best
+
+
+def easter(y):
+    a, b, c = y % 19, y // 100, y % 100
+    d, e = b // 4, b % 4
+    g = (8 * b + 13) // 25
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 19 * l) // 433
+    month = (h + l - 7 * m + 90) // 25
+    return dt.date(y, month, (h + l - 7 * m + 33 * month + 19) % 32)
+
+
+def pl_holiday(day):
+    """Dni ustawowo wolne od pracy w Polsce (niedziele sprawdza is_business_day)."""
+    fixed = {(1, 1), (1, 6), (5, 1), (5, 3), (8, 15), (11, 1), (11, 11), (12, 25), (12, 26)}
+    if (day.month, day.day) in fixed or (day.year >= 2025 and (day.month, day.day) == (12, 24)):
+        return True
+    e = easter(day.year)
+    return day in (e + dt.timedelta(days=1), e + dt.timedelta(days=60))  # poniedziałek wielkanocny, Boże Ciało
+
+
+def business_days_before(first_day, n=10):
+    """n-ty dzień roboczy przed first_day (list ROR/DOR: stopa NBP „obowiązująca w dziesiątym dniu roboczym przed
+    pierwszym dniem miesiąca” okresu odsetkowego)."""
+    d, k = first_day, 0
+    while k < n:
+        d -= dt.timedelta(days=1)
+        if d.weekday() < 5 and not pl_holiday(d):
+            k += 1
+    return d
+
+
+ROR_FROM = "2022-06"  # ROR/DOR zmienne wg stopy NBP
+
+
+def check_nbp_ror(data, month):
+    """Silnik liczy ROR/DOR od nbpRef (stopa z 1. dnia miesiąca), a list — od stopy z 10. dnia roboczego przed miesiącem.
+    Różnią się, gdy NBP zmienił stopę w tych ostatnich dniach roboczych. Rekord kontrolowanego miesiąca → błąd, archiwum → ostrzeżenie."""
+    bad = []
+    for ym in sorted(k for k in data if k >= ROR_FROM):
+        y, m = map(int, ym.split("-"))
+        first = dt.date(y, m, 1)
+        tday = business_days_before(first)
+        at_t, at_1 = nbp_ref_on(tday), nbp_ref_on(first)
+        if at_t and at_1 and at_t[1] != at_1[1]:
+            msg = (f"ROR/DOR {ym}: stopa NBP w 10. dniu roboczym przed miesiącem ({tday.isoformat()}) to {fmt(at_t[1])}%, "
+                   f"a 1. dnia miesiąca (nbpRef) {fmt(at_1[1])}% — zmiana od {at_1[0]}; silnik policzy okresy ROR/DOR z {ym} "
+                   "od nbpRef, a według listu obowiązuje stopa sprzed zmiany")
+            (errors if ym == month else warns).append(msg)
+            bad.append(ym)
+    if not bad:
+        oks.append(f"stopa NBP z 10. dnia roboczego przed miesiącem = nbpRef we wszystkich miesiącach od {ROR_FROM} (ROR/DOR)")
+    return bad
 
 
 def gus_cpi():
@@ -282,6 +350,8 @@ def check_macro(rec, month, first_day, prev, today, cur):
         errors.append("nie udało się odczytać stopy referencyjnej z archiwum NBP")
     else:
         check(f"stopa referencyjna NBP na {first_day.isoformat()} (obowiązuje od {nbp[0]})", rec.get("nbpRef"), nbp[1])
+        if month >= ROR_FROM:
+            check_nbp_ror(json.loads((ROOT / "data" / "months.json").read_text(encoding="utf-8")), month)
 
     # CPI
     if rec.get("cpi") is None:

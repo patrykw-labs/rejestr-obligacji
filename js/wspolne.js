@@ -9,7 +9,7 @@ const VIEW_TIPS={
   o_next:"Jak liczone jest oprocentowanie od 2. okresu: stałe przez cały czas, inflacja (CPI) + marża albo stopa referencyjna NBP + marża.",
   o_cap:"Roczna — odsetki co rok dopisywane do kapitału (procent składany), wypłata przy wykupie. Brak — odsetki liczone zawsze od 100 zł.",
   o_pay:"Kiedy dostajesz odsetki: przy wykupie, co rok (kupon) albo co miesiąc.",
-  o_fee:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki, więc nie stracisz z wpłaconych 100 zł (wyjątek: ROR i DOR od 2. miesiąca).",
+  o_fee:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki, więc nie stracisz z wpłaconych 100 zł. Wyjątki: COI od 2. roku oraz ROR i DOR od 2. miesiąca — tam opłata jest stała, także gdy przekracza narosłe odsetki (wypłata może być niższa niż 100 zł za sztukę).",
   o_swap:"Cena nowej obligacji przy zamianie w dniu wykupu starej — zwykle 99,90 zł zamiast 100 zł (OTS: 100,00 zł). ROS i ROD nie mają ceny zamiany.",
   o_avail:"Kto może kupić serię: wszyscy albo tylko beneficjenci programu 800+ (obligacje rodzinne ROS i ROD).",
   mode:"Co pokazuje wykres: oprocentowanie 1. okresu z listów emisyjnych, samą marżę ponad wskaźnik albo faktyczne oprocentowanie 2. roku z późniejszych odczytów CPI i stóp NBP.",
@@ -41,6 +41,10 @@ let calcTipY=0;document.addEventListener("focusin",e=>{if(e.target.classList&&e.
 window.addEventListener("scroll",()=>{if(Math.abs(scrollY-calcTipY)<40)return;document.querySelectorAll(".qtip.open").forEach(x=>x.classList.remove("open"));const a=document.activeElement;if(a&&a.classList&&a.classList.contains("qtip"))a.blur()},{passive:true});
 // ustawienia z adresu, których nie dało się wczytać (nieznana seria, okres, typ…): state.linkWarn[widok] = [teksty];
 // komunikat pokazujemy raz, przy pierwszym wyświetleniu widoku, zamiast cicho przechodzić na ustawienia domyślne
+// okno przedterminowego wykupu (Zamiana.redeemWindow): krótki opis, gdy w danym dniu nie można zerwać serii
+const isoDmy=s=>s.split("-").reverse().join(".");
+const redeemTxt=w=>w.reason==="early"?`dyspozycję przedterminowego wykupu można złożyć od ${isoDmy(w.from)} (po 7 dniach od zakupu)`
+  :`do wykupu w terminie (${isoDmy(w.maturity)}) zostało mniej niż 20 dni — przedterminowego wykupu nie można już zlecić`;
 function linkWarnSet(view,list){if(list&&list.length){state.linkWarn=state.linkWarn||{};state.linkWarn[view]=list}}
 function linkWarnHtml(view){const l=state.linkWarn&&state.linkWarn[view];if(!l)return "";delete state.linkWarn[view];
   return `<div class="insight warn" role="status"><span class="t">nie wszystko z linku dało się wczytać</span>${l.map(esc).join("<br>")}</div>`}

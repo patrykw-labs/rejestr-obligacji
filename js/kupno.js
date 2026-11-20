@@ -125,19 +125,18 @@ function buyRecompute(){
     else{for(let i=0;i<40;i++){const m=(lo+hi)/2,fm=f(m);if(Math.sign(fm)===Math.sign(flo)){lo=m;flo=fm}else{hi=m;fhi=fm}}
       const be=(lo+hi)/2;beTxt=`${esc(best.c.code)} wygrywa z ${esc(second.c.code)}, dopóki stała inflacja jest ${f(-2)>0?"poniżej":"powyżej"} ${fmt(be,1)}%.`}
   }
-  // wrażliwość na moment wypłaty: zwycięzca przy okresie o miesiąc krótszym i dłuższym (np. COI bez opłaty w rocznicę zakupu)
+  // wrażliwość na moment wypłaty: zwycięzca przy okresie o miesiąc krótszym i dłuższym (np. kupon COI albo wykup w terminie tuż za granicą okresu)
   const winnerAt=h=>{if(h<1||h>BUY_H[BUY_H.length-1]+1)return null;try{return Zamiana.compareBuy(Object.assign(buyParams(b,cands),{horizonMonths:h})).ranking[0]}catch(e){return null}};
   const wShort=winnerAt(H-1),wLong=winnerAt(H+1),codeOf=t=>cand[t]?.code||t;
   let momentTxt="";
   if((wShort&&wShort!==best.type)||(wLong&&wLong!==best.type)){
     const parts=wShort&&wLong&&wShort===wLong?[`o miesiąc krótszym lub dłuższym wygrywa ${esc(codeOf(wShort))}`]
       :[wShort?`o miesiąc krótszym wygrywa ${esc(codeOf(wShort))}`:"",wLong?`o miesiąc dłuższym — ${esc(codeOf(wLong))}`:""].filter(Boolean);
-    momentTxt=`Wynik zależy od dokładnego momentu wypłaty: przy okresie ${parts.join(", a przy okresie ")}.`+
-      (best.type==="COI"&&liq?" COI wypada najlepiej, gdy wypłata przypada w rocznicę zakupu: odsetki bieżącego roku wynoszą wtedy 0, więc nie ma opłaty za wcześniejszy wykup.":"");}
+    momentTxt=`Wynik zależy od dokładnego momentu wypłaty: przy okresie ${parts.join(", a przy okresie ")}.`;}
   const notes=x=>{const n=[];const term=Zamiana.TYPES[x.type].term;const w=x.events.filter(e=>e.kind==="wykup"&&!e.final).length;
     if(w)n.push(w===1?"wykup w terminie i zamiana na nową":`${w}× wykup w terminie i zamiana`);
     if(x.events.some(e=>e.kind==="wykup"&&e.final))n.push("wykup w terminie na koniec okresu — bez zamiany");
-    if(liq&&H%term!==0)n.push(x.type==="OTS"?"na koniec przed wykupem — bez odsetek":`na koniec przed wykupem — opłata ${x.type==="ROR"||x.type==="DOR"?"":"do "}${fmt(x.c.fee)} zł/szt.`);
+    if(liq&&H%term!==0)n.push(x.type==="OTS"?"na koniec przed wykupem — bez odsetek":`na koniec przed wykupem — opłata ${Zamiana.TYPES[x.type].flatFee&&H%term>=(Zamiana.TYPES[x.type].period||12)?"":"do "}${fmt(x.c.fee)} zł/szt.`);
     if(b.sw)n.push(x.buyPrice<100?`zakup po ${fmt(x.buyPrice)} zł (zamiana), ${x.count} szt.`:x.type==="OTS"?"zamiana na OTS po 100,00 zł":"bez ceny zamiany — zakup po 100 zł");
     if(x.c.availability!=="wszyscy")n.push("tylko 800+");
     if(x.type==="COI")n.push("kupony co rok na konto");if(x.type==="ROR"||x.type==="DOR")n.push("odsetki co miesiąc na konto");
@@ -157,7 +156,7 @@ function buyRecompute(){
       <li>${b.sw?`Za ${zl0(+b.kw)} z wykupu w terminie kupujesz pełne obligacje po cenie zamiany: 99,90 zł (${Math.floor(+b.kw/99.9+1e-9)} szt.), OTS po 100,00 zł, a ROS i ROD — bez ceny zamiany — po 100 zł (${Math.floor(+b.kw/100)} szt.). Podatek liczymy od kosztu zakupu (99,90 zł), reszta trafia na konto`:`Za ${zl0(+b.kw)} kupujesz pełne obligacje po 100 zł (${Math.floor(+b.kw/100)} szt.), reszta trafia na konto`} (${fmt(+b.sv,1)}%${b.acc==="std"?" przed podatkiem":""}).</li>
       <li>Oprocentowanie z listów emisyjnych oferty ${esc(mLabel(off.id))}. Od 2. okresu: inflacja ogłoszona w miesiącu przed okresem (odczyt za P−2) + marża (EDO, COI, ROS, ROD) albo stopa referencyjna NBP + marża (ROR, DOR); do ${mShort(off.cpiRefMonth||off.id)} z archiwum GUS i NBP, dalej Twój scenariusz (inflacja ${b.sc==="custom"?"rok po roku":fmt(CPI_PRESETS[b.sc].v,1)+"%"}, stopa NBP ${fmt(+b.nbp)}%).</li>
       <li>Kupony COI i odsetki ROR/DOR trafiają na konto po podatku. Seria, która w tym okresie wykupi się w terminie, zamienia się na taką samą serię na dzisiejszych warunkach po cenie zamiany (99,90 zł; OTS 100,00 zł; ROS i ROD — bez ceny zamiany, po 100 zł).</li>
-      <li>${liq?`Na koniec okresu wypłacasz wszystko: przed terminem wykupu z opłatą za przedterminowy wykup (nie wyższą niż narosłe odsetki; ROR i DOR od 2. miesiąca — stałą; OTS — bez odsetek) i z podatkiem 19% od zysku${b.acc!=="std"?" (w IKE/IKZE bez podatku i bez opłaty przy wypłacie z konta)":""}.`:"Wartość bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty."}${b.acc==="ikze"?" W IKZE wartości są po 10% ryczałcie przy wypłacie po 65. roku życia.":""}</li>
+      <li>${liq?`Na koniec okresu wypłacasz wszystko: przed terminem wykupu z opłatą za przedterminowy wykup (nie wyższą niż narosłe odsetki; COI od 2. roku, ROR i DOR od 2. miesiąca — stałą, także gdy przekracza odsetki; OTS — bez odsetek) i z podatkiem 19% od zysku${b.acc!=="std"?" (w IKE/IKZE bez podatku i bez opłaty przy wypłacie z konta)":""}.`:"Wartość bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty."}${b.acc==="ikze"?" W IKZE wartości są po 10% ryczałcie przy wypłacie po 65. roku życia.":""}</li>
       <li>Linie odniesienia na wykresie: <b>wpłata + inflacja</b> — wpłacona kwota od dziś rośnie co miesiąc tak jak poziom cen GUS (łańcuch wskaźników „grudzień poprzedniego roku = 100”, do dziś z archiwum), a dalej o (1 + inflacja ze scenariusza)<sup>1/12</sup>; wartość obligacji nad tą linią to zysk realny, pod nią — utrata siły nabywczej. <b>Wpłata na stopie NBP</b> rośnie tak samo o stopę referencyjną NBP${b.acc==="std"?" (zysk po 19% podatku)":""}.</li>
       <li>To symulacja przy stałych założeniach, nie rekomendacja inwestycyjna. Wiążące są listy emisyjne.</li>
     </ul></details>

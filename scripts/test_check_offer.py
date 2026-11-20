@@ -3,7 +3,8 @@
 
 Buduje syntetyczną tablicę GUS (CSV w cp1250, jak na stat.gov.pl) z danych archiwum,
 po czym sprawdza: zgodność, wykrycie rozbieżności w rekordzie i w archiwum,
-brak miesiąca w tablicy i niedostępność tablicy (ostrzeżenie zamiast błędu).
+brak miesiąca w tablicy i niedostępność tablicy (ostrzeżenie zamiast błędu);
+na koniec stopę NBP z 10. dnia roboczego przed miesiącem (ROR/DOR) na syntetycznym archiwum NBP.
 Użycie: python3 scripts/test_check_offer.py
 """
 import json
@@ -83,6 +84,55 @@ if flash:
     run("szybki szacunek, tablica jeszcze bez miesiąca", gus_table(skip=data[m]["cpiRefMonth"]), m, 0, 0, "szybki szacunek")
     run("szybki szacunek, a GUS ma już odczyt finalny",
         gus_table(patch={data[m]["cpiRefMonth"]: {"yoy": data[m]["cpi"], "ytd": data[m].get("cpiYtd")}}), m, 0, 1, "odczyt finalny")
+
+# stopa NBP z 10. dnia roboczego przed miesiącem (list ROR/DOR) a nbpRef z 1. dnia — syntetyczne archiwum NBP
+import datetime as dt  # noqa: E402
+
+
+def nbp_xml(shift=None):
+    """Archiwum NBP: stopa z nbpRef miesiąca obowiązuje od ok. 6. dnia poprzedniego miesiąca (jak decyzje RPP — przed 10. dniem
+    roboczym przed miesiącem); shift = miesiąc, w którym zmiana wchodzi 3 dni przed jego początkiem i o 1 p.p. wyżej."""
+    out = ["<stopy_procentowe_archiwum>"]
+    for ym in sorted(data):
+        first, rate = dt.date.fromisoformat(f"{ym}-01"), data[ym]["nbpRef"]
+        day = (first - dt.timedelta(days=25)).isoformat()
+        if ym == shift:
+            day, rate = (first - dt.timedelta(days=3)).isoformat(), rate + 1
+        val = f"{rate:.2f}".replace(".", ",")
+        out.append(f'<pozycje obowiazuje_od="{day}"><pozycja id="ref" oprocentowanie="{val}"/></pozycje>')
+    return "\n".join(out + ["</stopy_procentowe_archiwum>"])
+
+
+def run_nbp(name, xml, month, expect_errors, expect_warns, contains=None):
+    global fails
+    co.errors.clear(), co.warns.clear(), co.oks.clear(), co._NBP.clear()
+    with tempfile.TemporaryDirectory() as d:
+        path = os.path.join(d, "nbp.xml")
+        Path(path).write_text(xml, encoding="utf-8")
+        os.environ["CHECK_NBP_XML"] = path
+        co.check_nbp_ror(data, month)
+    text = " | ".join(co.errors + co.warns + co.oks)
+    ok = len(co.errors) == expect_errors and len(co.warns) == expect_warns and (contains is None or contains in text)
+    print(("OK   " if ok else "BŁĄD ") + name + ("" if ok else f" — błędy {co.errors}, ostrzeżenia {co.warns}"))
+    fails += not ok
+
+
+def check(name, got, want):
+    global fails
+    print(("OK   " if got == want else "BŁĄD ") + name + ("" if got == want else f" — {got!r}, oczekiwano {want!r}"))
+    fails += got != want
+
+
+check("10. dzień roboczy przed 01.12.2026", co.business_days_before(dt.date(2026, 12, 1)), dt.date(2026, 11, 17))
+check("10. dzień roboczy przed 01.01.2025 (święta, Wigilia jeszcze roboczy)", co.business_days_before(dt.date(2025, 1, 1)), dt.date(2024, 12, 16))
+check("10. dzień roboczy przed 01.01.2026 (Wigilia wolna od 2025)", co.business_days_before(dt.date(2026, 1, 1)), dt.date(2025, 12, 15))
+check("10. dzień roboczy przed 01.06.2020 (zmiana stopy NBP 29.05.2020 po tym dniu)", co.business_days_before(dt.date(2020, 6, 1)), dt.date(2020, 5, 18))
+check("Wielkanoc 2026", co.easter(2026), dt.date(2026, 4, 5))
+last = max(data)
+run_nbp("NBP: zmiany przed 10. dniem roboczym — zgodne", nbp_xml(), last, 0, 0, "= nbpRef")
+run_nbp("NBP: zmiana w ostatnich dniach roboczych przed kontrolowanym miesiącem — błąd", nbp_xml(shift=last), last, 1, 0, f"ROR/DOR {last}")
+run_nbp("NBP: taka zmiana w archiwum — ostrzeżenie", nbp_xml(shift="2023-10"), last, 0, 1, "ROR/DOR 2023-10")
+run_nbp("NBP: miesiące przed ROR/DOR (2020) pomijane", nbp_xml(shift="2020-06"), last, 0, 0)
 
 print(f"{'0 błędów' if not fails else f'{fails} błędów'}")
 sys.exit(1 if fails else 0)

@@ -99,9 +99,16 @@ const coi = Z.compare({
   target: { type: "COI", rate1: 6, margin: 1.5, fee: 2 },
   cpiFuture: [0], savingsRate: 0, tax: true, valuation: "liquidate",
 });
-eq("COI kupon po 12 mies. (netto)", coi.months[12].keep, 10 * 100 + 10 * 6 * 0.81, 0.02);
-// miesiąc 13: 100·(1+0,015/12)=100,13 → opłata 0,13 → 100; + kupon 48,60
-eq("COI po 13 mies.", coi.months[13].keep, 1000 + 48.6, 0.02);
+// od 2. roku stała opłata 2 zł (list COI1130, pkt 6) — także w rocznicę, gdy narosłych odsetek nie ma
+eq("COI kupon po 12 mies. (netto), opłata 2 zł", coi.months[12].keep, 10 * 98 + 10 * 6 * 0.81, 0.02);
+// miesiąc 13: 100·(1+0,015/12)=100,13 → opłata 2 zł (nie 0,13) → 98,13; + kupon 48,60
+eq("COI po 13 mies.", coi.months[13].keep, 981.3 + 48.6, 0.02);
+// 1. rok: opłata nie wyższa niż narosłe odsetki (pkt 5) — wypłata nie mniej niż 100 zł
+eq("COI w 1. roku: opłata do wysokości odsetek", Z.bondValue({ type: "COI", fee: 2 }, 1, [0.06]).fee, 0.5);
+eq("COI w 1. roku: opłata najwyżej 2 zł", Z.bondValue({ type: "COI", fee: 2 }, 6, [0.06]).fee, 2);
+eq("COI od 2. roku: stała opłata przy małych odsetkach", Z.bondValue({ type: "COI", fee: 2 }, 13, [0.06, 0.015]).net, 98.13);
+eq("COI w rocznicę (2. rok): opłata 2 zł bez odsetek", Z.bondValue({ type: "COI", fee: 2 }, 24, [0.06, 0.05, 0.04]).net, 98);
+eq("COI w terminie bez opłaty", Z.bondValue({ type: "COI", fee: 2 }, 48, [0.06, 0.05, 0.04, 0.04]).fee, 0);
 // „trzymam”: narosłe odsetki 0,125 zł/szt. (zaokrąglone do 100,13 zł/szt.) bez opłaty, po podatku
 const coiH = Z.compare(Object.assign({}, { now: "2026-11", horizonMonths: 13,
   old: { type: "COI", rate1: 6, margin: 1.5, fee: 2, purchase: "2026-11", count: 10 },
@@ -155,14 +162,16 @@ eq("portfel: najpóźniejszy wykup", pf.latestMaturity, "2032-04");
 const one = (o) => Z.compare(Object.assign({}, pfBase, { old: o, horizonMonths: 96 }));
 const rA = one(posA), rB = one(posB);
 eq("portfel: trzymam = suma pozycji", pf.atHorizon.keep, rA.atHorizon.keep + rB.atHorizon.keep);
-eq("portfel: zamieniam wszystko = suma pozycji", pf.atHorizon.swapAll, rA.atHorizon.swap + rB.atHorizon.swap);
+// bez łączenia reszt (łączenie dokłada sztuki z sumy reszt poniżej 100 zł)
+const pfNoPool = Z.comparePortfolio(Object.assign({}, pfBase, { positions: [posA, posB], poolRemainders: false }));
+eq("portfel: zamieniam wszystko = suma pozycji", pfNoPool.atHorizon.swapAll, rA.atHorizon.swap + rB.atHorizon.swap);
 eq("portfel: wybór pozycji wg różnicy", pf.positions.map((x) => x.swap), [rA.atHorizon.diff > 0, rB.atHorizon.diff > 0]);
 eq("portfel: wariant „wybrane” nie gorszy niż trzymanie", pf.atHorizon.diffBest >= 0, true);
 eq("portfel: wariant „wybrane” nie gorszy niż zamiana wszystkiego", pf.atHorizon.best >= pf.atHorizon.swapAll - 1e-9, true);
 eq("portfel: koszt zerwania wszystkiego = suma", pf.switchAll.cost, rA.switchNow.cost + rB.switchNow.cost);
 eq("portfel: historia od najwcześniejszego zakupu", pf.past[0].ym, "2021-04");
 eq("portfel: historia do 04.2022 tylko COI", pf.past[11].value, rB.past[11].value);
-eq("COI w rocznicę: kupon w obu wariantach, różnica dziś = 0", rB.months[0].diff, 0);
+eq("COI w rocznicę (4. rok): kupon w obu wariantach, różnica dziś = stała opłata 0,70 zł × 30", rB.months[0].diff, -21, 1e-6);
 eq("COI: historia łączy się z „dziś” (z kuponami otrzymanymi do dziś)", rB.past[rB.past.length - 1].value, rB.months[0].keep);
 eq("COI: kupony otrzymane do dziś w obu wariantach", rB.months[0].swap - rB.switchNow.proceeds, rB.paidCoupons);
 eq("COI: kupony do dziś = 3 lata netto", rB.paidCoupons, rB.oldRates.slice(0, 3).reduce((a, r) => a + 100 * r, 0) * 30 * 0.81, 0.01);
@@ -393,7 +402,7 @@ const buyBase = { now: "2026-11", amount: 10000, candidates: buyCands, cpiHistor
 const bAt = (H, t, extra) => Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: H }, extra || {})).results.find((x) => x.type === t);
 eq("kupno: OTS po 3 mies. — 10 000 + 50 zł odsetek − 9,50 zł podatku", bAt(3, "OTS").final, 10040.5, 1e-6);
 eq("kupno: EDO po 3 mies. — opłata do wysokości odsetek, wypłata 100 zł/szt.", bAt(3, "EDO").final, 10000, 1e-6);
-eq("kupno: COI po roku — kupon 475 zł po podatku, obligacje po 100 zł", bAt(12, "COI").final, 10384.75, 1e-6);
+eq("kupno: COI po roku — kupon 475 zł po podatku, obligacje po 100 zł − 2 zł opłaty", bAt(12, "COI").final, 10184.75, 1e-6);
 eq("kupno: EDO po roku — 105,35 − opłata 3 zł, podatek od 2,35 zł", bAt(12, "EDO").final, 10000 + 235 * 0.81, 1e-6);
 eq("kupno: TOS w IKE po 3 latach — zamiana na nowe TOS po 99,90", bAt(36, "TOS", { tax: false }).events.filter((e) => e.kind === "wykup").map((e) => e.t), [36]);
 const b120 = Z.compareBuy(Object.assign({}, buyBase, { horizonMonths: 120 }));
@@ -523,6 +532,24 @@ eq("rachunek: liczba sztuk niezgodna z wartością nominalną → ostrzeżenie",
 eq("rachunek (spacje) bez kwoty: sklejone tysiące z ostrzeżeniem", [sp("EDO0434 1 000 0").n, !!sp("EDO0434 1 000 0").warn], [1000, true]);
 eq("rachunek (spacje) bez kwoty: 200 i 0 — bez ostrzeżenia", [sp("EDO0434 200 0 2034-04-02").n, sp("EDO0434 200 0 2034-04-02").warn], [200, undefined]);
 eq("rachunek: pusty tekst", Z.parseRegister(""), { rows: [], skipped: [] });
+
+// ---------------------------------------------------------------------------
+// 16. Okno przedterminowego wykupu (listy emisyjne, np. COI1130 ust. 23): od 8. dnia po sprzedaży do 20 dni przed wykupem
+// ---------------------------------------------------------------------------
+const rwin = (type, p, pd, now, d) => Z.redeemWindow(type, p, pd, now, d);
+eq("okno: 7 dni po zakupie — jeszcze nie", [rwin("EDO", "2026-11", 3, "2026-11", 10).reason, rwin("EDO", "2026-11", 3, "2026-11", 10).from], ["early", "2026-11-11"]);
+eq("okno: 8. dzień po zakupie — można", rwin("EDO", "2026-11", 3, "2026-11", 11).ok, true);
+eq("okno: dokładnie 20 dni przed wykupem — można", [rwin("COI", "2022-12", 10, "2026-11", 20).ok, rwin("COI", "2022-12", 10, "2026-11", 20).until], [true, "2026-11-20"]);
+eq("okno: 19 dni przed wykupem — już nie", [rwin("COI", "2022-12", 10, "2026-11", 21).reason, rwin("COI", "2022-12", 10, "2026-11", 21).maturity], ["late", "2026-12-10"]);
+eq("okno: przez koniec miesiąca (zakup 28.11 → od 06.12)", [rwin("OTS", "2026-11", 28, "2026-12", 5).reason, rwin("OTS", "2026-11", 28, "2026-12", 6).ok], ["early", true]);
+eq("okno: OTS 3 mies. — 20 dni przed wykupem", rwin("OTS", "2026-09", 15, "2026-11", 26).reason, "late");
+eq("okno: bez dnia zakupu — najłagodniej (zakup 1., wykup ostatniego dnia)", [rwin("EDO", "2026-11", null, "2026-11", 8).reason, rwin("EDO", "2026-11", null, "2026-11", 9).ok, rwin("ROR", "2025-12", null, "2026-12", 11).ok], ["early", true, true]);
+eq("okno: seria w środku okresu — bez ograniczeń", rwin("EDO", "2020-05", 12, "2026-11", 19).ok, true);
+const hw = Z.holdings({ now: "2026-11", breakDay: 20, cpiHistory: hist, nbpHistory: nbpHist, cpiFuture: [2.5], positions: [
+  { type: "COI", rate1: 6.55, margin: 1.25, fee: 0.7, purchase: "2022-12", purchaseDay: 5, count: 10 },
+  { type: "EDO", rate1: 5.35, margin: 2, fee: 3, purchase: "2026-11", purchaseDay: 18, count: 10 },
+  { type: "EDO", rate1: 6.8, margin: 1.5, fee: 3, purchase: "2024-01", purchaseDay: 2, count: 10 }] });
+eq("portfel: okno wykupu w pozycjach", hw.items.map((x) => x.redeem.reason), ["late", "early", null]);
 
 console.log(`${pass} OK, ${fail} błędów`);
 process.exit(fail ? 1 : 0);

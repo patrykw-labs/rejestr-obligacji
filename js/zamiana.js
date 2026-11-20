@@ -10,6 +10,9 @@
  *    COI: odsetki wypłacane co rok, N·r.
  *  - Przedterminowy wykup w okresie k: N·Π(1+ri)·(1+rk·a/12) − b, nie mniej niż N
  *    (opłata b nie wyższa niż narosłe odsetki). Tu a = pełne miesiące okresu (przybliżenie dni/ACT).
+ *    COI od 2. roku, ROR/DOR od 2. miesiąca: stała opłata b, bez progu N (flatFee).
+ *    Okno: nie wcześniej niż po 7 dniach od sprzedaży i nie później niż 20 dni przed wykupem (redeemWindow);
+ *    bez ograniczeń przy wypłacie z IKE/IKZE.
  *  - Podatek Belki od zysku (po opłacie); przy IKE/IKZE pomijany. Opłata za wykup zostaje.
  *  - Zakup po zerwaniu: 100 zł za obligację, całe sztuki, reszta na konto.
  *    Zamiana po 99,90 zł tylko przy wykupie w terminie (rollover).
@@ -21,7 +24,8 @@
     EDO: { term: 120, indexed: true, coupon: false, label: "EDO (10 lat)" },
     ROD: { term: 144, indexed: true, coupon: false, label: "ROD (12 lat, 800+)" },
     ROS: { term: 72, indexed: true, coupon: false, label: "ROS (6 lat, 800+)" },
-    COI: { term: 48, indexed: true, coupon: true, label: "COI (4 lata)" },
+    // COI: w 1. roku opłata nie wyższa niż narosłe odsetki, od 2. roku stała (bez progu 100 zł) — list COI1130 (pkt 5–6)
+    COI: { term: 48, indexed: true, coupon: true, flatFee: true, label: "COI (4 lata)" },
     TOS: { term: 36, indexed: false, coupon: false, label: "TOS (3 lata)" },
     // DOS (w ofercie do 05.2022): 2 lata, stała stopa, kapitalizacja roczna — tylko do historii serii
     DOS: { term: 24, indexed: false, coupon: false, label: "DOS (2 lata)" },
@@ -61,6 +65,25 @@
     const prev = addMonths(now, -1), pdPrev = clamp(prev, purchaseDay);
     const len = daysIn(prev) - pdPrev + pdNow;
     return whole - 1 + (daysIn(prev) - pdPrev + b) / len;
+  }
+
+  /**
+   * Okno przedterminowego wykupu z listów emisyjnych: dyspozycję można złożyć „nie wcześniej niż po upływie siedmiu dni
+   * kalendarzowych od dnia sprzedaży” (czyli od 8. dnia po zakupie) i „nie później niż dwadzieścia dni kalendarzowych przed
+   * dniem wykupu”. Nie dotyczy wypłaty z IKE/IKZE (sprawdza to wywołujący). Bez dnia zakupu: wariant najłagodniejszy
+   * (zakup 1. dnia dla dolnej granicy, wykup ostatniego dnia miesiąca dla górnej).
+   * Zwraca {ok, reason: null | "early" | "late", from, until, maturity} — daty "RRRR-MM-DD".
+   */
+  function redeemWindow(type, purchase, purchaseDay, now, day) {
+    const t = TYPES[type];
+    const DAY = 864e5, maturityYm = addMonths(purchase, t.term);
+    const at = (ym, d) => { const [y, m] = ym.split("-").map(Number); return Date.UTC(y, m - 1, Math.min(Math.max(1, Math.round(d)), daysIn(ym))); };
+    const iso = (x) => new Date(x).toISOString().slice(0, 10);
+    const from = at(purchase, purchaseDay || 1) + 8 * DAY;
+    const mat = at(maturityYm, purchaseDay || 31), until = mat - 20 * DAY;
+    const today = at(now, day || 1);
+    const reason = today < from ? "early" : today > until ? "late" : null;
+    return { ok: !reason, reason, from: iso(from), until: iso(until), maturity: iso(mat) };
   }
 
   /** Kod serii, np. EDO0434 → wykup 2034-04, zakup = wykup − okres. */
@@ -132,7 +155,7 @@
     }
     if (round) gross = r2(gross);
     const accrued = gross - NOMINAL; // narosłe odsetki (dla COI, ROR, DOR: tylko bieżący okres)
-    // ROR/DOR od 2. okresu: stała opłata, także gdy przekracza narosłe odsetki (wypłata może być < 100 zł)
+    // COI, ROR, DOR od 2. okresu: stała opłata, także gdy przekracza narosłe odsetki (wypłata może być < 100 zł)
     const fee = t.noEarlyInterest ? Math.max(0, accrued)
       : t.flatFee && fullPeriods >= 1 ? spec.fee : Math.max(0, Math.min(spec.fee, accrued));
     const net = round ? r2(gross - fee) : gross - fee;
@@ -537,6 +560,7 @@
       };
       const v = bondValue(o, age, rates, { roundPerBond: true });
       const gross = v.gross * n, fee = v.fee * n;
+      const redeem = redeemWindow(o.type, o.purchase, o.purchaseDay, p.now, p.breakDay);
       const breakTax = taxOf(gross - fee - NOMINAL * n);
       const k = Math.floor(age / P + 1e-9);
       const periodEnd = addMonths(o.purchase, Math.min((k + 1) * P, t.term));
@@ -570,7 +594,7 @@
       schedule.push({ ym: maturity, kind: "wykup", amount: atMaturity, known: maturityKnown ? (maturityPrelim ? "prelim" : "final") : false });
       return {
         spec: o, age, maturity, monthsToMaturity: t.term - age, rates, schedule,
-        gross, fee, breakTax, payout: gross - fee - breakTax,
+        gross, fee, breakTax, payout: gross - fee - breakTax, redeem,
         hold: gross - taxOf(gross - NOMINAL * n),
         couponsPaid: net(v.coupons.reduce((s, c) => s + c.amount, 0) * n),
         rateNow: rates[k], periodIndex: k, periodEnd, next, coupon,
@@ -819,7 +843,7 @@
   }
 
   const api = { TYPES, NOMINAL, parseCode, periodRates, bondValue, compare, comparePortfolio, compareBuy, holdings, seriesOutcome, breakEvenInflation, breakEvenNbp,
-    cpiHistoryFromMonths, cpiYtdFromMonths, makePriceLevel, makeInflationStep, nbpHistoryFromMonths, ageMonths, makeNbpAt, couponAmount, seriesFromArchive, parseRegister, addMonths, monthsBetween, simulateLeg, makeCpiAt };
+    cpiHistoryFromMonths, cpiYtdFromMonths, makePriceLevel, makeInflationStep, nbpHistoryFromMonths, ageMonths, redeemWindow, makeNbpAt, couponAmount, seriesFromArchive, parseRegister, addMonths, monthsBetween, simulateLeg, makeCpiAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Zamiana = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

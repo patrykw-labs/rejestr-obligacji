@@ -15,6 +15,7 @@ const CALC_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR","OTS"];
 const calcSwapPrice=t=>Zamiana.TYPES[t]?.swapPrice||99.9;
 const calcSwapTxt=t=>fmt(calcSwapPrice(t))+" zł";
 const calcUsesOts=c=>c.pos.some(o=>o.type==="OTS")||c.tt==="OTS";
+const calcUsesCoi=c=>c.pos.some(o=>o.type==="COI")||c.tt==="COI";
 const calcIsNbp=t=>!!Zamiana.TYPES[t]?.nbp;
 const calcR1Label=t=>t==="OTS"?"Oprocentowanie":calcIsNbp(t)?"1. miesiąc":"1. rok";
 const calcNbpNow=()=>state.months[state.months.length-1].nbpRef??0;
@@ -322,7 +323,7 @@ const CALC_TIPS={
   pd:"Dzień miesiąca zakupu. Okresy odsetkowe zaczynają się tego dnia, więc wpływa na odsetki narosłe w dniu zerwania.",
   r1:"Oprocentowanie w 1. okresie z listu emisyjnego (dla ROR i DOR — w 1. miesiącu, dla OTS — przez cały okres).",
   m:"Marża dodawana do inflacji (EDO, COI, ROS, ROD) albo do stopy referencyjnej NBP (ROR, DOR) od 2. okresu.",
-  f:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki (ROR i DOR od 2. miesiąca — stała).",
+  f:"Opłata za przedterminowy wykup, za każdą sztukę. Zwykle nie wyższa niż narosłe odsetki (COI od 2. roku, ROR i DOR od 2. miesiąca — stała, także gdy przekracza odsetki).",
   tt:"Na co zamieniasz: seria z oferty w miesiącu zerwania. Po zerwaniu kupujesz ją po 100 zł. „Własne parametry” — np. przyszła oferta.",
   rr1:"Oprocentowanie 1. okresu obligacji kupowanych później, gdy jakaś seria wykupi się w terminie (w obu wariantach). Puste = jak nowa seria.",
   h:"Do kiedy porównujemy oba warianty. Domyślnie do wykupu Twojej serii (w portfelu — ostatniej), albo po wybranej liczbie lat.",
@@ -343,13 +344,18 @@ const calcRulesHtml=c=>`<li>Zerwanie ${calcBreakDate(c)}: wiek obligacji to peł
       <li>Od 2. roku: inflacja ogłoszona w miesiącu przed okresem (odczyt za miesiąc P−2) + marża; ujemna inflacja = 0. ${c.cm==="s"&&calcNow()<calcArchiveNow()?`Odczyty do ${mShort(Zamiana.addMonths(calcNow(),-1))} (stan wiedzy w dniu zerwania), dalej Twój scenariusz — także dla miesięcy, które już minęły.`:`Odczyty do ${mShort(state.months[state.months.length-1].cpiRefMonth||calcArchiveNow())} z archiwum GUS, dalej Twój scenariusz.`}</li>
       ${calcUsesOts(c)?`<li><b>OTS:</b> stałe oprocentowanie przez 3 miesiące, odsetki (100 zł × stopa × 3/12) wypłacane przy wykupie. Przy zerwaniu dostajesz 100 zł za sztukę, a odsetki przepadają. Zamiana na OTS kosztuje 100,00 zł (nie 99,90 zł)${c.tt==="OTS"?"; OTS w obliczeniach odnawia się co 3 miesiące na warunkach z oferty (tych odnowień nie wyróżniamy w tabeli ani na wykresie)":""}.</li>`:""}
       ${calcUsesNbp(c)?`<li><b>ROR i DOR:</b> odsetki za każdy miesiąc (100 zł × stopa / 12, do grosza) trafiają na konto. Od 2. miesiąca stopa = stopa referencyjna NBP z 10. dnia roboczego przed miesiącem okresu + marża; do ${mShort(calcNow())} z archiwum NBP, dalej ${fmt(+c.nbp)}% (Twoje założenie). Przy zerwaniu od 2. miesiąca opłata jest stała (0,50 zł ROR, 0,70 zł DOR), także gdy przekracza narosłe odsetki — wtedy dostajesz mniej niż 100 zł za sztukę.</li>`:""}
-      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesNbp(c)?" (poza ROR i DOR od 2. miesiąca)":""}${calcUsesOts(c)?"; OTS — 100 zł bez odsetek":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
+      <li>Przedterminowy wykup: wartość minus opłata, ale nie mniej niż 100 zł za sztukę${calcUsesCoi(c)||calcUsesNbp(c)?` (poza ${[calcUsesCoi(c)?"COI od 2. roku":"",calcUsesNbp(c)?"ROR i DOR od 2. miesiąca":""].filter(Boolean).join(" oraz ")} — tam opłata jest stała, także w rocznicę zakupu i gdy przekracza narosłe odsetki)`:""}${calcUsesOts(c)?"; OTS — 100 zł bez odsetek":""}. Podatek 19% od zysku${c.acc==="ike"?" — tu pominięty (IKE)":c.acc==="ikze"?" — tu pominięty (IKZE); zamiast niego przy wypłacie po 65. roku życia 10% ryczałtu od całej kwoty, uwzględniony w wartościach w czasie i w różnicy (nie w koszcie zerwania)":""}. Wypłata z IKE/IKZE jest bez opłaty za wykup, ale zerwanie w ramach konta, żeby kupić nowe obligacje — z opłatą. Reszta poniżej 100 zł trafia na konto (${fmt(+c.sv,1)}%${c.ike?"":" przed podatkiem"}).</li>`;
 const calcCouponTxt=v=>v>0.005?`; w tym odsetki wypłacone ${calcDo()}: ${zl0(v)}`:"";
 const calcCouponDesc=v=>v>0.005?` Wartość obejmuje odsetki wypłacone ${calcDo()} (kupony COI, odsetki ROR/DOR: ${zl0(v)}, bez oprocentowania) — dostajesz je w obu wariantach, więc nie zmieniają różnicy.`:"";
 const calcShareHtml=`<div class="row"><button type="button" class="btn" id="z-share" data-goatcounter-click="kalkulator-link">Kopiuj link do tego wyliczenia</button><span class="small" id="z-share-msg"></span></div>`;
 function calcBindShare(){$("#z-share").addEventListener("click",async()=>{const url=location.href;try{await navigator.clipboard.writeText(url);$("#z-share-msg").textContent="Skopiowano."}catch(e){$("#z-share-msg").textContent=url}})}
 const calcTgtCode=c=>c.tc?c.tt+" (własne parametry)":(calcTargetFromOffer(c.tt)?.tcode||c.tt);
 const calcHorizonTxt=(c,H,mat,multi)=>c.h==="m"?(multi?`do wykupu ostatniej serii (${mShort(mat)})`:null):"po "+(H%12?fmt(H/12,1):String(H/12))+(H===12?" roku":" latach");
+// okno przedterminowego wykupu z listów emisyjnych (7 dni po zakupie, 20 dni przed wykupem): ostrzeżenie nad wynikiem
+function calcRedeemWarnHtml(c){
+  const msgs=c.pos.filter(o=>o.p&&Zamiana.TYPES[o.type]).map(o=>({o,w:Zamiana.redeemWindow(o.type,o.p,+o.pd||null,calcNow(),+c.bd)})).filter(z=>!z.w.ok)
+    .map(z=>`<b>${esc(calcPosCode(z.o))}</b>: ${esc(redeemTxt(z.w))}.${z.w.reason==="late"?` Poczekaj na wykup w terminie — bez opłaty, a całą kwotę zamienisz po ${calcSwapTxt(c.tt)} za sztukę.`:""}`);
+  return msgs.length?`<div class="insight warn"><span class="t">nie można zerwać ${calcD()}</span>${msgs.join("<br>")} Wynik poniżej pokazuje takie zerwanie tylko dla porównania.${c.ike?" Ograniczenie nie dotyczy wypłaty z IKE/IKZE, ale zerwania w ramach konta, żeby kupić nowe obligacje — tak.":""}</div>`:""}
 function calcRecompute(){
   const out=$("#z-out");if(!out)return;queueMicrotask(()=>resultPeekBind("#z-out"));const c=state.calc,now=calcNow();
   const note=$("#z-code-note");if(note)note.textContent=c.pos[0].code?`Parametry z listu emisyjnego ${c.pos[0].code}. Aby je zmienić, wybierz „inna, wpiszę ręcznie”.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
@@ -370,6 +376,7 @@ function calcRecompute(){
   const oldCode=o.code||o.type, tgtCode=calcTgtCode(c);
   const events=calcColorEvents(calcEvents(r,o,c.tt,oldCode,tgtCode));
   out.innerHTML=`<div class="vlist">
+    ${calcRedeemWarnHtml(c)}
     <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} ${yrsTxt}`}</div>
       <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (${calcRealTxt()}): ${sgn(a.diffReal)}. ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":`Jedyne zerwanie to zamiana ${calcD()}; dalej oba warianty trzymają obligacje do wykupu`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(Math.floor(+o.n)*100):""}
@@ -424,6 +431,7 @@ function calcRecomputePortfolio(out,c,now){
   const paidC=rowsP.reduce((t,z)=>t+z.x.result.paidCoupons,0);
   const detailHref=z=>"#"+calcHash(Object.assign({},c,{pos:[z.o]}));
   out.innerHTML=`<div class="vlist">
+    ${calcRedeemWarnHtml(c)}
     <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): ${sgn(a.diffBest)} ${yrsTxt}`:`Zamień cały portfel: ${sgn(a.diffBest)} ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to ${sgn(a.diffAll)} ${yrsTxt}`}</div>
       <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł${sn.pooledExtra?` (w tym ${sn.pooledExtra} szt. z połączonych reszt)`:""} + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (${calcRealTxt()}): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby ${calcD()} ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":`jedyne zerwanie to zamiana ${calcD()}`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(rowsP.reduce((s,z)=>s+Math.floor(+z.o.n)*100,0)):""}

@@ -40,7 +40,7 @@ const CASES = [
   ["#kupno", "Co kupić — domyślnie", "#b-out .verdict", "§ 5"],
   ["#kupno&kw=25000&h=36&sc=high&sv=5&ike=1&r8=1", "Co kupić — 3 lata, IKE, 800+", "#b-out .verdict", "ROD"],
   ["#kupno&kw=5000&h=6&sc=custom&cpi=3,4&val=h", "Co kupić — pół roku, bez wypłaty", "#b-out .verdict", "bez wypłaty"],
-  ["#kupno&kw=10000&h=60", "Co kupić — 5 lat: notka o momencie wypłaty (rocznica COI)", "#b-out .verdict", "moment wypłaty"],
+  ["#kupno&kw=10000&h=24", "Co kupić — 2 lata: notka o momencie wypłaty (±1 mies. wygrywa inna seria)", "#b-out .verdict", "moment wypłaty"],
   ["#kupno&kw=10000&h=60&ike=2", "Co kupić — IKZE: notka o uldze w PIT", "#b-out .verdict", "ulga w PIT nie jest liczona"],
   ["#kupno&kw=10000&h=36&sw=1&r8=1", "Co kupić — zakup za pieniądze z wykupu (cena zamiany)", "#b-out .verdict", "bez ceny zamiany — zakup po 100 zł"],
   ["#zamiana&k=EDO0434&n=100&tt=EDO&bd=12&ike=2", "Kalkulator — IKZE: notka o uldze w PIT", "#z-out .verdict", "kosztuje naprawdę 8800 zł"],
@@ -467,6 +467,21 @@ const CASES = [
           await pg.waitForSelector("text=po dniu wyceny");
           if (!(await pg.$(`select[data-pk=code] option[value=${cur}]:not([selected])`)) && !(await pg.$eval("select[data-pk=code]", (e) => e.selectedOptions[0].textContent)).includes("zakup"))
             problem = `seria z bieżącego miesiąca (${cur}) bez opisu na liście serii`;
+          // okno przedterminowego wykupu: 7 dni po zakupie i 20 dni przed wykupem — komunikat zamiast kwoty, poza sumą
+          const last = Object.keys(mj).sort().pop(), [ly, lm] = last.split("-").map(Number);
+          const nx = lm === 12 ? [ly + 1, 1] : [ly, lm + 1], coiSoon = `COI${String(nx[1]).padStart(2, "0")}${String(nx[0]).slice(2)}`;
+          await pg.goto("about:blank");
+          await pg.goto(base + `#portfel&pf=${coiSoon}~10~5,${cur}~10~15,EDO0434~100~15&bd=20`);
+          await pg.waitForSelector("#p-out .stats");
+          const pt = await pg.$eval("#p-out", (e) => e.innerText);
+          if (!problem && !(/nie można dziś zerwać/.test(pt) && /mniej niż 20 dni do wykupu/.test(pt) && /zerwanie możliwe od 23\./.test(pt)))
+            problem = `okno wykupu w portfelu (${coiSoon}, ${cur}): brak komunikatów`;
+          if (!problem && !new RegExp(`bez ${coiSoon}, ${cur}`).test(pt)) problem = "okno wykupu: serie nie wyłączone z sumy";
+          await pg.goto("about:blank");
+          await pg.goto(base + `#zamiana&k=${coiSoon}&n=10&pd=5&tt=EDO&bd=20`);
+          await pg.waitForSelector("#z-out .verdict");
+          if (!problem && !/nie można zerwać dziś[\s\S]*Poczekaj na wykup w terminie/.test(await pg.$eval("#z-out", (e) => e.innerText)))
+            problem = `okno wykupu w kalkulatorze (${coiSoon}): brak ostrzeżenia`;
         }
       }
     } catch (e) { problem = e.message.split("\n")[0]; }
