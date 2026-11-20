@@ -4,6 +4,8 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+## v1.5.3 — 2026-11-20
+
 - Poprawka: przy przedterminowym wykupie COI od 2. roku opłata jest stała (2,00 zł, w starszych seriach 0,70 zł), także w rocznicę zakupu i gdy przekracza narosłe odsetki — tak mówią listy emisyjne. Wcześniej kalkulatory ograniczały ją do narosłych odsetek, przez co „Co kupić?” wskazywało COI jako zwycięzcę przy okresach w pełnych latach (np. domyślne 5 lat), a „Mój portfel” zaniżał opłatę. Poprawione też objaśnienia opłaty i notka „moment wypłaty”.
 - „Mój portfel” i kalkulator zamiany uwzględniają okno przedterminowego wykupu z listów emisyjnych: dyspozycję można złożyć dopiero po 7 dniach od zakupu i najpóźniej 20 dni przed wykupem. Portfel pokazuje wtedy, od kiedy można zerwać serię (albo że zostaje wykup w terminie) i nie wlicza jej do „Na rękę po zerwaniu”; kalkulator ostrzega nad wynikiem.
 - Kontrola danych sprawdza, czy stopa NBP z 10. dnia roboczego przed miesiącem — od niej list emisyjny liczy oprocentowanie ROR i DOR — jest taka sama jak stopa z 1. dnia miesiąca, z której liczą kalkulatory (zgłasza zmianę stopy, która weszła w ostatnich dniach przed miesiącem).
