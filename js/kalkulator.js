@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — widok Kalkulator zamiany (formularz, wynik, wykres); obliczenia w js/zamiana.js. Ładowany przez index.html (bez kroku budowania). */
 /* ===================== Kalkulator zamiany ===================== */
 const CALC_ACC=[["std","Zwykły (podatek Belki)"],["ike","IKE"],["ikze","IKZE"]];

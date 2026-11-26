@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """Wersje plików strony w adresach (?v=<skrót treści>), żeby przeglądarka nie łączyła nowego index.html
 ze starą kopią stylów lub skryptów z pamięci podręcznej.
 

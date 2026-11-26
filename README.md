@@ -4,7 +4,7 @@
 
 <a href="https://www.buymeacoffee.com/patrykw"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&amp;emoji=&amp;slug=patrykw&amp;button_colour=FFDD00&amp;font_colour=000000&amp;font_family=Cookie&amp;outline_colour=000000&amp;coffee_colour=ffffff" alt="Buy me a coffee" /></a>
 
-[![Walidacja danych](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml/badge.svg)](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml) [![Wydanie](https://img.shields.io/github/v/release/patrykw-labs/rejestr-obligacji?label=wydanie)](https://github.com/patrykw-labs/rejestr-obligacji/releases) [![Licencja MIT](https://img.shields.io/badge/licencja-MIT-blue)](LICENSE)
+[![Walidacja danych](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml/badge.svg)](https://github.com/patrykw-labs/rejestr-obligacji/actions/workflows/validate.yml) [![Wydanie](https://img.shields.io/github/v/release/patrykw-labs/rejestr-obligacji?label=wydanie)](https://github.com/patrykw-labs/rejestr-obligacji/releases) [![Licencja AGPL-3.0](https://img.shields.io/badge/licencja-AGPL--3.0-blue)](LICENSE)
 
 Archiwum miesięcznych ofert detalicznych obligacji skarbowych od stycznia 2019 r. Dla każdego miesiąca i każdej serii (OTS, ROR, DOR, TOS, COI, EDO, ROS, ROD oraz historycznie DOS i TOZ) zapisane są: oprocentowanie w 1. okresie, marża, zasada oprocentowania, opłata za przedterminowy wykup, cena zamiany i link do listu emisyjnego. Wszystko na tle inflacji (CPI r/r, GUS) i stopy referencyjnej NBP.
 
@@ -79,4 +79,8 @@ Jeśli rejestr Ci się przydaje: [☕ Postaw mi kawę](https://buymeacoffee.com/
 
 ## Licencja
 
-Kod: [MIT](LICENSE). Dane w `data/` to fakty z publicznych źródeł (MF, GUS, NBP). Licencja MIT dotyczy kodu, a nie tych źródeł.
+Kod: [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`), © 2026 patrykw-labs. Możesz go używać, zmieniać i rozpowszechniać, także komercyjnie, ale zmieniona wersja musi być udostępniona na tej samej licencji razem z kodem źródłowym — również wtedy, gdy udostępniasz ją innym tylko przez sieć (np. jako stronę albo usługę). Program jest dostarczany bez jakiejkolwiek gwarancji (szczegóły w [LICENSE](LICENSE)).
+
+Wydania do v1.5.3 włącznie zostały opublikowane na licencji MIT i na jej warunkach można dalej korzystać z tamtych wersji; licencja AGPL-3.0 obowiązuje od kolejnej wersji.
+
+Dane w `data/` to fakty z publicznych źródeł (MF, GUS, NBP) — licencja dotyczy kodu, a nie tych źródeł. Czcionka w `assets/fonts/` ma własną licencję (SIL OFL 1.1, `OFL.txt`).

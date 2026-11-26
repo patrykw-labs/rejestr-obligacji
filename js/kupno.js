@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — widok „Co kupić?”: porównanie wszystkich serii z bieżącej oferty dla tej samej kwoty
    i okresu. Obliczenia w js/zamiana.js (compareBuy); wspólne elementy formularza z js/kalkulator.js. */
 const BUY_TYPES=["EDO","COI","TOS","ROS","ROD","DOR","ROR","OTS"];

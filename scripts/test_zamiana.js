@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: AGPL-3.0-only
 /* Testy silnika kalkulatora zamiany (js/zamiana.js). Uruchom: node scripts/test_zamiana.js */
 "use strict";
 const path = require("path");

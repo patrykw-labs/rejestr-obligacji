@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Silnik kalkulatora zamiany obligacji skarbowych (zerwać i kupić nowe czy trzymać?).
  * Czyste funkcje, bez DOM. Działa w przeglądarce (window.Zamiana) i w Node (module.exports).

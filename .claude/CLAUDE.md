@@ -19,6 +19,9 @@ Archiwum miesięcznych ofert detalicznych obligacji skarbowych (od 2019-01). Str
 - `assets/banner.jpg` — baner (README, strona, podgląd linku og:image); `assets/banner-mobile.jpg` — wersja 2:1 z dużym przyciskiem „Postaw mi kawę”, pokazywana na stronie na ekranach do 720 px (`<picture>`). `.github/FUNDING.yml` — przycisk „Sponsor” (Buy Me a Coffee `patrykw`).
 - W `index.html` zostaw licznik GoatCounter (`rejestr-obligacji.goatcounter.com`), atrybuty `data-goatcounter-click` na linkach Buy Me a Coffee i zastrzeżenie w stopce.
 
+## Licencja
+- Kod na GNU AGPL-3.0 (`AGPL-3.0-only`, pełny tekst w `LICENSE` — nie zmieniaj go). Każdy plik z kodem (js, css, skrypty) zaczyna się nagłówkiem `SPDX-License-Identifier: AGPL-3.0-only` (w skryptach — po linii `#!`); dopisz go w nowych plikach. Stopka strony musi linkować do kodu źródłowego (AGPL, sekcja 13 — użytkownicy przez sieć). Wydania do v1.5.3 były na MIT. Dane z publicznych źródeł nie są objęte licencją kodu.
+
 ## Niezależność od zewnętrznych produktów
 - Inspirujemy się, ale budujemy niezależnie. **Nigdy nie używaj nazw własnych zewnętrznych produktów, serwisów, kalkulatorów, blogów, nazwisk autorów, ich adresów stron ani brandingu** — w kodzie, komentarzach, testach, danych, README, notatkach do wydań, opisach commitów i na stronie. Dotyczy to także sytuacji, gdy właściciel poda taki produkt jako wzór albo źródło do porównania: pisz neutralnie, np. „niezależny arkusz kontrolny”, „publikacja o zamianie EDO”, „inny serwis”.
 - Wyjątki: urzędowe źródła danych (MF, obligacjeskarbowe.pl, GUS, NBP, listy emisyjne) i usługi, z których projekt faktycznie korzysta (GitHub, GoatCounter, Buy Me a Coffee jako przycisk wsparcia).

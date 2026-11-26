@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """Test porównania CPI z tablicą GUS w check_offer.py — bez sieci.
 
 Buduje syntetyczną tablicę GUS (CSV w cp1250, jak na stat.gov.pl) z danych archiwum,

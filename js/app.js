@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — stan, narzędzia i widoki: Oferta miesiąca, Wykres w czasie, Historia serii. Ładowany przez index.html (bez kroku budowania). */
 const SERIES=["OTS","ROR","DOR","TOS","COI","EDO","ROS","ROD"];
 const LEGACY={DOS:"#8f7b5a",TOZ:"#5e8f8a"};

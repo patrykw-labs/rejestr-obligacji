@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — eksport wyników: CSV (średnik, przecinek dziesiętny, BOM) i PNG wykresu (z tytułem, legendą,
    znakiem wodnym i źródłem). Używany przez kalkulator zamiany, „Co kupić?” i „Mój portfel”. Ładowany po app.js (bez kroku budowania). */
 

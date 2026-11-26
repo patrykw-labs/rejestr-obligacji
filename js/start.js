@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — start: zakładka z adresu, wczytanie danych, przełącznik motywu. Ładowany przez index.html (bez kroku budowania). */
 const VIEWS=["oferta","wykres","seria","zamiana","kupno","portfel"];
 (function(){const h=(location.hash||"").slice(1).split("&")[0];if(VIEWS.includes(h)){state.view=h;document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.view===h)))}})();

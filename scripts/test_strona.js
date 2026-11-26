@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: AGPL-3.0-only
 /*
  * Test strony w przeglądarce (Playwright): otwiera każdą zakładkę i typowe linki kalkulatora zamiany,
  * sprawdza, czy widok się wyrenderował i czy nie było błędów JavaScript; także ciemny motyw (kontrast,

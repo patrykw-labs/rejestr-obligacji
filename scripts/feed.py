@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """Kanał Atom z ofertami obligacji (feed.xml) generowany z data/months.json.
 
 Uruchom po każdej zmianie danych:  python3 scripts/feed.py

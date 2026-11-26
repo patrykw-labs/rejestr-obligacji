@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — widok „Mój portfel”: ile są warte posiadane obligacje dziś, bez zamiany (wartość, wypłata po
    zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania). Obliczenia w js/zamiana.js (holdings);
    wspólne elementy formularza z js/kalkulator.js. Stan w adresie #portfel&pf=KOD~szt~dzień,…&bd=…&ike=0|1&sc=… */

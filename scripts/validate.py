@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """Sprawdza data/months.json: składnię, schemat i spójność statusów. Uruchom przed każdym commitem."""
 import json, re, sys
 from pathlib import Path

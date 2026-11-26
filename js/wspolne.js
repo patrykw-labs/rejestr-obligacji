@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Rejestr ofert obligacji — wspólne elementy widoków: dymki „?” z objaśnieniami (calcTip, calcBindTips) i przycisk
    „Wyczyść ustawienia” z cofnięciem. Ładowany po app.js, przed widokami (bez kroku budowania). Nazwy calcTip/calcBindTips
    zostały z czasów, gdy dymki były tylko w kalkulatorze; CALC_TIPS (pola kalkulatorów) definiuje kalkulator.js. */
