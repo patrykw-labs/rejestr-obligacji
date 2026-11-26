@@ -157,7 +157,7 @@ function renderPortfolio(main){
         <p class="small" id="p-store">${pfStoreNote()}</p></div>
       <div class="card"><h3>Wycena</h3>
         <div class="frow"><label class="field"><span class="flabel">Dzień wyceny${calcTip("pbd")}</span><input id="p-bd" type="number" min="1" max="${calcDaysIn(now)}" step="1" inputmode="numeric" value="${esc(s.bd)}"><span class="fnote">${esc(mLabel(now))}</span></label></div>
-        <div class="field"><span class="flabel">Rachunek${calcTip("pacc")}</span><div class="chips" role="group" aria-label="Rachunek">${PF_ACC.map(([k,l])=>`<button type="button" class="chip" data-pacc="${k}" aria-pressed="${s.acc===k}">${l}</button>`).join("")}</div></div>
+        <div class="field"><span class="flabel">Rachunek${calcTip("pacc")}</span><div class="seg seg-f" role="group" aria-label="Rachunek">${PF_ACC.map(([k,l])=>`<button type="button" data-pacc="${k}" aria-pressed="${s.acc===k}">${l}</button>`).join("")}</div></div>
         <div class="field"><span class="flabel">Inflacja dalej (do prognoz)${calcTip("pcpi")}</span><div class="chips" role="group" aria-label="Scenariusz inflacji">${Object.entries(CPI_PRESETS).map(([k,v])=>`<button type="button" class="chip" data-psc="${k}" aria-pressed="${s.sc===k}">${v.label}</button>`).join("")}</div></div>
       </div>
     </div>
@@ -171,7 +171,7 @@ function renderPortfolio(main){
   $("#p-bd").addEventListener("input",e=>{s.bd=e.target.value;abarMirror("p","bd",s.bd,()=>pfAbarSummary(s));pfRecompute()});
   // rachunek i inflacja — te same zmiany z formularza i z paska założeń (z plakietką „było …”); przechodzą do innych zakładek
   const pickAcc=v=>{s.acc=v;sharedSet("pf",{acc:v});renderPortfolio(main)},pickSc=v=>{s.sc=v;sharedSet("pf",{sc:v});renderPortfolio(main)};
-  main.querySelectorAll("button.chip[data-pacc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.pacc))));
+  main.querySelectorAll("button[data-pacc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.pacc))));
   main.querySelectorAll("button.chip[data-psc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickSc(b.dataset.psc))));
   abarBind("p",main,{summary:()=>pfAbarSummary(s),onPick:(k,v)=>k==="acc"?pickAcc(v):pickSc(v),
     onNum:(k,v)=>{s.bd=v;$("#p-bd").value=v;pfRecompute()}});

@@ -7,6 +7,9 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 - Pasek założeń w kalkulatorze zamiany, „Co kupić?” i „Mój portfel”: po przewinięciu pod formularz przykleja się pod nagłówkiem z ustawieniami, które zmieniają cały wynik (rachunek zwykły / IKE / IKZE, inflacja, okres, wycena; w „Co kupić?” także kwota, w portfelu dzień wyceny), i ze skrótem wyniku. Zmiana od razu przelicza wykres i tabele bez przewijania do formularza. Na telefonie pasek to jedna linijka podsumowania z przyciskiem „Zmień”, który otwiera panel z ustawieniami.
 - Po zmianie rachunku, inflacji, okresu albo wyceny najważniejsze wyniki na chwilę się podświetlają, a obok widać poprzednią wartość („było …”).
 - Rachunek i scenariusz inflacji wybrane w jednej zakładce przechodzą do pozostałych (kalkulator, „Co kupić?”, „Mój portfel”); link z parametrami nadal ma pierwszeństwo.
+- „Co kupić?”: ranking jako poziome słupki zysku; przy IKE i IKZE przerywany kontur pokazuje tę samą serię na zwykłym rachunku, a pod spodem widać, przy ilu seriach rachunek ulgowy daje więcej. Kwota i okres mają suwaki (kwota — typowe skoki od 100 zł do 1 mln zł, pole do wpisania zostaje).
+- Kalkulator zamiany: przy IKE i IKZE przerywana linia „różnica na zwykłym rachunku” na wykresie i zdanie w werdykcie, ile ta sama decyzja dałaby na zwykłym rachunku.
+- Rachunek i wycena w formularzach jako przełączniki segmentowe zamiast pola wyboru.
 
 ## v1.5.3 — 2026-11-20
 

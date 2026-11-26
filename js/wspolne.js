@@ -102,7 +102,7 @@ const withWas=fn=>{const s=wasSnap();fn();wasShow(s)};
 
 // ---------- pasek założeń ----------
 // Przyklejony pod nagłówkiem pasek z ustawieniami, które zmieniają cały wynik (rachunek, inflacja, okres…), i ze skrótem
-// wyniku. Pojawia się, gdy formularz (.calc-grid) zniknie nad górną krawędzią ekranu. Na wąskim ekranie: jedna linijka
+// wyniku. Pojawia się, gdy z formularza (.calc-grid) zostanie na ekranie mniej, niż zasłoniłby sam pasek. Na wąskim ekranie: jedna linijka
 // podsumowania i przycisk „Zmień”, który otwiera panel od dołu z tymi samymi ustawieniami (Esc / „Gotowe” / tło zamyka).
 // items: [{k, label, type:"seg"|"sel"|"num", opts:[[v,etykieta]], cur, step, min, sync:"#id pola w formularzu"}]
 // onPick(k,v) — zmiana przełącznika/listy (widok przerysowuje się sam); onNum(k,v) — wpisywanie liczby (tylko przeliczenie).
@@ -131,7 +131,8 @@ function abarBind(p,main,{onPick,onNum,summary}){
   const bar=$("#"+p+"-abar"),sheet=$("#"+p+"-asheet"),form=main.querySelector(".calc-grid");if(!bar||!form)return;
   const sumBtn=bar.querySelector(".ab-sum");
   const show=()=>{if(!bar.isConnected){removeEventListener("scroll",abarScroll);removeEventListener("resize",abarScroll);return}
-    const top=(document.querySelector(".topbar")?.getBoundingClientRect().height||58)+8,on=form.getBoundingClientRect().bottom<top;
+    // pasek pojawia się, zanim dół formularza schowa się pod nagłówkiem: gdy to, co zostało z formularza, i tak zasłoniłby pasek
+    const top=(document.querySelector(".topbar")?.getBoundingClientRect().height||58)+(bar.firstElementChild?.offsetHeight||70)+30,on=form.getBoundingClientRect().bottom<top;
     bar.classList.toggle("on",on);bar.inert=!on;if(!on&&!sheet.hidden)close(false)};
   if(abarScroll){removeEventListener("scroll",abarScroll);removeEventListener("resize",abarScroll)}
   abarScroll=show;addEventListener("scroll",show,{passive:true});addEventListener("resize",show);

@@ -240,10 +240,11 @@ function renderCalc(main){
         ${past?`<div class="field"><span class="flabel">Inflacja i stopa NBP po ${mShort(now)}${calcTip("cm")}</span><div class="chips" role="group" aria-label="Dane po dacie zerwania"><button type="button" class="chip" data-cm="a" aria-pressed="${c.cm!=="s"}">rzeczywiste z archiwum, dalej scenariusz</button><button type="button" class="chip" data-cm="s" aria-pressed="${c.cm==="s"}">tylko scenariusz (stan wiedzy z ${mShort(now)})</button></div></div>`:""}
         ${c.sc==="custom"?`<div class="cpi-years">${Array.from({length:yrs},(_,i)=>`<label>rok ${i+1}<input type="number" step="0.1" data-cpi="${i}" value="${esc(c.cpi[i])}"></label>`).join("")}</div>`:""}
         <div class="field"><span class="flabel">Rachunek${calcTip("acc")}</span>
-          <div class="chips" role="group" aria-label="Rachunek">${CALC_ACC.map(([k,l])=>`<button type="button" class="chip" data-acc="${k}" aria-pressed="${c.acc===k}">${l}</button>`).join("")}</div>
+          <div class="seg seg-f" role="group" aria-label="Rachunek">${CALC_ACC.map(([k,l])=>`<button type="button" data-acc="${k}" aria-pressed="${c.acc===k}">${l}</button>`).join("")}</div>
           <span class="fnote">${CALC_ACC_NOTE[c.acc]}</span>
         </div>
-        <label class="check"><input id="z-val" type="checkbox"${c.val==="liquidate"?" checked":""}> Wyceniaj jak przy wypłacie wszystkiego${c.ike?"":", z opłatą za wykup"}${calcTip("val")}</label>
+        <div class="field"><span class="flabel">Wycena${calcTip("val")}</span>
+          <div class="seg seg-f" role="group" aria-label="Wycena"><button type="button" data-val="hold" aria-pressed="${c.val!=="liquidate"}">trzymam do wykupu</button><button type="button" data-val="liquidate" aria-pressed="${c.val==="liquidate"}">wypłata wszystkiego${c.ike?"":" (z opłatą)"}</button></div></div>
       </div>
     </div>
     <div id="z-out"></div>
@@ -262,7 +263,7 @@ function renderCalc(main){
   if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;renderCalc(main)});
   if($("#z-nbp"))$("#z-nbp").addEventListener("input",e=>{c.nbp=e.target.value;abarMirror("z","nbp",c.nbp);calcRecompute()});
   $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main);else abarMirror("z","h",c.h,()=>calcAbarSummary(c,hOpts))});
-  $("#z-val").addEventListener("change",e=>withWas(()=>{c.val=e.target.checked?"liquidate":"hold";renderCalc(main)}));
+  main.querySelectorAll(".calc-grid button[data-val]").forEach(b=>b.addEventListener("click",()=>withWas(()=>{c.val=b.dataset.val;renderCalc(main)})));
   $("#z-dm").addEventListener("change",e=>{const v=e.target.value;if(!/^\d{4}-\d{2}$/.test(v))return;c.dm=v===calcArchiveNow()?undefined:v;
     if(!c.tc){const o=calcTargetFromOffer(c.tt,v)||CALC_TYPES.map(t=>calcTargetFromOffer(t,v)).find(Boolean);if(o)Object.assign(c,o)}
     c.bd=Math.min(+c.bd||1,calcDaysIn(v));renderCalc(main)});
@@ -270,7 +271,7 @@ function renderCalc(main){
   // rachunek, inflacja, okres, wycena — te same zmiany z formularza i z paska założeń (z plakietką „było …”)
   const pickAcc=v=>{c.acc=v;c.ike=v!=="std";sharedSet("calc",{acc:v});renderCalc(main)};
   const pickSc=v=>{if(v==="custom"&&c.sc!=="custom"){const x=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(x)}c.sc=v;sharedSet("calc",{sc:v,cpi:c.cpi});renderCalc(main)};
-  main.querySelectorAll("button.chip[data-acc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.acc))));
+  main.querySelectorAll(".calc-grid button[data-acc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.acc))));
   main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickSc(b.dataset.sc))));
   main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;sharedSet("calc",{sc:"custom",cpi:c.cpi})}calcRecompute()}));
   abarBind("z",main,{summary:()=>calcAbarSummary(c,hOpts),
@@ -353,7 +354,7 @@ const CALC_TIPS={
   cpi:"Scenariusz inflacji (CPI r/r) w kolejnych latach. Od niego zależy oprocentowanie EDO, COI, ROS, ROD od 2. roku. Dla miesięcy z archiwum — rzeczywiste odczyty GUS.",
   cm:"Rzeczywiste: inflacja i stopa NBP po dacie zerwania z archiwum (jak to się naprawdę potoczyło). Tylko scenariusz: stan wiedzy z dnia decyzji.",
   acc:"Zwykły rachunek — podatek 19% od zysku. IKE — bez podatku. IKZE — bez podatku Belki, ale 10% ryczałtu przy wypłacie; ulgi w PIT przy wpłacie nie liczymy (jest taka sama dla każdej porównywanej serii).",
-  val:"Domyślnie wartość w czasie jest bez opłaty (nikt dalej nie zrywa). Ta opcja wycenia każdy miesiąc tak, jakbyś wypłacał wszystko, z opłatą.",
+  val:"„Trzymam do wykupu” (domyślnie): wartość w czasie bez opłaty, bo nikt dalej nie zrywa. „Wypłata wszystkiego” wycenia każdy miesiąc tak, jakbyś wypłacał wszystko — z opłatą za przedterminowy wykup.",
   real:"Kwota w dzisiejszych złotych (przy zerwaniu w przeszłości — w złotych z dnia zerwania): wartość nominalna podzielona przez skumulowaną inflację z Twojego scenariusza. Pokazuje siłę nabywczą, a nie to, co zobaczysz na koncie — np. 11 877 zł po 5 latach przy inflacji 2,5% to realnie ok. 10 498 zł.",
   range:"Od zakupu — cała historia. Od zerwania — oś tylko dla prognozy, linie są bardziej rozsunięte."
 };
@@ -375,6 +376,12 @@ function calcRedeemWarnHtml(c){
   const msgs=c.pos.filter(o=>o.p&&Zamiana.TYPES[o.type]).map(o=>({o,w:Zamiana.redeemWindow(o.type,o.p,+o.pd||null,calcNow(),+c.bd)})).filter(z=>!z.w.ok)
     .map(z=>`<b>${esc(calcPosCode(z.o))}</b>: ${esc(redeemTxt(z.w))}.${z.w.reason==="late"?` Poczekaj na wykup w terminie — bez opłaty, a całą kwotę zamienisz po ${calcSwapTxt(c.tt)} za sztukę.`:""}`);
   return msgs.length?`<div class="insight warn"><span class="t">nie można zerwać ${calcD()}</span>${msgs.join("<br>")} Wynik poniżej pokazuje takie zerwanie tylko dla porównania.${c.ike?" Ograniczenie nie dotyczy wypłaty z IKE/IKZE, ale zerwania w ramach konta, żeby kupić nowe obligacje — tak.":""}</div>`:""}
+// ten sam wynik na zwykłym rachunku (przy IKE/IKZE): różnica zamiana − trzymanie w każdym miesiącu — przerywana linia
+// „na zwykłym rachunku” w panelu różnicy i zdanie w werdykcie; key — wariant portfela pokazany w wyniku ("best" | "swapAll")
+function calcGhost(c,p,key){if(c.acc==="std")return null;try{const q=Object.assign({},p,{tax:true,withdrawalTax:0});
+  if(!key)return Zamiana.compare(q).months.map(m=>m.diff);
+  return Zamiana.comparePortfolio(q).months.map(m=>m[key]-m.keep)}catch(e){return null}}
+const calcGhostTxt=(g,H)=>g&&g[H]!=null?` Na zwykłym rachunku (podatek Belki) ta sama decyzja to ${sgn(g[H])}.`:"";
 function calcRecompute(){
   const out=$("#z-out");if(!out)return;queueMicrotask(()=>resultPeekBind("#z-out"));const c=state.calc,now=calcNow();
   const note=$("#z-code-note");if(note)note.textContent=c.pos[0].code?`Parametry z listu emisyjnego ${c.pos[0].code}. Aby je zmienić, wybierz „inna, wpiszę ręcznie”.`:"Uzupełnij parametry ręcznie (z listu emisyjnego swojej serii).";
@@ -386,7 +393,7 @@ function calcRecompute(){
   const o=c.pos[0];
   let r,p;
   try{p=calcParams(c,o);r=Zamiana.compare(p)}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
-  const beC=calcBe(p,"cpi"),beN=calcUsesNbp(c)?calcBe(p,"nbp"):{independent:true};
+  const beC=calcBe(p,"cpi"),beN=calcUsesNbp(c)?calcBe(p,"nbp"):{independent:true},ghost=calcGhost(c,p);
   const H=r.horizonMonths,a=r.atHorizon,good=a.diff>=0,yrsTxt=calcHorizonTxt(c,H,r.maturity,false)||`do wykupu ${o.code||o.type} (${mShort(r.maturity)})`;
   const liq=c.val==="liquidate";
   const sn=r.switchNow;
@@ -397,7 +404,7 @@ function calcRecompute(){
   out.innerHTML=`<div class="vlist">
     ${calcRedeemWarnHtml(c)}
     <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?"Zamiana się opłaca:":"Lepiej trzymać: zamiana to"} <span data-m="diff" data-v="${a.diff}">${sgn(a.diff)}</span> ${yrsTxt}</div>
-      <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (${calcRealTxt()}): ${sgn(a.diffReal)}. ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":`Jedyne zerwanie to zamiana ${calcD()}; dalej oba warianty trzymają obligacje do wykupu`}, ${calcTaxTxt(c)}.</div></div>
+      <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (${calcRealTxt()}): ${sgn(a.diffReal)}.${calcGhostTxt(ghost,H)} ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":`Jedyne zerwanie to zamiana ${calcD()}; dalej oba warianty trzymają obligacje do wykupu`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(Math.floor(+o.n)*100):""}
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam</span><span class="v" data-m="keep" data-v="${a.keep}">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
@@ -421,7 +428,7 @@ function calcRecompute(){
     ${calcShareHtml}
   </div>`;
   abarResult("z",`Zamiana ${esc(c.h==="m"?"do "+mShort(r.maturity):yrsTxt)}: <b class="${good?"d-up":"d-down"}" data-m="diff" data-v="${a.diff}">${sgn(a.diff)}</b>`);
-  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,amount:Math.floor(+o.n)*100,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
+  drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,amount:Math.floor(+o.n)*100,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],Object.assign(calcMacro(c,p),{ghost}));
   calcBindExport(c,r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"},`${Math.floor(+o.n)} szt. ${oldCode} → ${tgtCode}`,`${oldCode}-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);
 }
@@ -433,7 +440,7 @@ function calcRecomputePortfolio(out,c,now){
   const rowsP=r.positions.map((x,i)=>{const o=c.pos[i];return {x,o,i,code:calcPosCode(o),pp:Object.assign({},p,{old:p.positions[i],positions:undefined,horizonMonths:H})}}).map(z=>Object.assign(z,{beC:calcBe(z.pp,"cpi"),beN:calcUsesNbp(c)?calcBe(z.pp,"nbp"):null}));
   const sel=rowsP.filter(z=>z.x.swap),kept=rowsP.filter(z=>!z.x.swap);
   const swapSet=new Set((pick?sel:rowsP).map(z=>z.i));
-  const key=pick?"best":"swapAll",sn=pick?r.switchBest:r.switchAll,beM=pick?r.breakEvenMonthBest:r.breakEvenMonthAll;
+  const key=pick?"best":"swapAll",sn=pick?r.switchBest:r.switchAll,beM=pick?r.breakEvenMonthBest:r.breakEvenMonthAll,ghost=calcGhost(c,p,key);
   const ms=r.months.map(m=>({t:m.t,ym:m.ym,keep:m.keep,swap:m[key],diff:m[key]-m.keep,swapReal:m[key+"Real"],diffReal:m[key+"Real"]-m.keepReal}));
   const codes=list=>list.map(z=>z.code).join(", ");
   const lab={keep:"Trzymam wszystko",swap:pick?(kept.length?"Zamieniam wybrane":"Zamieniam wszystko"):"Zamieniam wszystko"};
@@ -453,7 +460,7 @@ function calcRecomputePortfolio(out,c,now){
   out.innerHTML=`<div class="vlist">
     ${calcRedeemWarnHtml(c)}
     <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): <span data-m="diff" data-v="${a.diffBest}">${sgn(a.diffBest)}</span> ${yrsTxt}`:`Zamień cały portfel: <span data-m="diff" data-v="${a.diffBest}">${sgn(a.diffBest)}</span> ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to <span data-m="diff" data-v="${a.diffAll}">${sgn(a.diffAll)}</span> ${yrsTxt}`}</div>
-      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł${sn.pooledExtra?` (w tym ${sn.pooledExtra} szt. z połączonych reszt)`:""} + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (${calcRealTxt()}): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby ${calcD()} ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":`jedyne zerwanie to zamiana ${calcD()}`}, ${calcTaxTxt(c)}.</div></div>
+      <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł${sn.pooledExtra?` (w tym ${sn.pooledExtra} szt. z połączonych reszt)`:""} + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (${calcRealTxt()}): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby ${calcD()} ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} ${calcGhostTxt(ghost,H).trim()} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":`jedyne zerwanie to zamiana ${calcD()}`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(rowsP.reduce((s,z)=>s+Math.floor(+z.o.n)*100,0)):""}
     <div class="stats">
       <div class="stat t-acc"><span class="k">Trzymam wszystko</span><span class="v" data-m="keep" data-v="${a.keep}">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(paidC)}</span></div>
@@ -482,7 +489,7 @@ function calcRecomputePortfolio(out,c,now){
     ${calcShareHtml}
   </div>`;
   {const d=pick?a.diffBest:a.diffAll;abarResult("z",`${pick?(kept.length?`Zamiana ${sel.length} z ${rowsP.length} serii`:"Zamiana portfela"):"Zamiana wszystkiego"} ${esc(c.h==="m"?"do "+mShort(r.latestMaturity):yrsTxt||"")}: <b class="${d>=0?"d-up":"d-down"}" data-m="diff" data-v="${d}">${sgn(d)}</b>`)}
-  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,amount:Math.floor(+z.o.n)*100,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
+  drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,amount:Math.floor(+z.o.n)*100,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),Object.assign(calcMacro(c,p),{ghost}));
   calcBindExport(c,ms,H,events,lab,`Portfel ${rowsP.length} serii → ${tgtCode}`,`portfel-${rowsP.length}-serii-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);
 }
@@ -525,7 +532,9 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   const range=state.calcRange==="future"?"future":"all";
   // punkty: historia od zakupu (wspólna) + przyszłość (dwa warianty); indeks k = 0..N, dziś = P
   const pastAll=r.past||[],past=range==="future"?pastAll.slice(-1):pastAll,P=Math.max(0,past.length-1),fut=r.months;
-  const pts=past.map(p=>({ym:p.ym,t:p.t,keep:p.value,swap:null})).slice(0,P).concat(fut.map(m=>({ym:m.ym,t:m.t,keep:m.keep,swap:m.swap,diff:m.diff})));
+  const pts=past.map(p=>({ym:p.ym,t:p.t,keep:p.value,swap:null})).slice(0,P).concat(fut.map((m,j)=>({ym:m.ym,t:m.t,keep:m.keep,swap:m.swap,diff:m.diff,gdiff:macro.ghost?macro.ghost[j]:null})));
+  // „duch”: różnica zamiana − trzymanie na zwykłym rachunku (tylko przy IKE/IKZE)
+  const hasGhost=!!macro.ghost,showGhost=hasGhost&&vis("ghost");
   // linie odniesienia liczone na pełnej osi (od zakupu), potem wycinek widocznego zakresu
   const hasBench=purchases.some(z=>z.amount>0),fullYm=pastAll.slice(0,Math.max(0,pastAll.length-1)).map(z=>z.ym).concat(fut.map(m=>m.ym));
   const hasCpi=hasBench&&!!macro.cpiAt,hasNbp=hasBench&&!!macro.nbpAt,showCpi=hasCpi&&vis("cpi"),showNbp=hasNbp&&vis("nbp");
@@ -540,7 +549,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   const x=i=>L+(n<=1?0:(W-L-R)*i/(n-1)),y=v=>T+(M1-T)*(1-(v-min)/(max-min));
   const fk=v=>Math.abs(v)>=10000?(Math.round(v/100)/10).toLocaleString("pl-PL")+" tys.":Math.round(v).toLocaleString("pl-PL");
   // pasek różnicy (zamiana − trzymanie)
-  const diffs=pts.slice(P).map(m=>m.diff);let lo=Math.min(0,...diffs),hi=Math.max(0,...diffs);if(hi-lo<1){hi+=1;lo-=1}
+  const diffs=pts.slice(P).flatMap(m=>showGhost&&m.gdiff!=null?[m.diff,m.gdiff]:[m.diff]);let lo=Math.min(0,...diffs),hi=Math.max(0,...diffs);if(hi-lo<1){hi+=1;lo-=1}
   const pad=(hi-lo)*0.12;hi+=hi>0?pad:0;lo-=lo<0?pad:0;
   const dy=v=>D0+(D1-D0)*(hi-v)/(hi-lo);
   let g="";for(let v=min;v<=max+1e-9;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--line-strong)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fk(v)}</text>`;
@@ -557,19 +566,22 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
   const line=(from,to,k)=>pts.slice(from,to+1).map((m,j)=>(j?"L":"M")+x(from+j).toFixed(1)+" "+y(m[k]).toFixed(1)).join(" ");
   const area=(sign)=>{const seg=pts.slice(P).map((m,j)=>`L${x(P+j).toFixed(1)} ${dy(sign>0?Math.max(m.diff,0):Math.min(m.diff,0)).toFixed(1)}`).join(" ");return `M${x(P).toFixed(1)} ${dy(0).toFixed(1)} ${seg} L${x(n-1).toFixed(1)} ${dy(0).toFixed(1)} Z`};
   const dline=pts.slice(P).map((m,j)=>(j?"L":"M")+x(P+j).toFixed(1)+" "+dy(m.diff).toFixed(1)).join(" ");
+  const gline=showGhost?pts.slice(P).map((m,j)=>(j?"L":"M")+x(P+j).toFixed(1)+" "+dy(m.gdiff??m.diff).toFixed(1)).join(" "):"";
   const histPath=P>0?line(0,P,"keep"):"";
   const buys=range==="future"?[]:purchases.map(p=>({p,i:pts.findIndex((m,k)=>k<=P&&m.ym===p.ym)})).filter(z=>z.i>=0);
   const evs=events.filter(e=>e.t>0);
   const todayAnchor=P>n*0.85?"end":P<n*0.08?"start":"middle";
   const lgItems=[...(P>0?[{k:"hist",label:`od zakupu do ${calcIsToday()?"dziś":"zerwania"}`,color:"var(--ink-2)"}]:[]),{k:"keep",label:lab.keep.toLowerCase()==="trzymam"?`trzymam ${oldCode}`:lab.keep.toLowerCase(),color:"var(--muted)"},
     {k:"swap",label:lab.swap.toLowerCase()==="zamieniam"?`zamieniam na ${tgtCode}`:`${lab.swap.toLowerCase()} na ${tgtCode}`,color:"var(--accent)"},
-    ...(hasCpi?[{k:"cpi",label:"wpłata + inflacja",color:"var(--s-CPI)",dash:1}]:[]),...(hasNbp?[{k:"nbp",label:macro.tax?"wpłata na stopie NBP (po podatku)":"wpłata na stopie NBP",color:"var(--s-NBP)",dash:1}]:[])];
+    ...(hasCpi?[{k:"cpi",label:"wpłata + inflacja",color:"var(--s-CPI)",dash:1}]:[]),...(hasNbp?[{k:"nbp",label:macro.tax?"wpłata na stopie NBP (po podatku)":"wpłata na stopie NBP",color:"var(--s-NBP)",dash:1}]:[]),
+    ...(hasGhost?[{k:"ghost",label:"różnica na zwykłym rachunku",color:"var(--ink-2)",dash:1}]:[])];
   el.innerHTML=chartLegendHtml(lgItems,vis)+`<div class="ctools"><span class="small">Oś od:${calcTip("range")}</span><button type="button" class="chip" data-range="all" aria-pressed="${range==="all"}">zakupu</button><button type="button" class="chip" data-range="future" aria-pressed="${range==="future"}" title="Oś Y tylko dla prognozy — linie są bardziej rozsunięte">${calcIsToday()?"dziś":"zerwania"} (przybliżenie)</button></div>
     <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Wartość: ${esc(lab.keep.toLowerCase())} kontra ${esc(lab.swap.toLowerCase())}, z paskiem różnicy">${g}<line x1="${L}" x2="${W-R}" y1="${M1}" y2="${M1}" style="stroke:var(--line-strong)"/>${xt}
     ${P>0?`<rect x="${L}" y="${T}" width="${x(P)-L}" height="${D1-T}" style="fill:var(--surface-2);opacity:.6"/>`:""}
     <text x="${W-R}" y="${D0-6}" text-anchor="end" style="fill:var(--muted)">różnica: zamiana − trzymanie</text>
     <path d="${area(1)}" style="fill:var(--ok);opacity:.22"/><path d="${area(-1)}" style="fill:var(--bad);opacity:.22"/>
     <path d="${dline}" fill="none" style="stroke:var(--ink-2)" stroke-width="1.6" stroke-linejoin="round"/>
+    ${gline?`<path class="zghost" d="${gline}" fill="none" style="stroke:var(--ink-2)" stroke-width="1.4" stroke-dasharray="5 4" stroke-linejoin="round" opacity=".85"/>`:""}
     <line x1="${x(P)}" x2="${x(P)}" y1="${T-8}" y2="${D1}" style="stroke:var(--ink-2);stroke-width:1.2;stroke-dasharray:4 3"/>
     <text x="${x(P)}" y="${T-11}" text-anchor="${todayAnchor}" style="fill:var(--ink);font-weight:700">${calcIsToday()?"dziś · ":""}decyzja ${mShort(calcNow())}</text>
     ${P>0?`<text x="${L+6}" y="${T+14}" style="fill:var(--muted)">zakup ${mShort(pts[0].ym)}</text>`:""}
@@ -597,7 +609,7 @@ function drawCalcChart(r,oldCode,tgtCode,events,lab,purchases,macro){
     }else{
       dots.innerHTML=`<circle cx="${x(i)}" cy="${y(m.keep)}" r="4" fill="var(--muted)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${y(m.swap)}" r="4" fill="var(--accent)" style="stroke:var(--surface);stroke-width:1.5"/><circle cx="${x(i)}" cy="${dy(m.diff)}" r="3.5" fill="${m.diff>=0?"var(--ok)":"var(--bad)"}" style="stroke:var(--surface);stroke-width:1.5"/>`;
       const evRows=events.filter(e=>P+e.t===i).map(e=>`<div class="tr evrow" style="color:${e.color||"var(--accent-ink)"}">↻ ${esc(e.text)}</div>`).join("");
-      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}${evRows}<div class="tr"><span class="dot" style="background:var(--muted)"></span><b>${esc(docked?"Trzymam":lab.keep)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>${esc(docked?"Zamieniam":lab.swap)}</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>${mRows}`;
+      tip.innerHTML=`<div class="tt">${mLabel(m.ym)} · ${when(m)}${hint}</div>${buyRows}${evRows}<div class="tr"><span class="dot" style="background:var(--muted)"></span><b>${esc(docked?"Trzymam":lab.keep)}</b> <span class="num">${zl0(m.keep)}</span></div><div class="tr"><span class="dot" style="background:var(--accent)"></span><b>${esc(docked?"Zamieniam":lab.swap)}</b> <span class="num">${zl0(m.swap)}</span></div><div class="tr"><b>Różnica</b> <span class="num ${m.diff>=0?"d-up":"d-down"}">${sgn(m.diff)}</span></div>${showGhost&&m.gdiff!=null?`<div class="tr" style="color:var(--ink-2)">na zwykłym rachunku <span class="num">${sgn(m.gdiff)}</span></div>`:""}${mRows}`;
     }
     tip.hidden=false;if(docked)return;const rr=svg.getBoundingClientRect(),er=el.getBoundingClientRect();const px=x(i)/W*rr.width+(rr.left-er.left);const tw=tip.offsetWidth;let left=px+14;if(left+tw>er.width-4)left=px-14-tw;if(left<4)left=4;tip.style.left=left+"px";tip.style.top=(rr.top-er.top+10)+"px"};
   const idx=cx=>{const rr=svg.getBoundingClientRect();const sx=(cx-rr.left)*W/rr.width;return Math.max(0,Math.min(n-1,Math.round((sx-L)/((W-L-R)/(n-1)))))};

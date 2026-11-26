@@ -6,12 +6,15 @@ const buyHLabel=m=>m<12?`${m} mies.`:(m%12?fmt(m/12,1)+" roku":(m/12===1?"1 rok"
 // „po 3 miesiącach”, „po roku”, „po 1,5 roku”, „po 5 latach”
 const buyAfterTxt=m=>m<12?`po ${m} miesiącach`:m===12?"po roku":(m%12?`po ${fmt(m/12,1)} roku`:`po ${m/12} latach`);
 const buyOffer=()=>state.months[state.months.length-1];
+// suwak kwoty: typowe kwoty (pole liczbowe przyjmuje każdą); pozycja suwaka = najbliższa w skali logarytmicznej
+const BUY_KW=[100,500,1000,2000,3000,5000,7500,10000,15000,20000,25000,30000,40000,50000,75000,100000,150000,200000,300000,500000,1000000];
+const buyKwIdx=v=>{const l=Math.log(Math.max(100,+v||100));let k=0;BUY_KW.forEach((x,i)=>{if(Math.abs(Math.log(x)-l)<Math.abs(Math.log(BUY_KW[k])-l))k=i});return k};
 Object.assign(CALC_TIPS,{
   kw:"Ile chcesz zainwestować. Kupujesz pełne obligacje po 100 zł, reszta trafia na konto.",
   bh:"Po jakim czasie chcesz wypłacić pieniądze. Seria, która wykupi się wcześniej, zamienia się na taką samą na dzisiejszych warunkach.",
   r8:"ROS i ROD mogą kupić tylko beneficjenci programu 800+ (do wysokości otrzymanych świadczeń).",
   bsw:"Masz w tym miesiącu wykup obligacji w terminie? Za te pieniądze kupisz nowe po cenie zamiany: 99,90 zł zamiast 100 zł (OTS — 100,00 zł). ROS i ROD nie mają ceny zamiany — kupujesz je po 100 zł.",
-  bval:"Domyślnie liczymy, ile dostaniesz, wypłacając wszystko na koniec okresu — z opłatą za przedterminowy wykup i podatkiem. Ta opcja pokazuje wartość bez wypłaty."
+  bval:"„Wypłata wszystkiego” (domyślnie): ile dostaniesz, wypłacając wszystko na koniec okresu — z opłatą za przedterminowy wykup i podatkiem. „Bez wypłaty”: wartość obligacji po podatku od narosłych odsetek, bez opłaty."
 });
 function buyDefaults(){return {kw:10000,h:60,sc:"base",cpi:Array(12).fill(2.5),sv:4,acc:"std",nbp:calcNbpNow(),r8:false,val:"l",sw:false}}
 function buyFromHash(){
@@ -68,12 +71,15 @@ function renderBuy(main){
       <div class="card">
         <h3>Kwota i okres</h3>
         <div class="frow">
-          <label class="field wide"><span class="flabel">Kwota, zł${calcTip("kw")}</span><input id="b-kw" type="number" min="100" step="100" inputmode="numeric" value="${esc(b.kw)}"></label>
-          <label class="field"><span class="flabel">Okres${calcTip("bh")}</span><span class="sel"><select id="b-h">${selOpts(BUY_H.map(m=>[m,buyHLabel(m)]),b.h)}</select></span></label>
+          <div class="field wide"><span class="flabel" id="b-kw-l">Kwota, zł${calcTip("kw")}</span><input id="b-kw" type="number" min="100" step="100" inputmode="numeric" aria-labelledby="b-kw-l" value="${esc(b.kw)}">
+            <input id="b-kw-r" class="range" type="range" min="0" max="${BUY_KW.length-1}" step="1" value="${buyKwIdx(b.kw)}" aria-label="Kwota — suwak (typowe kwoty)" aria-valuetext="${esc(zl0(+b.kw||0))}"><span class="range-ends"><span>100 zł</span><span>1 mln zł</span></span></div>
+          <div class="field wide"><span class="flabel" id="b-h-l">Okres: <b id="b-h-v">${esc(buyHLabel(b.h))}</b>${calcTip("bh")}</span>
+            <input id="b-h" class="range" type="range" min="0" max="${BUY_H.length-1}" step="1" value="${Math.max(0,BUY_H.indexOf(+b.h))}" aria-labelledby="b-h-l" aria-valuetext="${esc(buyHLabel(b.h))}"><span class="range-ends"><span>3 mies.</span><span>12 lat</span></span></div>
         </div>
         <label class="check"><input id="b-sw" type="checkbox"${b.sw?" checked":""}> Kupuję za pieniądze z wykupu w terminie (zamiana po 99,90 zł)${calcTip("bsw")}</label>
         <label class="check"><input id="b-r8" type="checkbox"${b.r8?" checked":""}> Mam prawo do obligacji rodzinnych (800+) — pokaż ROS i ROD${calcTip("r8")}</label>
-        <label class="check"><input id="b-val" type="checkbox"${b.val==="h"?" checked":""}> Wyceniaj bez wypłaty (bez opłaty za wykup)${calcTip("bval")}</label>
+        <div class="field"><span class="flabel">Wycena${calcTip("bval")}</span>
+          <div class="seg seg-f" role="group" aria-label="Wycena"><button type="button" data-bval="l" aria-pressed="${b.val!=="h"}">wypłata wszystkiego</button><button type="button" data-bval="h" aria-pressed="${b.val==="h"}">bez wypłaty</button></div></div>
       </div>
       <div class="card">
         <h3>Założenia na przyszłość</h3>
@@ -86,27 +92,32 @@ function renderBuy(main){
           <label class="field"><span class="flabel">Konto na resztę, %${calcTip("sv")}</span><input id="b-sv" type="number" step="0.1" inputmode="decimal" value="${esc(b.sv)}"></label>
         </div>
         <div class="field"><span class="flabel">Rachunek${calcTip("acc")}</span>
-          <div class="chips" role="group" aria-label="Rachunek">${CALC_ACC.map(([k,l])=>`<button type="button" class="chip" data-bacc="${k}" aria-pressed="${b.acc===k}">${l}</button>`).join("")}</div>
+          <div class="seg seg-f" role="group" aria-label="Rachunek">${CALC_ACC.map(([k,l])=>`<button type="button" data-bacc="${k}" aria-pressed="${b.acc===k}">${l}</button>`).join("")}</div>
         </div>
       </div>
     </div>
     <div id="b-out"></div>
   </div>`;
-  const inp=(id,k)=>$(id).addEventListener("input",e=>{b[k]=e.target.value;if(k==="kw")abarMirror("b","kw",b.kw,()=>buyAbarSummary(b));buyRecompute()});
+  const inp=(id,k)=>$(id).addEventListener("input",e=>{b[k]=e.target.value;if(k==="kw"){abarMirror("b","kw",b.kw,()=>buyAbarSummary(b));$("#b-kw-r").value=buyKwIdx(b.kw)}buyRecompute()});
   inp("#b-kw","kw");inp("#b-sv","sv");inp("#b-nbp","nbp");
-  $("#b-h").addEventListener("change",e=>withWas(()=>{b.h=+e.target.value;renderBuy(main)}));
+  // suwaki kwoty i okresu: przeliczenie przy przesuwaniu, plakietka „było …” po puszczeniu (wartość sprzed przesunięcia)
+  let gest=null;const gStart=()=>{if(!gest)gest=wasSnap()},gEnd=()=>{const g=gest;gest=null;if(g)wasShow(g)};
+  $("#b-kw-r").addEventListener("input",e=>{gStart();b.kw=BUY_KW[+e.target.value];$("#b-kw").value=b.kw;e.target.setAttribute("aria-valuetext",zl0(b.kw));abarMirror("b","kw",b.kw,()=>buyAbarSummary(b));buyRecompute()});
+  $("#b-kw-r").addEventListener("change",gEnd);
+  $("#b-h").addEventListener("input",e=>{gStart();b.h=BUY_H[+e.target.value];$("#b-h-v").textContent=buyHLabel(b.h);e.target.setAttribute("aria-valuetext",buyHLabel(b.h));abarMirror("b","h",b.h,()=>buyAbarSummary(b));buyRecompute()});
+  $("#b-h").addEventListener("change",()=>{gEnd();if(b.sc==="custom")renderBuy(main)});
   $("#b-r8").addEventListener("change",e=>{b.r8=e.target.checked;buyRecompute()});
   $("#b-sw").addEventListener("change",e=>{b.sw=e.target.checked;buyRecompute()});
-  $("#b-val").addEventListener("change",e=>withWas(()=>{b.val=e.target.checked?"h":"l";renderBuy(main)}));
+  main.querySelectorAll(".calc-grid button[data-bval]").forEach(x=>x.addEventListener("click",()=>withWas(()=>{b.val=x.dataset.bval;renderBuy(main)})));
   // rachunek, inflacja, okres, wycena — te same zmiany z formularza i z paska założeń (z plakietką „było …”)
   const pickAcc=v=>{b.acc=v;sharedSet("buy",{acc:v});renderBuy(main)};
   const pickSc=v=>{if(v==="custom"&&b.sc!=="custom"){const x=CPI_PRESETS[b.sc]?.v??2.5;b.cpi=Array(12).fill(x)}b.sc=v;sharedSet("buy",{sc:v,cpi:b.cpi});renderBuy(main)};
   main.querySelectorAll("button.chip[data-bsc]").forEach(x=>x.addEventListener("click",()=>withWas(()=>pickSc(x.dataset.bsc))));
-  main.querySelectorAll("button.chip[data-bacc]").forEach(x=>x.addEventListener("click",()=>withWas(()=>pickAcc(x.dataset.bacc))));
+  main.querySelectorAll(".calc-grid button[data-bacc]").forEach(x=>x.addEventListener("click",()=>withWas(()=>pickAcc(x.dataset.bacc))));
   main.querySelectorAll("input[data-bcpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.bcpi,v=parseFloat(el.value);if(!isNaN(v)){b.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)b.cpi[j]=v;sharedSet("buy",{sc:"custom",cpi:b.cpi})}buyRecompute()}));
   abarBind("b",main,{summary:()=>buyAbarSummary(b),
     onPick:(k,v)=>{if(k==="acc")pickAcc(v);else if(k==="sc")pickSc(v);else{b[k]=k==="h"?+v:v;renderBuy(main)}},
-    onNum:(k,v)=>{b[k]=v;const f=$("#b-"+k);if(f)f.value=v;buyRecompute()}});
+    onNum:(k,v)=>{b[k]=v;const f=$("#b-"+k);if(f)f.value=v;if(k==="kw")$("#b-kw-r").value=buyKwIdx(v);buyRecompute()}});
   viewResetBind("b","buy","buyVis",buyDefaults,()=>renderBuy(main));
   calcBindTips(main.querySelector(".calc-grid"));
   buyRecompute();
@@ -145,6 +156,17 @@ function buyRecompute(){
     const parts=wShort&&wLong&&wShort===wLong?[`o miesiąc krótszym lub dłuższym wygrywa ${esc(codeOf(wShort))}`]
       :[wShort?`o miesiąc krótszym wygrywa ${esc(codeOf(wShort))}`:"",wLong?`o miesiąc dłuższym — ${esc(codeOf(wLong))}`:""].filter(Boolean);
     momentTxt=`Wynik zależy od dokładnego momentu wypłaty: przy okresie ${parts.join(", a przy okresie ")}.`;}
+  // ranking jako poziome słupki zysku; przy IKE/IKZE przerywany kontur — ta sama seria na zwykłym rachunku (podatek Belki)
+  let ghost=null;if(b.acc!=="std"){try{const g=Zamiana.compareBuy(Object.assign(buyParams(b,cands),{tax:true,withdrawalTax:0}));ghost=Object.fromEntries(g.results.map(x=>[x.type,x.final]))}catch(e){}}
+  const kw=+b.kw,gMax=Math.max(1,...rank.map(x=>x.final-kw),...(ghost?Object.values(ghost).map(v=>v-kw):[]));
+  const bw=v=>Math.max(0,Math.min(100,(v-kw)/gMax*100)).toFixed(1);
+  const accN=b.acc==="ikze"?"IKZE":"IKE",better=ghost?rank.filter(x=>x.final>ghost[x.type]+0.5).length:0;
+  const barsHtml=`<div class="card"><h3>Zysk ${esc(buyAfterTxt(H))} <small>${ghost?`${accN} kontra zwykły rachunek`:"na rękę, ponad wpłatę"}</small></h3>
+    <div class="rbars" role="list">${rank.map((x,i)=>{const gv=ghost?ghost[x.type]:null,d=gv==null?0:x.final-gv;
+      return `<div class="rbar" role="listitem"><span class="rb-l"><span class="dot" style="background:var(--s-${x.type})"></span><b>${i+1}. ${esc(x.c.code)}</b></span>
+        <span class="rb-track" aria-hidden="true"><span class="rb-fill" style="width:${bw(x.final)}%;background:var(--s-${x.type})"></span>${gv!=null?`<span class="rb-ghost" style="width:${bw(gv)}%"></span>`:""}</span>
+        <span class="rb-v num"><b>${sgn(x.gain)}</b>${gv!=null?`<span class="small">zwykły ${sgn(gv-kw)} · ${accN} ${sgn(d)}</span>`:""}</span></div>`}).join("")}</div>
+    ${ghost?`<p class="small rb-note"><span class="rb-key"></span> przerywany kontur — ta sama seria na zwykłym rachunku (podatek Belki). ${better===rank.length?`${accN} daje więcej przy każdej serii.`:better===0?`Przy tym okresie ${accN} nie daje więcej przy żadnej serii${b.acc==="ikze"?" — 10% ryczałtu od całej wypłaty to więcej niż 19% od samego zysku (ulga w PIT przy wpłacie nieliczona)":""}.`:`${accN} daje więcej przy ${better} z ${rank.length} serii.`}</p>`:""}</div>`;
   const notes=x=>{const n=[];const term=Zamiana.TYPES[x.type].term;const w=x.events.filter(e=>e.kind==="wykup"&&!e.final).length;
     if(w)n.push(w===1?"wykup w terminie i zamiana na nową":`${w}× wykup w terminie i zamiana`);
     if(x.events.some(e=>e.kind==="wykup"&&e.final))n.push("wykup w terminie na koniec okresu — bez zamiany");
@@ -160,6 +182,7 @@ function buyRecompute(){
     ${momentTxt?`<div class="insight warn"><span class="t">moment wypłaty</span>${momentTxt}</div>`:""}
     <div class="card"><div class="sec-head"><div><h3>Wartość w czasie</h3><p class="desc">${b.acc==="ikze"?ikzeChartTxt:""}${liq?"Ile dostałbyś, wypłacając wszystko z końcem danego miesiąca (po opłacie i podatku), z resztą na koncie.":"Wartość obligacji bez wypłaty, z resztą na koncie."}</p></div></div>
       <div class="chart" id="b-chart"></div></div>
+    ${barsHtml}
     <div class="card table-card"><div class="tc-head"><h3>Wszystkie serie z oferty</h3><p class="desc">Kwota ${zl0(+b.kw)}, okres ${esc(hTxt)}, ${calcTaxTxt({acc:b.acc})}. ${liq?"Wartość na koniec = wypłata wszystkiego (po opłacie i podatku) plus konto.":"Wartość na koniec bez wypłaty: obligacje po podatku od narosłych odsetek, bez opłaty, plus konto."}</p></div>
       <div class="frame"><table><thead><tr><th>#</th><th>Seria</th><th>Oprocentowanie</th><th class="r">Na koniec</th><th class="r">Zysk</th><th class="r">Rocznie</th><th class="r">Realnie${calcTip("real",1)}</th><th>Uwagi</th></tr></thead><tbody>
       ${rank.map((x,i)=>`<tr><td>${i+1}</td><td><b style="color:var(--s-${x.type})">${esc(x.c.code)}</b> <span class="small">${esc(Zamiana.TYPES[x.type].label)}</span></td><td>${esc(buyRuleTxt(x.c))}</td><td class="r num"><b>${zl0(x.final)}</b></td><td class="r num"><span class="${x.gain>0?"d-up":x.gain<0?"d-down":"d-0"}">${sgn(x.gain)}</span></td><td class="r num">${pct(x.annual)}</td><td class="r num">${zl0(x.finalReal)}</td><td class="small">${esc(notes(x))}</td></tr>`).join("")}

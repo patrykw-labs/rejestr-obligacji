@@ -119,7 +119,7 @@ const CASES = [
     const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c[3] > 0.5) return c; } return [255, 255, 255, 1]; };
     const bad = [];
     for (const sel of ["main h2", "main .desc", "main th", "main td", "main .stat .v", "main .stat .s", "nav.tabs button", "main .chip", "main .btn", "main .insight", "footer",
-      "main .abar.on .ab-l", "main .abar.on .seg button:not([aria-pressed=true])", "main .abar.on .seg button[aria-pressed=true]", "main .abar.on .ab-res", "main .abar.on .ab-sum-go", "main .was"]) {
+      "main .abar.on .ab-l", "main .abar.on .seg button:not([aria-pressed=true])", "main .abar.on .seg button[aria-pressed=true]", "main .abar.on .ab-res", "main .abar.on .ab-sum-go", "main .was", "main .rb-v .small", "main .rb-note", "main .range-ends", "main .seg-f button[aria-pressed=true]", "main .seg-f button:not([aria-pressed=true])"]) {
       const el = document.querySelector(sel); if (!el) continue;
       const a = lum(rgb(getComputedStyle(el).color)), b = lum(bgOf(el)), r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
       if (r < min) bad.push(`${sel} ${r.toFixed(2)}:1`);
@@ -544,19 +544,67 @@ const CASES = [
       if (!problem && c.bad.length) problem = "pasek: za słaby kontrast: " + c.bad.join(", ");
       await pg.click("#tab-kupno");
       await pg.waitForSelector("#b-out .verdict");
-      if (!problem && (await pg.$eval('button.chip[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "ike") problem = "IKE nie przeszło do „Co kupić?”";
+      if (!problem && (await pg.$eval('button[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "ike") problem = "IKE nie przeszło do „Co kupić?”";
       await pg.click('button.chip[data-bsc="high"]');
       await pg.click("#tab-portfel");
       await pg.waitForSelector("#p-out .stats");
-      const pf = await pg.evaluate(() => [document.querySelector('button.chip[data-pacc][aria-pressed="true"]').dataset.pacc, document.querySelector('button.chip[data-psc][aria-pressed="true"]').dataset.psc]);
+      const pf = await pg.evaluate(() => [document.querySelector('button[data-pacc][aria-pressed="true"]').dataset.pacc, document.querySelector('button.chip[data-psc][aria-pressed="true"]').dataset.psc]);
       if (!problem && pf.join() !== "ike,high") problem = "rachunek/inflacja nie przeszły do portfela: " + pf.join();
       await pg.evaluate(() => { location.hash = "#kupno&kw=5000&h=36&sc=base&ike=0"; });
       await pg.waitForFunction(() => document.querySelector("#b-kw")?.value === "5000");
-      if (!problem && (await pg.$eval('button.chip[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "std") problem = "link z ike=0 nie ma pierwszeństwa przed wspólnymi założeniami";
+      if (!problem && (await pg.$eval('button[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "std") problem = "link z ike=0 nie ma pierwszeństwa przed wspólnymi założeniami";
     } catch (e) { problem = e.message.split("\n")[0]; }
     if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
     await ctx.close();
     if (problem) { fail++; console.log(`✗ pasek założeń (${scheme === "dark" ? "ciemny" : "jasny"} motyw): ${problem}`); } else pass++;
+  }
+  // etap 2: pasek pojawia się, zanim dół formularza schowa się pod nagłówkiem; „Co kupić?” — słupki zysku z konturem zwykłego
+  // rachunku przy IKE (bez konturu na zwykłym), suwaki okresu i kwoty, przełącznik wyceny; kalkulator — linia różnicy na zwykłym
+  // rachunku przy IKE i zdanie w werdykcie
+  for (const scheme of ["light", "dark"]) {
+    let problem = "";
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: scheme });
+    const pg = await ctx.newPage();
+    const errors = [];
+    pg.on("pageerror", (e) => errors.push(e.message));
+    await pg.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      await pg.goto(base + "#kupno&kw=10000&h=60&sc=base&sv=4&ike=1");
+      await pg.waitForSelector("#b-out .rbars");
+      await pg.evaluate(() => scrollTo(0, document.querySelector("#b-out").getBoundingClientRect().top + scrollY - 59 - 100));
+      await pg.waitForTimeout(250);
+      if (!(await pg.$eval("#b-abar", (e) => e.classList.contains("on")))) problem = "pasek nie pojawia się, gdy z formularza zostało ~40 px nad wynikiem";
+      const rows = await pg.$$eval("#b-out .rbar", (r) => r.length), ghosts = await pg.$$eval("#b-out .rb-ghost", (r) => r.length);
+      if (!problem && (!rows || rows !== ghosts)) problem = `słupki: ${rows} serii, ${ghosts} konturów zwykłego rachunku`;
+      const c = await contrastCheck(pg, 4.5);
+      if (!problem && c.bad.length) problem = "za słaby kontrast: " + c.bad.join(", ");
+      await pg.evaluate(() => scrollTo(0, 0));
+      await pg.focus("#b-h"); await pg.keyboard.press("ArrowRight");
+      await pg.waitForFunction(() => /h=72/.test(location.hash));
+      if (!problem && (await pg.textContent("#b-h-v")) !== "6 lat") problem = "suwak okresu: etykieta " + await pg.textContent("#b-h-v");
+      await pg.focus("#b-kw-r"); await pg.keyboard.press("ArrowRight");
+      await pg.waitForFunction(() => /kw=15000/.test(location.hash));
+      if (!problem && (await pg.inputValue("#b-kw")) !== "15000") problem = "suwak kwoty nie zmienił pola";
+      if (!problem && !(await pg.$$eval("#main .was", (w) => w.length))) problem = "suwak: brak plakietki „było …” po zmianie";
+      await pg.click('.calc-grid button[data-bval="h"]');
+      await pg.waitForFunction(() => /val=h/.test(location.hash));
+      await pg.click('.calc-grid button[data-bacc="std"]');
+      await pg.waitForSelector("#b-out .rbars");
+      if (!problem && await pg.$("#b-out .rb-ghost")) problem = "kontur zwykłego rachunku przy zwykłym rachunku";
+      await pg.goto("about:blank");
+      await pg.goto(base + "#zamiana&k=EDO0434&n=100&tt=EDO&bd=12&ike=1");
+      await pg.waitForSelector("#z-chart svg");
+      if (!problem && !(await pg.$("#z-chart .zghost"))) problem = "kalkulator: brak linii różnicy na zwykłym rachunku przy IKE";
+      if (!problem && !/Na zwykłym rachunku/.test(await pg.textContent("#z-out .verdict"))) problem = "kalkulator: brak zdania o zwykłym rachunku w werdykcie";
+      await pg.click('.calc-grid button[data-val="liquidate"]');
+      await pg.waitForFunction(() => /val=l/.test(location.hash));
+      await pg.click('.calc-grid button[data-acc="std"]');
+      await pg.waitForSelector("#z-chart svg");
+      if (!problem && await pg.$("#z-chart .zghost")) problem = "kalkulator: linia zwykłego rachunku przy zwykłym rachunku";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    await ctx.close();
+    if (problem) { fail++; console.log(`✗ porównanie ze zwykłym rachunkiem, suwaki (${scheme === "dark" ? "ciemny" : "jasny"} motyw): ${problem}`); } else pass++;
   }
   {
     let problem = "";
