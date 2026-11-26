@@ -131,7 +131,7 @@ function pfParams(s){
     cpiPrelim:Object.fromEntries(state.months.filter(m=>m.cpiKind==="szybki szacunek"&&m.cpiRefMonth).map(m=>[m.cpiRefMonth,true]))};
 }
 function renderPortfolio(main){
-  if(!state.pf){const h=pfFromHash();if(h){state.pf=h;state.pfLink=true}else state.pf=pfLoad()||pfDefaults()}
+  if(!state.pf){const h=pfFromHash();if(h){state.pf=h;state.pfLink=true}else state.pf=sharedPull("pf",pfLoad()||pfDefaults())}
   const s=state.pf,now=pfNow(),opts=calcOptions(now,true,true);
   const undo=viewUndoShown("pf"),isDef=pfHash(s)===pfHash(pfDefaults());
   const codeOpts=cur=>CALC_TYPES.filter(t=>opts[t]).map(t=>`<optgroup label="${t}">${selOpts(opts[t].map(x=>[x,x+" · zakup "+mShort(Zamiana.parseCode(x).purchase)]),cur)}</optgroup>`).join("");
@@ -141,7 +141,10 @@ function renderPortfolio(main){
         <label class="field"><span class="flabel">Szt.${calcTip("n")}</span><input data-pi="${i}" data-pk="n" type="number" min="1" step="1" inputmode="numeric" value="${esc(o.n)}"></label>
         <label class="field"><span class="flabel">Dzień${calcTip("ppd")}</span><input data-pi="${i}" data-pk="pd" type="number" min="1" max="31" step="1" inputmode="numeric" value="${esc(o.pd)}"></label></div>
       ${a?`<span class="fnote">zakup ${mShort(a.p)} · wykup ${mShort(mat)} · ${calcR1Label(a.type)} ${fmt(a.r1)}%${a.type==="OTS"||a.type==="TOS"?"":` · marża ${fmt(a.m)} p.p.`} · ${a.type==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(a.f)} zł/szt.`}</span>`:""}</div>`};
+  const abItems=[{k:"acc",label:"Rachunek",type:"seg",opts:[["std","Zwykły"],["ike","IKE / IKZE"]],cur:s.acc},
+    {k:"sc",label:"Inflacja dalej",type:"seg",opts:AB_SC,cur:s.sc},{k:"bd",label:"Dzień wyceny",type:"num",step:1,min:1,cur:s.bd}];
   main.innerHTML=`<div class="vlist">
+    ${abarHtml("p",abItems,pfAbarSummary(s))}
     <div class="sec-head"><div><p class="kicker">§ 6 · mój portfel</p><h2>Ile są warte <span class="acc">moje obligacje</span>?</h2><p class="desc">Wpisz serie, które masz: zobaczysz ich wartość na ${esc(pfDate(now,s.bd))}, ile dostaniesz na rękę po zerwaniu, terminy wykupu, najbliższe kupony i zmiany oprocentowania. Bez zamiany — czy opłaca się zamienić je na nowe, sprawdzisz w kalkulatorze zamiany.</p></div>
       ${resetRowHtml("p",isDef,undo,"przykładowa seria EDO, wycena na dziś, zwykły rachunek")}</div>
     ${linkWarnHtml("portfel")}
@@ -165,9 +168,13 @@ function renderPortfolio(main){
     else el.addEventListener("input",()=>{o[k]=el.value;pfRecompute()})});
   main.querySelectorAll("button[data-pdel]").forEach(b=>b.addEventListener("click",()=>{s.pos.splice(+b.dataset.pdel,1);renderPortfolio(main)}));
   $("#p-add").addEventListener("click",()=>{const c=pfNext(s);if(c&&s.pos.length<PF_MAX){s.pos.push({code:c,n:10,pd:1});renderPortfolio(main)}});
-  $("#p-bd").addEventListener("input",e=>{s.bd=e.target.value;pfRecompute()});
-  main.querySelectorAll("button.chip[data-pacc]").forEach(b=>b.addEventListener("click",()=>{s.acc=b.dataset.pacc;renderPortfolio(main)}));
-  main.querySelectorAll("button.chip[data-psc]").forEach(b=>b.addEventListener("click",()=>{s.sc=b.dataset.psc;renderPortfolio(main)}));
+  $("#p-bd").addEventListener("input",e=>{s.bd=e.target.value;abarMirror("p","bd",s.bd,()=>pfAbarSummary(s));pfRecompute()});
+  // rachunek i inflacja — te same zmiany z formularza i z paska założeń (z plakietką „było …”); przechodzą do innych zakładek
+  const pickAcc=v=>{s.acc=v;sharedSet("pf",{acc:v});renderPortfolio(main)},pickSc=v=>{s.sc=v;sharedSet("pf",{sc:v});renderPortfolio(main)};
+  main.querySelectorAll("button.chip[data-pacc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.pacc))));
+  main.querySelectorAll("button.chip[data-psc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickSc(b.dataset.psc))));
+  abarBind("p",main,{summary:()=>pfAbarSummary(s),onPick:(k,v)=>k==="acc"?pickAcc(v):pickSc(v),
+    onNum:(k,v)=>{s.bd=v;$("#p-bd").value=v;pfRecompute()}});
   viewResetBind("p","pf",null,pfDefaults,()=>renderPortfolio(main));
   // wczytanie portfela z pliku: zastępuje bieżący (z możliwością cofnięcia), zapis w przeglądarce jak przy zmianie ręcznej
   $("#p-load-file").addEventListener("click",()=>$("#p-file").click());
@@ -203,6 +210,8 @@ function pfBindStore(){const main=$("#main"),b=$("#p-forget"),k=$("#p-keep"),l=$
   if(b)b.addEventListener("click",()=>pfForget(main));
   if(k)k.addEventListener("click",()=>{state.pfLink=false;const ch=pfSave(state.pf);const st=$("#p-store");if(st){st.innerHTML=pfStoreNote(ch);pfBindStore()}});
   if(l)l.addEventListener("click",()=>{const v=pfLoad();if(!v)return;state.pf=v;state.pfLink=false;renderPortfolio(main)})}
+// podsumowanie założeń w pasku (telefon): „zwykły rachunek · inflacja 2,5% · wycena 26.11.2026”
+const pfAbarSummary=s=>[s.acc==="ike"?"IKE / IKZE":"zwykły rachunek",abScTxt(s.sc),"wycena "+(calcDayOk(s.bd)?pfDate(pfNow(),s.bd):"–")].join(" · ");
 function pfRecompute(){
   const out=$("#p-out");if(!out)return;const s=state.pf,now=pfNow();
   try{history.replaceState(null,"","#"+pfHash(s))}catch(e){}
@@ -211,7 +220,7 @@ function pfRecompute(){
   if(!s.pos.length)errs.push("Dodaj co najmniej jedną serię.");
   s.pos.forEach((o,i)=>{if(!(Math.floor(+o.n)>=1))errs.push(`Seria ${i+1}: podaj liczbę sztuk.`);if(!calcDayOk(o.pd))errs.push(`Seria ${i+1}: dzień zakupu od 1 do 31.`);else if(calcFromCode(o.code)?.p===now&&+o.pd>+s.bd)errs.push(`Seria ${i+1} (${o.code}): zakup ${o.pd}. dnia jest po dniu wyceny (${s.bd}.) — ustaw dzień wyceny na dziś albo popraw dzień zakupu.`)});
   if(!(calcDayOk(s.bd)&&+s.bd<=calcDaysIn(now)))errs.push(`Dzień wyceny: od 1 do ${calcDaysIn(now)}.`);
-  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
+  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;abarResult("p",`<span>uzupełnij dane w formularzu</span>`);return}
   let r;try{r=Zamiana.holdings(pfParams(s))}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
   const pd=i=>+s.pos[i].pd||1,live=r.items.map((x,i)=>Object.assign(x,{i,code:s.pos[i].code})).filter(x=>!x.matured&&!x.error);
   const done=r.items.filter(x=>x.matured);
@@ -232,9 +241,9 @@ function pfRecompute(){
   const first=ev[0],calcH=pfCalcHash(s);
   out.innerHTML=`<div class="vlist">
     <div class="stats">
-      <div class="stat t-acc"><span class="k">Wartość ${s.bd==calcDefaultBreakDay()?"dziś":"na "+pfDate(now,s.bd)}${calcTip("pgross")}</span><span class="v">${zl0(gross)}</span><span class="s">z narosłymi odsetkami, przed opłatą i podatkiem${paid>0.005?`; do tego odsetki wypłacone dotąd: <b>${zl0(paid)}</b>`:""}</span></div>
-      <div class="stat t-green"><span class="k">Na rękę po zerwaniu${calcTip("ppay")}</span><span class="v v-green">${brk.length?zl0(pay):"–"}</span><span class="s">${brk.length?`opłaty ${zl0(fee)}${tax?`, podatek ${zl0(tx)}`:" (bez podatku)"} — koszt zerwania <b>${zl0(grossB-pay)}</b>`:"żadnej serii nie można dziś zerwać"}${brk.length&&noBrk.length?` · bez ${noBrk.map(x=>esc(x.code)).join(", ")} (nie można dziś zerwać)`:""}</span></div>
-      <div class="stat t-gold"><span class="k">Przy wykupie w terminie${calcTip("pmat")}</span><span class="v">${zl0(mat)}</span><span class="s">${futC>0.005?`wykup <b>${zl0(matFin)}</b> + kupony i odsetki do wykupu <b>${zl0(futC)}</b> · `:""}${live.length>1?`ostatni wykup ${mShort(lastMat)}`:`wykup ${lastMat?mShort(lastMat):"–"}`}${anyGuess?` · prognoza przy inflacji ${fmt(CPI_PRESETS[s.sc].v,1)}%`:anyPrelim?" · stopy częściowo wstępne (szybki szacunek GUS)":""}${tax?" · po podatku":""}</span></div>
+      <div class="stat t-acc"><span class="k">Wartość ${s.bd==calcDefaultBreakDay()?"dziś":"na "+pfDate(now,s.bd)}${calcTip("pgross")}</span><span class="v" data-m="gross" data-v="${gross}">${zl0(gross)}</span><span class="s">z narosłymi odsetkami, przed opłatą i podatkiem${paid>0.005?`; do tego odsetki wypłacone dotąd: <b>${zl0(paid)}</b>`:""}</span></div>
+      <div class="stat t-green"><span class="k">Na rękę po zerwaniu${calcTip("ppay")}</span><span class="v v-green" data-m="pay" data-v="${brk.length?pay:""}">${brk.length?zl0(pay):"–"}</span><span class="s">${brk.length?`opłaty ${zl0(fee)}${tax?`, podatek ${zl0(tx)}`:" (bez podatku)"} — koszt zerwania <b>${zl0(grossB-pay)}</b>`:"żadnej serii nie można dziś zerwać"}${brk.length&&noBrk.length?` · bez ${noBrk.map(x=>esc(x.code)).join(", ")} (nie można dziś zerwać)`:""}</span></div>
+      <div class="stat t-gold"><span class="k">Przy wykupie w terminie${calcTip("pmat")}</span><span class="v" data-m="mat" data-v="${mat}">${zl0(mat)}</span><span class="s">${futC>0.005?`wykup <b>${zl0(matFin)}</b> + kupony i odsetki do wykupu <b>${zl0(futC)}</b> · `:""}${live.length>1?`ostatni wykup ${mShort(lastMat)}`:`wykup ${lastMat?mShort(lastMat):"–"}`}${anyGuess?` · prognoza przy inflacji ${fmt(CPI_PRESETS[s.sc].v,1)}%`:anyPrelim?" · stopy częściowo wstępne (szybki szacunek GUS)":""}${tax?" · po podatku":""}</span></div>
       <div class="stat t-red"><span class="k">Najbliższe zdarzenie</span><span class="v sm">${first?pfDate(first.ym,first.d):"–"}</span><span class="s">${first?`<b>${esc(first.code)}</b> — ${esc({wykup:"wykup w terminie",kupon:"wypłata odsetek",stopa:"nowe oprocentowanie"}[first.kind])}`:"brak w ciągu roku"}</span></div>
     </div>
     ${done.length?`<div class="insight warn"><span class="t">po terminie wykupu</span>${done.map(x=>esc(s.pos[r.items.indexOf(x)].code)).join(", ")} — wykupione ${done.length===1?"w":"przed"} ${esc(mLabel(now))}; nie liczymy ${done.length===1?"jej":"ich"} do sumy.</div>`:""}
@@ -284,5 +293,6 @@ function pfRecompute(){
     const evs=[[],["Data","Seria","Zdarzenie"],...ev.map(e=>[pfDate(e.ym,e.d),e.code,e.text])];
     downloadCsv(`moj-portfel-${now}-${String(s.bd).padStart(2,"0")}.csv`,["Seria","Szt.","Zakup","Wykup","Oprocentowanie (%)","Koniec okresu","Wartość (zł)","Opłata przy zerwaniu (zł)","Podatek przy zerwaniu (zł)","Na rękę po zerwaniu (zł)","Odsetki wypłacone dotąd (zł)","Wykup w terminie (zł)","Kupony do wykupu (zł)","Łącznie do wykupu (zł)","Wartość przy wykupie"],rows.concat(evs),
       [["Wycena na",pfDate(now,s.bd)],["Rachunek",tax?"zwykły (podatek Belki)":"IKE / IKZE (bez podatku Belki)"],["Inflacja dalej (prognozy)",fmt(CPI_PRESETS[s.sc].v,1)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — wycena orientacyjna"]])});
+  abarResult("p",`Na rękę po zerwaniu <b data-m="pay" data-v="${brk.length?pay:""}">${brk.length?zl0(pay):"–"}</b><br>Przy wykupie w terminie <b data-m="mat" data-v="${mat}">${zl0(mat)}</b>`);
   calcBindShare();calcBindTips(out);
 }

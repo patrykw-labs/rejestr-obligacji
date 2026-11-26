@@ -58,8 +58,9 @@ function resultPeekBind(outSel){
   let bar=document.getElementById("peek");
   if(!v||!("IntersectionObserver" in window)){if(bar)bar.remove();return}
   if(!bar){bar=document.createElement("button");bar.id="peek";bar.type="button";bar.className="peek";bar.hidden=true;document.body.appendChild(bar)}
-  bar.innerHTML=`<span class="peek-t">${esc(v.querySelector(".vt")?.textContent||"")}</span><span class="peek-go">wynik ↓</span>`;
-  bar.setAttribute("aria-label","Przejdź do wyniku: "+(v.querySelector(".vt")?.textContent||""));
+  const vt=v.querySelector(".vt"),txt=vt?[...vt.childNodes].filter(n=>!(n.classList&&n.classList.contains("was"))).map(n=>n.textContent).join("").trim():"";
+  bar.innerHTML=`<span class="peek-t">${esc(txt)}</span><span class="peek-go">wynik ↓</span>`;
+  bar.setAttribute("aria-label","Przejdź do wyniku: "+txt);
   bar.classList.toggle("good",v.classList.contains("good"));bar.classList.toggle("bad",v.classList.contains("bad"));
   bar.onclick=()=>v.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
   peekObs=new IntersectionObserver(([e])=>{bar.hidden=e.isIntersecting||e.boundingClientRect.top<0},{threshold:0});
@@ -74,3 +75,84 @@ function viewUndo(key,visKey,render){const u=state[key+"Undo"];if(!u)return;stat
 // cofnięcie pokazujemy tylko w widoku tuż po wyczyszczeniu
 function viewUndoShown(key){const u=state[key+"UndoFresh"]?state[key+"Undo"]:null;state[key+"UndoFresh"]=false;return u}
 function viewResetBind(p,key,visKey,fresh,render){const r=$("#"+p+"-reset");if(r)r.addEventListener("click",()=>viewReset(key,visKey,fresh,render));const u=$("#"+p+"-undo");if(u)u.addEventListener("click",()=>viewUndo(key,visKey,render))}
+
+// ---------- wspólne założenia zakładek ----------
+// Rachunek i scenariusz inflacji wybrane w jednej zakładce (kalkulator, „Co kupić?”, „Mój portfel”) przechodzą do pozostałych
+// do końca wizyty. Zakładka otwarta z linku z parametrami bierze wartości z linku (state.shared ich nie nadpisuje).
+// Portfel ma tylko „zwykły” i „IKE / IKZE” oraz scenariusze bez „własnej” inflacji — wartości są tłumaczone w obie strony.
+function sharedPull(view,o){const s=state.shared;if(!s||!o)return o;
+  if(s.acc){if(view==="pf")o.acc=s.acc==="std"?"std":"ike";else{o.acc=s.acc;if(view==="calc")o.ike=s.acc!=="std"}}
+  if(s.sc){if(view==="pf"){if(CPI_PRESETS[s.sc])o.sc=s.sc}else{o.sc=s.sc;if(s.sc==="custom"&&s.cpi)o.cpi=s.cpi.slice()}}
+  return o}
+function sharedSet(view,patch){const s=state.shared=state.shared||{};
+  if(patch.acc)s.acc=view==="pf"&&patch.acc==="ike"&&(s.acc==="ike"||s.acc==="ikze")?s.acc:patch.acc;
+  if(patch.sc){s.sc=patch.sc;if(patch.cpi)s.cpi=patch.cpi.slice()}
+  sharedPull("calc",state.calc);sharedPull("buy",state.buy);sharedPull("pf",state.pf)}
+
+// ---------- plakietka „było …” ----------
+// Elementy z data-m (klucz) i data-v (liczba; data-x — np. kod zwycięskiej serii) to najważniejsze wyniki widoku.
+// wasSnap() przed zmianą założenia, wasShow() po przeliczeniu: przy zmianie wartości mignięcie i plakietka z poprzednią.
+function wasSnap(){const m={};document.querySelectorAll("#main [data-m]").forEach(e=>{const k=e.dataset.m;if(!(k in m))m[k]={v:+e.dataset.v,t:e.textContent.trim(),x:e.dataset.x||""}});return m}
+function wasShow(snap){if(!snap)return;
+  document.querySelectorAll("#main [data-m]").forEach(e=>{const o=snap[e.dataset.m];if(!o||isNaN(o.v))return;const x=e.dataset.x||"";
+    if(Math.abs(o.v-(+e.dataset.v))<0.5&&o.x===x)return;
+    e.classList.add("flash");e.insertAdjacentHTML("afterend",`<span class="was">było ${esc(o.x&&o.x!==x?o.x+": ":"")}${esc(o.t)}</span>`)});
+  clearTimeout(wasShow.t);wasShow.t=setTimeout(()=>{document.querySelectorAll("#main .was").forEach(w=>{w.classList.add("gone");setTimeout(()=>w.remove(),600)});document.querySelectorAll("#main .flash").forEach(e=>e.classList.remove("flash"))},6000)}
+const withWas=fn=>{const s=wasSnap();fn();wasShow(s)};
+
+// ---------- pasek założeń ----------
+// Przyklejony pod nagłówkiem pasek z ustawieniami, które zmieniają cały wynik (rachunek, inflacja, okres…), i ze skrótem
+// wyniku. Pojawia się, gdy formularz (.calc-grid) zniknie nad górną krawędzią ekranu. Na wąskim ekranie: jedna linijka
+// podsumowania i przycisk „Zmień”, który otwiera panel od dołu z tymi samymi ustawieniami (Esc / „Gotowe” / tło zamyka).
+// items: [{k, label, type:"seg"|"sel"|"num", opts:[[v,etykieta]], cur, step, min, sync:"#id pola w formularzu"}]
+// onPick(k,v) — zmiana przełącznika/listy (widok przerysowuje się sam); onNum(k,v) — wpisywanie liczby (tylko przeliczenie).
+const abarKeep={};
+function abarItemHtml(p,it,where){
+  const lid=`${p}-ab-${it.k}-${where}`;
+  if(it.type==="seg")return `<div class="ab-g"><span class="ab-l" id="${lid}">${esc(it.label)}</span><div class="seg" role="group" aria-labelledby="${lid}">${it.opts.map(([v,l])=>`<button type="button" data-ab="${esc(it.k)}" data-v="${esc(v)}" aria-pressed="${String(v)===String(it.cur)}">${esc(l)}</button>`).join("")}</div></div>`;
+  if(it.type==="sel")return `<label class="ab-g"><span class="ab-l">${esc(it.label)}</span><span class="sel"><select data-ab="${esc(it.k)}">${selOpts(it.opts,it.cur)}</select></span></label>`;
+  return `<label class="ab-g"><span class="ab-l">${esc(it.label)}</span><input type="number" data-ab="${esc(it.k)}" data-num="1" inputmode="decimal" step="${it.step||1}"${it.min!=null?` min="${it.min}"`:""} value="${esc(it.cur)}"></label>`;
+}
+function abarHtml(p,items,summary){
+  return `<div class="abar" id="${p}-abar" role="region" aria-label="Założenia (widoczne podczas przewijania)" inert>
+    <div class="abar-in"><div class="ab-full">${items.map(it=>abarItemHtml(p,it,"b")).join("")}</div>
+      <button type="button" class="ab-sum" aria-haspopup="dialog" aria-expanded="false" aria-controls="${p}-asheet"><span class="ab-sum-t">${esc(summary)}</span><span class="ab-sum-go">Zmień</span></button>
+      <div class="ab-res" aria-live="polite"></div></div></div>
+    <div class="asheet" id="${p}-asheet" hidden><div class="asheet-bg" data-ab-close></div>
+      <div class="asheet-in" role="dialog" aria-modal="true" aria-labelledby="${p}-asheet-t"><div class="asheet-grip" aria-hidden="true"></div>
+        <h3 id="${p}-asheet-t">Założenia</h3>${items.map(it=>abarItemHtml(p,it,"s")).join("")}
+        <div class="ab-res" aria-hidden="true"></div>
+        <button type="button" class="btn solid ab-done" data-ab-close>Gotowe</button></div></div>`;
+}
+// wynik w pasku i w panelu (po każdym przeliczeniu)
+function abarResult(p,html){document.querySelectorAll(`#${p}-abar .ab-res, #${p}-asheet .ab-res`).forEach(e=>e.innerHTML=html)}
+let abarScroll=null;
+function abarBind(p,main,{onPick,onNum,summary}){
+  const bar=$("#"+p+"-abar"),sheet=$("#"+p+"-asheet"),form=main.querySelector(".calc-grid");if(!bar||!form)return;
+  const sumBtn=bar.querySelector(".ab-sum");
+  const show=()=>{if(!bar.isConnected){removeEventListener("scroll",abarScroll);removeEventListener("resize",abarScroll);return}
+    const top=(document.querySelector(".topbar")?.getBoundingClientRect().height||58)+8,on=form.getBoundingClientRect().bottom<top;
+    bar.classList.toggle("on",on);bar.inert=!on;if(!on&&!sheet.hidden)close(false)};
+  if(abarScroll){removeEventListener("scroll",abarScroll);removeEventListener("resize",abarScroll)}
+  abarScroll=show;addEventListener("scroll",show,{passive:true});addEventListener("resize",show);
+  show();requestAnimationFrame(()=>bar.classList.add("ready"));
+  const open=(anim=true)=>{sheet.hidden=false;sheet.classList.toggle("anim",anim);sumBtn.setAttribute("aria-expanded","true")};
+  function close(focus=true){sheet.hidden=true;sumBtn.setAttribute("aria-expanded","false");if(focus)sumBtn.focus()}
+  sumBtn.addEventListener("click",()=>{open();(sheet.querySelector("[aria-pressed=true],select,input")||sheet.querySelector("button")).focus()});
+  sheet.querySelectorAll("[data-ab-close]").forEach(b=>b.addEventListener("click",()=>close()));
+  sheet.addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();close();return}
+    if(e.key!=="Tab")return;const f=[...sheet.querySelectorAll("button,select,input")].filter(x=>!x.disabled&&x.offsetParent);if(!f.length)return;
+    if(e.shiftKey&&document.activeElement===f[0]){e.preventDefault();f[f.length-1].focus()}else if(!e.shiftKey&&document.activeElement===f[f.length-1]){e.preventDefault();f[0].focus()}});
+  // po przerysowaniu widoku: panel otwarty dalej, fokus na tej samej kontrolce
+  if(abarKeep[p]?.open)open(false);
+  // przerysowanie widoku może na chwilę skrócić stronę — przywracamy przewinięcie, widoczność paska i fokus na tej samej kontrolce
+  const pick=(el,k,v)=>{const keep=abarKeep[p]={open:!sheet.hidden,sel:`[data-ab="${k}"]`+(el.tagName==="BUTTON"?`[data-v="${v}"]`:"")},y=scrollY;
+    withWas(()=>onPick(k,v));delete abarKeep[p];if(Math.abs(scrollY-y)>1)scrollTo(0,y);if(abarScroll)abarScroll();
+    const host=$(keep.open?`#${p}-asheet`:`#${p}-abar`),f=host&&host.querySelector(keep.sel);if(f)f.focus({preventScroll:true})};
+  [bar,sheet].forEach(host=>host.querySelectorAll("[data-ab]").forEach(el=>{const k=el.dataset.ab;
+    if(el.tagName==="BUTTON")el.addEventListener("click",()=>pick(el,k,el.dataset.v));
+    else if(el.dataset.num)el.addEventListener("input",()=>{document.querySelectorAll(`#${p}-abar [data-ab="${k}"], #${p}-asheet [data-ab="${k}"]`).forEach(o=>{if(o!==el)o.value=el.value});onNum(k,el.value);bar.querySelector(".ab-sum-t").textContent=summary()});
+    else el.addEventListener("change",()=>pick(el,k,el.value))}));
+}
+// pole formularza → pasek (przy wpisywaniu w formularzu pasek nie jest przerysowywany)
+function abarMirror(p,k,val,summary){document.querySelectorAll(`#${p}-abar [data-ab="${k}"], #${p}-asheet [data-ab="${k}"]`).forEach(o=>o.value=val);const t=document.querySelector(`#${p}-abar .ab-sum-t`);if(t&&summary)t.textContent=summary()}

@@ -22,6 +22,11 @@ const calcNbpNow=()=>state.months[state.months.length-1].nbpRef??0;
 // czy w wyliczeniu jest ROR/DOR (pokazujemy wtedy scenariusz stopy NBP)
 const calcUsesNbp=c=>c.pos.some(o=>calcIsNbp(o.type))||calcIsNbp(c.tt);
 const CPI_PRESETS={base:{label:"Bazowy 2,5%",v:2.5},high:{label:"Wysoka inflacja 5%",v:5},low:{label:"Niska inflacja 1,5%",v:1.5}};
+// krótkie etykiety do paska założeń (wspolne.js: abarHtml)
+const AB_ACC=[["std","Zwykły"],["ike","IKE"],["ikze","IKZE"]];
+const AB_SC=[["low","1,5%"],["base","2,5%"],["high","5%"]];
+const abAccTxt=a=>({std:"zwykły rachunek",ike:"IKE",ikze:"IKZE"})[a]||a;
+const abScTxt=(sc,cpi)=>sc==="custom"?"inflacja własna":"inflacja "+fmt(CPI_PRESETS[sc]?.v??2.5,1)+"%";
 const zl0=v=>v==null||isNaN(v)?"–":Math.round(v).toLocaleString("pl-PL")+" zł";
 const zl2=v=>v==null||isNaN(v)?"–":Number(v).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})+" zł";
 const sgn=(v,f=zl0)=>(v>0?"+":v<0?"−":"")+f(Math.abs(v));
@@ -169,7 +174,7 @@ function calcFresh(){const saved=state.calc;state.calc=null;const d=calcDefaults
 function calcReset(main){state.calcRangeUndo=state.calcRange;state.calcRange=undefined;viewReset("calc","calcVis",calcFresh,()=>renderCalc(main))}
 function calcUndoReset(main){if(state.calcUndo)state.calcRange=state.calcRangeUndo;viewUndo("calc","calcVis",()=>renderCalc(main))}
 function renderCalc(main){
-  if(!state.calc)state.calc=calcFromHash()||calcDefaults();
+  if(!state.calc)state.calc=calcFromHash()||sharedPull("calc",calcDefaults());
   const undo=viewUndoShown("calc");
   const isDef=calcHash(state.calc)===calcHash(calcFresh())&&!Object.keys(state.calcVis||{}).length&&!state.calcRange;
   const c=state.calc,now=calcNow(),opts=calcOptions(),offer=calcOfferRec(now),multi=c.pos.length>1,today=calcIsToday(),past=now<calcArchiveNow();
@@ -194,7 +199,12 @@ function renderCalc(main){
       <div class="pos-row">${sel}${nF.replace("Liczba sztuk","Szt.")}${dF.replace("Dzień zakupu","Dzień")}</div>
       ${o.code?`<span class="fnote">zakup ${mShort(o.p)} · wykup ${mat?mShort(mat):"–"} · ${calcR1Label(o.type)} ${fmt(o.r1)}% · marża ${fmt(o.m)} p.p. · ${o.type==="OTS"?"przy zerwaniu bez odsetek":`opłata ${fmt(o.f)} zł/szt.`} (z listu emisyjnego)</span>`:`<div class="frow">${typeF}${pF}</div>${parF}`}</div>`;
   };
+  const hOpts=[["m",(multi?"do wykupu ostatniej":"do wykupu")+(matYm?" ("+mShort(matYm)+")":"")]].concat([1,2,3,4,5,6,7,8,9,10,12,15,20].map(y=>[y,"po "+y+(y===1?" roku":" latach")]));
+  const abItems=[{k:"acc",label:"Rachunek",type:"seg",opts:AB_ACC,cur:c.acc},{k:"sc",label:"Inflacja",type:"seg",opts:AB_SC.concat([["custom","własna"]]),cur:c.sc},
+    {k:"h",label:"Porównaj",type:"sel",opts:hOpts,cur:c.h},{k:"val",label:"Wycena",type:"seg",opts:[["hold","trzymam"],["liquidate","wypłacam"]],cur:c.val}]
+    .concat(calcUsesNbp(c)?[{k:"nbp",label:"Stopa NBP, %",type:"num",step:0.25,min:0,cur:c.nbp}]:[]);
   main.innerHTML=`<div class="vlist">
+    ${abarHtml("z",abItems,calcAbarSummary(c,hOpts))}
     <div class="sec-head"><div><p class="kicker">§ 4 · kalkulator zamiany</p><h2>Zerwać i kupić nowe, czy <span class="acc">trzymać</span>?</h2><p class="desc">Porównuje dwa scenariusze na ten sam okres: <b>trzymasz</b> obecne obligacje albo <b>zrywasz je${today?" dziś":""}</b> (<span id="z-bdate">${esc(calcBreakDate(c))}</span>) i za uzyskane pieniądze kupujesz nowe z bieżącej oferty. Oprocentowanie Twojej serii ${calcDo()} liczymy z prawdziwych odczytów CPI (a dla ROR i DOR — stóp NBP) z archiwum, a dalej z Twoich założeń. Możesz dodać kilka serii naraz — kalkulator wskaże, które z nich warto zamienić.</p></div>
       ${resetRowHtml("z",isDef,undo,"przykładowa seria, oferta z bieżącego miesiąca, inflacja 2,5%")}</div>
     ${linkWarnHtml("zamiana")}
@@ -250,19 +260,28 @@ function renderCalc(main){
   [["z-bd","bd"],["z-tr1","tr1"],["z-tm","tm"],["z-tf","tf"],["z-h","h"],["z-sv","sv"]].forEach(([i,k])=>bind(i,k));
   $("#z-tt").addEventListener("change",e=>{const v=e.target.value;if(v==="custom")c.tc=true;else{c.tc=false;Object.assign(c,calcTargetFromOffer(v))}renderCalc(main)});
   if($("#z-ttype"))$("#z-ttype").addEventListener("change",e=>{c.tt=e.target.value;renderCalc(main)});
-  if($("#z-nbp"))$("#z-nbp").addEventListener("input",e=>{c.nbp=e.target.value;calcRecompute()});
-  $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main)});
-  $("#z-val").addEventListener("change",e=>{c.val=e.target.checked?"liquidate":"hold";calcRecompute()});
+  if($("#z-nbp"))$("#z-nbp").addEventListener("input",e=>{c.nbp=e.target.value;abarMirror("z","nbp",c.nbp);calcRecompute()});
+  $("#z-h").addEventListener("change",()=>{if(c.sc==="custom")renderCalc(main);else abarMirror("z","h",c.h,()=>calcAbarSummary(c,hOpts))});
+  $("#z-val").addEventListener("change",e=>withWas(()=>{c.val=e.target.checked?"liquidate":"hold";renderCalc(main)}));
   $("#z-dm").addEventListener("change",e=>{const v=e.target.value;if(!/^\d{4}-\d{2}$/.test(v))return;c.dm=v===calcArchiveNow()?undefined:v;
     if(!c.tc){const o=calcTargetFromOffer(c.tt,v)||CALC_TYPES.map(t=>calcTargetFromOffer(t,v)).find(Boolean);if(o)Object.assign(c,o)}
     c.bd=Math.min(+c.bd||1,calcDaysIn(v));renderCalc(main)});
   main.querySelectorAll("button.chip[data-cm]").forEach(b=>b.addEventListener("click",()=>{c.cm=b.dataset.cm;renderCalc(main)}));
-  main.querySelectorAll("button.chip[data-acc]").forEach(b=>b.addEventListener("click",()=>{c.acc=b.dataset.acc;c.ike=c.acc!=="std";renderCalc(main)}));
-  main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>{if(b.dataset.sc==="custom"&&c.sc!=="custom"){const v=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(v)}c.sc=b.dataset.sc;renderCalc(main)}));
-  main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;}calcRecompute()}));
+  // rachunek, inflacja, okres, wycena — te same zmiany z formularza i z paska założeń (z plakietką „było …”)
+  const pickAcc=v=>{c.acc=v;c.ike=v!=="std";sharedSet("calc",{acc:v});renderCalc(main)};
+  const pickSc=v=>{if(v==="custom"&&c.sc!=="custom"){const x=CPI_PRESETS[c.sc]?.v??2.5;c.cpi=Array(12).fill(x)}c.sc=v;sharedSet("calc",{sc:v,cpi:c.cpi});renderCalc(main)};
+  main.querySelectorAll("button.chip[data-acc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickAcc(b.dataset.acc))));
+  main.querySelectorAll("button.chip[data-sc]").forEach(b=>b.addEventListener("click",()=>withWas(()=>pickSc(b.dataset.sc))));
+  main.querySelectorAll("input[data-cpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.cpi,v=parseFloat(el.value);if(!isNaN(v)){c.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)c.cpi[j]=v;sharedSet("calc",{sc:"custom",cpi:c.cpi})}calcRecompute()}));
+  abarBind("z",main,{summary:()=>calcAbarSummary(c,hOpts),
+    onPick:(k,v)=>{if(k==="acc")pickAcc(v);else if(k==="sc")pickSc(v);else{c[k]=v;renderCalc(main)}},
+    onNum:(k,v)=>{c[k]=v;const f=$("#z-"+k);if(f)f.value=v;calcRecompute()}});
   calcBindTips(main.querySelector(".calc-grid"));
   calcRecompute();
 }
+// podsumowanie założeń w pasku (telefon): „IKE · inflacja 2,5% · do wykupu (11.2034) · trzymam”
+function calcAbarSummary(c,hOpts){const h=(hOpts.find(([v])=>String(v)===String(c.h))||[,""])[1];
+  return [abAccTxt(c.acc),abScTxt(c.sc),h,c.val==="liquidate"?"wypłata wszystkiego":"bez wypłaty"].concat(calcUsesNbp(c)?["NBP "+fmt(+c.nbp)+"%"]:[]).join(" · ")}
 // etykieta „do wykupu … (MM.RRRR)” po zmianie miesiąca zakupu lub typu ręcznej serii (bez przerysowania formularza)
 function calcHorizonLabel(c){const el=$("#z-h");if(!el)return;const mats=c.pos.map(calcMaturity).filter(Boolean).sort(),m=mats[mats.length-1];
   el.options[0].textContent=(c.pos.length>1?"do wykupu ostatniej serii":"do wykupu starej serii")+(m?" ("+mShort(m)+")":"")}
@@ -362,7 +381,7 @@ function calcRecompute(){
   try{history.replaceState(null,"","#"+calcHash(c))}catch(e){}
   const bdEl=$("#z-bdate");if(bdEl&&calcDayOk(c.bd))bdEl.textContent=calcBreakDate(c);
   const errs=calcValidate(c);
-  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
+  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;abarResult("z",`<span>uzupełnij dane w formularzu</span>`);return}
   if(c.pos.length>1)return calcRecomputePortfolio(out,c,now);
   const o=c.pos[0];
   let r,p;
@@ -377,12 +396,12 @@ function calcRecompute(){
   const events=calcColorEvents(calcEvents(r,o,c.tt,oldCode,tgtCode));
   out.innerHTML=`<div class="vlist">
     ${calcRedeemWarnHtml(c)}
-    <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?`Zamiana się opłaca: ${sgn(a.diff)} ${yrsTxt}`:`Lepiej trzymać: zamiana to ${sgn(a.diff)} ${yrsTxt}`}</div>
+    <div class="verdict ${good?"good":"bad"}"><div class="vt">${good?"Zamiana się opłaca:":"Lepiej trzymać: zamiana to"} <span data-m="diff" data-v="${a.diff}">${sgn(a.diff)}</span> ${yrsTxt}</div>
       <div class="vs">${Math.floor(+o.n)} szt. ${esc(oldCode)} warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł + ${zl2(sn.cashRest)} na konto. Realnie (${calcRealTxt()}): ${sgn(a.diffReal)}. ${liq?"Wycena jak przy wypłacie wszystkiego na koniec okresu (z opłatą za wykup)":`Jedyne zerwanie to zamiana ${calcD()}; dalej oba warianty trzymają obligacje do wykupu`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(Math.floor(+o.n)*100):""}
     <div class="stats">
-      <div class="stat t-acc"><span class="k">Trzymam</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
-      <div class="stat t-green"><span class="k">Zamieniam</span><span class="v">${zl0(a.swap)}</span><span class="s">na koniec okresu; realnie ${zl0(a.swapReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
+      <div class="stat t-acc"><span class="k">Trzymam</span><span class="v" data-m="keep" data-v="${a.keep}">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
+      <div class="stat t-green"><span class="k">Zamieniam</span><span class="v" data-m="swap" data-v="${a.swap}">${zl0(a.swap)}</span><span class="s">na koniec okresu; realnie ${zl0(a.swapReal)}${calcCouponTxt(r.paidCoupons)}</span></div>
       <div class="stat t-red"><span class="k">Koszt zerwania${calcIsToday()?" dziś":""}</span><span class="v">${zl0(sn.cost)}</span><span class="s">opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. + ${zl2(sn.cashRest)} na konto</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${beInflTxt}</span></div>
     </div>
@@ -401,6 +420,7 @@ function calcRecompute(){
     ${exportRowHtml("z")}
     ${calcShareHtml}
   </div>`;
+  abarResult("z",`Zamiana ${esc(c.h==="m"?"do "+mShort(r.maturity):yrsTxt)}: <b class="${good?"d-up":"d-down"}" data-m="diff" data-v="${a.diff}">${sgn(a.diff)}</b>`);
   drawCalcChart(r,oldCode,tgtCode,events,null,[{ym:o.p,amount:Math.floor(+o.n)*100,text:`zakup ${Math.floor(+o.n)} szt. ${oldCode} (${zl0(Math.floor(+o.n)*100)})`}],calcMacro(c,p));
   calcBindExport(c,r.months,H,events,{keep:"Trzymam",swap:"Zamieniam"},`${Math.floor(+o.n)} szt. ${oldCode} → ${tgtCode}`,`${oldCode}-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);
@@ -432,12 +452,12 @@ function calcRecomputePortfolio(out,c,now){
   const detailHref=z=>"#"+calcHash(Object.assign({},c,{pos:[z.o]}));
   out.innerHTML=`<div class="vlist">
     ${calcRedeemWarnHtml(c)}
-    <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): ${sgn(a.diffBest)} ${yrsTxt}`:`Zamień cały portfel: ${sgn(a.diffBest)} ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to ${sgn(a.diffAll)} ${yrsTxt}`}</div>
+    <div class="verdict ${pick?"good":"bad"}"><div class="vt">${pick?(kept.length?`Zamień ${sel.length} z ${rowsP.length} serii (${esc(codes(sel))}): <span data-m="diff" data-v="${a.diffBest}">${sgn(a.diffBest)}</span> ${yrsTxt}`:`Zamień cały portfel: <span data-m="diff" data-v="${a.diffBest}">${sgn(a.diffBest)}</span> ${yrsTxt}`):`Lepiej trzymać cały portfel: zamiana wszystkiego to <span data-m="diff" data-v="${a.diffAll}">${sgn(a.diffAll)}</span> ${yrsTxt}`}</div>
       <div class="vs">${pick?`${kept.length?`Trzymaj: ${esc(codes(kept))}. `:""}Zerwane serie warte ${calcIsToday()?"dziś":"w dniu zerwania"} ${zl2(sn.valueBeforeFee)}; po opłacie${c.ike?"":" i podatku"} zostaje ${zl2(sn.proceeds)} → ${sn.newCount} szt. ${esc(tgtCode)} po 100 zł${sn.pooledExtra?` (w tym ${sn.pooledExtra} szt. z połączonych reszt)`:""} + ${zl2(sn.cashRest)} na konto. ${kept.length?`Gdybyś zamienił wszystko: ${sgn(a.diffAll)}. `:""}Realnie (${calcRealTxt()}): ${sgn(a.diffBestReal)}.`:`Żadna seria nie zyskuje na zamianie na ${esc(tgtCode)}. Zerwanie wszystkiego kosztowałoby ${calcD()} ${zl2(r.switchAll.cost)} (opłata${c.ike?"":" i podatek"}).`} Każda seria liczona osobno, z tymi samymi założeniami i wspólnym okresem; ${liq?"wycena jak przy wypłacie wszystkiego (z opłatą)":`jedyne zerwanie to zamiana ${calcD()}`}, ${calcTaxTxt(c)}.</div></div>
     ${c.acc==="ikze"?ikzeNoteHtml(rowsP.reduce((s,z)=>s+Math.floor(+z.o.n)*100,0)):""}
     <div class="stats">
-      <div class="stat t-acc"><span class="k">Trzymam wszystko</span><span class="v">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(paidC)}</span></div>
-      <div class="stat t-green"><span class="k">${esc(lab.swap)}</span><span class="v">${zl0(ms[H].swap)}</span><span class="s">na koniec okresu; realnie ${zl0(ms[H].swapReal)}${calcCouponTxt(paidC)}</span></div>
+      <div class="stat t-acc"><span class="k">Trzymam wszystko</span><span class="v" data-m="keep" data-v="${a.keep}">${zl0(a.keep)}</span><span class="s">na koniec okresu (${mShort(r.months[H].ym)}); realnie ${zl0(a.keepReal)}${calcCouponTxt(paidC)}</span></div>
+      <div class="stat t-green"><span class="k">${esc(lab.swap)}</span><span class="v" data-m="swap" data-v="${ms[H].swap}">${zl0(ms[H].swap)}</span><span class="s">na koniec okresu; realnie ${zl0(ms[H].swapReal)}${calcCouponTxt(paidC)}</span></div>
       <div class="stat t-red"><span class="k">Koszt zerwania${calcIsToday()?" dziś":""}</span><span class="v">${zl0(sn.cost)}</span><span class="s">${pick&&kept.length?"zrywane serie: ":""}opłata ${zl2(sn.fee)}${c.ike?"":` + podatek ${zl2(sn.tax)}`}; z ${zl2(sn.valueBeforeFee)} zostaje ${zl2(sn.proceeds)}</span></div>
       <div class="stat t-gold"><span class="k">Kiedy zamiana zaczyna się opłacać</span><span class="v sm">${beMonth}</span><span class="s">${pick?"dla wybranych serii łącznie":"dla zamiany wszystkich serii"}</span></div>
     </div>
@@ -461,6 +481,7 @@ function calcRecomputePortfolio(out,c,now){
     ${exportRowHtml("z")}
     ${calcShareHtml}
   </div>`;
+  {const d=pick?a.diffBest:a.diffAll;abarResult("z",`${pick?(kept.length?`Zamiana ${sel.length} z ${rowsP.length} serii`:"Zamiana portfela"):"Zamiana wszystkiego"} ${esc(c.h==="m"?"do "+mShort(r.latestMaturity):yrsTxt||"")}: <b class="${d>=0?"d-up":"d-down"}" data-m="diff" data-v="${d}">${sgn(d)}</b>`)}
   drawCalcChart({past:r.past,months:ms},"Portfel",tgtCode,events,lab,rowsP.map(z=>({ym:z.o.p,amount:Math.floor(+z.o.n)*100,text:`zakup ${Math.floor(+z.o.n)} szt. ${z.code} (${zl0(Math.floor(+z.o.n)*100)})`})),calcMacro(c,p));
   calcBindExport(c,ms,H,events,lab,`Portfel ${rowsP.length} serii → ${tgtCode}`,`portfel-${rowsP.length}-serii-na-${tgtCode}`);
   calcBindShare();calcBindTips(out);

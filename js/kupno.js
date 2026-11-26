@@ -53,10 +53,14 @@ function buyRuleTxt(c){
   return `${fmt(c.rate1)}% w 1. roku, potem inflacja + ${fmt(c.margin)} p.p.`;
 }
 function renderBuy(main){
-  if(!state.buy)state.buy=buyFromHash()||buyDefaults();
+  if(!state.buy)state.buy=buyFromHash()||sharedPull("buy",buyDefaults());
   const b=state.buy,off=buyOffer(),yrs=Math.min(12,Math.max(1,Math.ceil(b.h/12)));
   const undo=viewUndoShown("buy"),isDef=buyHash(b)===buyHash(buyDefaults())&&!Object.keys(state.buyVis||{}).length;
+  const abItems=[{k:"kw",label:"Kwota, zł",type:"num",step:100,min:100,cur:b.kw},{k:"h",label:"Okres",type:"sel",opts:BUY_H.map(m=>[m,buyHLabel(m)]),cur:b.h},
+    {k:"acc",label:"Rachunek",type:"seg",opts:AB_ACC,cur:b.acc},{k:"sc",label:"Inflacja",type:"seg",opts:AB_SC.concat([["custom","własna"]]),cur:b.sc},
+    {k:"val",label:"Wycena",type:"seg",opts:[["l","wypłacam"],["h","bez wypłaty"]],cur:b.val}];
   main.innerHTML=`<div class="vlist">
+    ${abarHtml("b",abItems,buyAbarSummary(b))}
     <div class="sec-head"><div><p class="kicker">§ 5 · co kupić</p><h2>Która seria da najwięcej <span class="acc">na rękę</span>?</h2><p class="desc">Porównuje serie z oferty na ${esc(mLabel(off.id))} dla tej samej kwoty i okresu: ile dostaniesz, wypłacając wszystko na koniec — po opłacie za przedterminowy wykup i podatku. Seria, która w tym czasie wykupi się w terminie, zamienia się na taką samą na dzisiejszych warunkach.</p></div>
       ${resetRowHtml("b",isDef,undo,"10 000 zł na 5 lat, inflacja 2,5%, zwykły rachunek")}</div>
     ${linkWarnHtml("kupno")}
@@ -88,19 +92,27 @@ function renderBuy(main){
     </div>
     <div id="b-out"></div>
   </div>`;
-  const inp=(id,k)=>$(id).addEventListener("input",e=>{b[k]=e.target.value;buyRecompute()});
+  const inp=(id,k)=>$(id).addEventListener("input",e=>{b[k]=e.target.value;if(k==="kw")abarMirror("b","kw",b.kw,()=>buyAbarSummary(b));buyRecompute()});
   inp("#b-kw","kw");inp("#b-sv","sv");inp("#b-nbp","nbp");
-  $("#b-h").addEventListener("change",e=>{b.h=+e.target.value;renderBuy(main)});
+  $("#b-h").addEventListener("change",e=>withWas(()=>{b.h=+e.target.value;renderBuy(main)}));
   $("#b-r8").addEventListener("change",e=>{b.r8=e.target.checked;buyRecompute()});
   $("#b-sw").addEventListener("change",e=>{b.sw=e.target.checked;buyRecompute()});
-  $("#b-val").addEventListener("change",e=>{b.val=e.target.checked?"h":"l";buyRecompute()});
-  main.querySelectorAll("button.chip[data-bsc]").forEach(x=>x.addEventListener("click",()=>{if(x.dataset.bsc==="custom"&&b.sc!=="custom"){const v=CPI_PRESETS[b.sc]?.v??2.5;b.cpi=Array(12).fill(v)}b.sc=x.dataset.bsc;renderBuy(main)}));
-  main.querySelectorAll("button.chip[data-bacc]").forEach(x=>x.addEventListener("click",()=>{b.acc=x.dataset.bacc;renderBuy(main)}));
-  main.querySelectorAll("input[data-bcpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.bcpi,v=parseFloat(el.value);if(!isNaN(v)){b.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)b.cpi[j]=v;}buyRecompute()}));
+  $("#b-val").addEventListener("change",e=>withWas(()=>{b.val=e.target.checked?"h":"l";renderBuy(main)}));
+  // rachunek, inflacja, okres, wycena — te same zmiany z formularza i z paska założeń (z plakietką „było …”)
+  const pickAcc=v=>{b.acc=v;sharedSet("buy",{acc:v});renderBuy(main)};
+  const pickSc=v=>{if(v==="custom"&&b.sc!=="custom"){const x=CPI_PRESETS[b.sc]?.v??2.5;b.cpi=Array(12).fill(x)}b.sc=v;sharedSet("buy",{sc:v,cpi:b.cpi});renderBuy(main)};
+  main.querySelectorAll("button.chip[data-bsc]").forEach(x=>x.addEventListener("click",()=>withWas(()=>pickSc(x.dataset.bsc))));
+  main.querySelectorAll("button.chip[data-bacc]").forEach(x=>x.addEventListener("click",()=>withWas(()=>pickAcc(x.dataset.bacc))));
+  main.querySelectorAll("input[data-bcpi]").forEach(el=>el.addEventListener("input",()=>{const i=+el.dataset.bcpi,v=parseFloat(el.value);if(!isNaN(v)){b.cpi[i]=v;for(let j=i+1;j<12;j++)if(j>=yrs)b.cpi[j]=v;sharedSet("buy",{sc:"custom",cpi:b.cpi})}buyRecompute()}));
+  abarBind("b",main,{summary:()=>buyAbarSummary(b),
+    onPick:(k,v)=>{if(k==="acc")pickAcc(v);else if(k==="sc")pickSc(v);else{b[k]=k==="h"?+v:v;renderBuy(main)}},
+    onNum:(k,v)=>{b[k]=v;const f=$("#b-"+k);if(f)f.value=v;buyRecompute()}});
   viewResetBind("b","buy","buyVis",buyDefaults,()=>renderBuy(main));
   calcBindTips(main.querySelector(".calc-grid"));
   buyRecompute();
 }
+// podsumowanie założeń w pasku (telefon): „10 000 zł · 5 lat · zwykły rachunek · inflacja 2,5%”
+const buyAbarSummary=b=>[zl0(+b.kw||0),buyHLabel(+b.h),abAccTxt(b.acc),abScTxt(b.sc)].concat(b.val==="h"?["bez wypłaty"]:[]).join(" · ");
 function buyRecompute(){
   const out=$("#b-out");if(!out)return;queueMicrotask(()=>resultPeekBind("#b-out"));const b=state.buy,off=buyOffer();
   try{history.replaceState(null,"","#"+buyHash(b))}catch(e){}
@@ -108,7 +120,7 @@ function buyRecompute(){
   if(!(+b.kw>=100))errs.push("Podaj kwotę — co najmniej 100 zł.");
   for(const [k,l] of [["sv","oprocentowanie konta"],["nbp","przyszłą stopę NBP"]])if(b[k]===""||isNaN(+b[k]))errs.push("Uzupełnij "+l+".");
   const cands=buyCandidates(b);if(!cands.length)errs.push("W ofercie nie ma serii do porównania.");
-  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;return}
+  if(errs.length){out.innerHTML=`<div class="insight warn"><span class="t">uzupełnij dane</span>${errs.map(esc).join("<br>")}</div>`;abarResult("b",`<span>uzupełnij dane w formularzu</span>`);return}
   let r;
   try{r=Zamiana.compareBuy(buyParams(b,cands))}catch(e){out.innerHTML=`<div class="insight warn"><span class="t">błąd</span>${esc(e.message)}</div>`;return}
   const byType=Object.fromEntries(r.results.map(x=>[x.type,x])),cand=Object.fromEntries(cands.map(c=>[c.type,c]));
@@ -142,7 +154,7 @@ function buyRecompute(){
     if(x.type==="COI")n.push("kupony co rok na konto");if(x.type==="ROR"||x.type==="DOR")n.push("odsetki co miesiąc na konto");
     return n.join("; ")};
   out.innerHTML=`<div class="vlist">
-    <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: ${zl0(best.final)} ${liq?"na rękę":""}</div>
+    <div class="verdict good"><div class="vt">${esc(buyAfterTxt(H).replace(/^p/,"P"))} najwięcej da ${esc(best.c.code)}: <span data-m="best" data-v="${best.final}" data-x="${esc(best.c.code)}">${zl0(best.final)}</span> ${liq?"na rękę":""}</div>
       <div class="vs">Zysk ${sgn(best.gain)} (${pct(best.annual)} rocznie${b.acc==="std"?" po podatku":""}), realnie ${zl0(best.finalReal)} w dzisiejszych złotych.${second?` Drugie miejsce: ${esc(second.c.code)} (${sgn(second.final-best.final)}).`:""} ${beTxt}</div></div>
     ${b.acc==="ikze"?ikzeNoteHtml(+b.kw):""}
     ${momentTxt?`<div class="insight warn"><span class="t">moment wypłaty</span>${momentTxt}</div>`:""}
@@ -173,6 +185,7 @@ function buyRecompute(){
     downloadCsv(base+".csv",["#","Seria","Oprocentowanie","Na koniec (zł)","Zysk (zł)","Rocznie (%)","Realnie (zł)","Uwagi"],rows.concat(monthly),
       [["Kwota",csvNum(+b.kw)],["Okres",hTxt],["Rachunek",calcTaxTxt({acc:b.acc})],["Wycena",liq?"wypłata wszystkiego na koniec":"bez wypłaty"],["Inflacja dalej",b.sc==="custom"?b.cpi.slice(0,Math.ceil(H/12)).map(v=>fmt(v,1)+"%").join(", "):fmt(CPI_PRESETS[b.sc].v,1)+"%"],["Stopa NBP dalej",fmt(+b.nbp)+"%"],["Link",location.href],["Źródło","Rejestr ofert obligacji — symulacja, nie rekomendacja inwestycyjna"]])});
   $("#b-png").addEventListener("click",()=>downloadChartPng($("#b-chart"),base+".png",`Co kupić: ${zl0(+b.kw)} na ${hTxt}`,`oferta ${mLabel(off.id)} · ${calcTaxTxt({acc:b.acc})} · ${liq?"wypłata na koniec okresu":"bez wypłaty"}`));
+  abarResult("b",`Najwięcej ${esc(buyAfterTxt(H))}: ${esc(best.c.code)} <b data-m="best" data-v="${best.final}" data-x="${esc(best.c.code)}">${zl0(best.final)}</b>${second?` <span>· 2. ${esc(second.c.code)} ${sgn(second.final-best.final)}</span>`:""}`);
   calcBindShare();calcBindTips(out);
 }
 function buyDrawChart(rank,macro){

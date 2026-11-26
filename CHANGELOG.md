@@ -4,6 +4,10 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 
 ## Nieopublikowane
 
+- Pasek założeń w kalkulatorze zamiany, „Co kupić?” i „Mój portfel”: po przewinięciu pod formularz przykleja się pod nagłówkiem z ustawieniami, które zmieniają cały wynik (rachunek zwykły / IKE / IKZE, inflacja, okres, wycena; w „Co kupić?” także kwota, w portfelu dzień wyceny), i ze skrótem wyniku. Zmiana od razu przelicza wykres i tabele bez przewijania do formularza. Na telefonie pasek to jedna linijka podsumowania z przyciskiem „Zmień”, który otwiera panel z ustawieniami.
+- Po zmianie rachunku, inflacji, okresu albo wyceny najważniejsze wyniki na chwilę się podświetlają, a obok widać poprzednią wartość („było …”).
+- Rachunek i scenariusz inflacji wybrane w jednej zakładce przechodzą do pozostałych (kalkulator, „Co kupić?”, „Mój portfel”); link z parametrami nadal ma pierwszeństwo.
+
 ## v1.5.3 — 2026-11-20
 
 - Poprawka: przy przedterminowym wykupie COI od 2. roku opłata jest stała (2,00 zł, w starszych seriach 0,70 zł), także w rocznicę zakupu i gdy przekracza narosłe odsetki — tak mówią listy emisyjne. Wcześniej kalkulatory ograniczały ją do narosłych odsetek, przez co „Co kupić?” wskazywało COI jako zwycięzcę przy okresach w pełnych latach (np. domyślne 5 lat), a „Mój portfel” zaniżał opłatę. Poprawione też objaśnienia opłaty i notka „moment wypłaty”.

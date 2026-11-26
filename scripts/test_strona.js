@@ -118,7 +118,8 @@ const CASES = [
     const lum = ([r, g, b]) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
     const bgOf = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgb(getComputedStyle(e).backgroundColor); if (c[3] > 0.5) return c; } return [255, 255, 255, 1]; };
     const bad = [];
-    for (const sel of ["main h2", "main .desc", "main th", "main td", "main .stat .v", "main .stat .s", "nav.tabs button", "main .chip", "main .btn", "main .insight", "footer"]) {
+    for (const sel of ["main h2", "main .desc", "main th", "main td", "main .stat .v", "main .stat .s", "nav.tabs button", "main .chip", "main .btn", "main .insight", "footer",
+      "main .abar.on .ab-l", "main .abar.on .seg button:not([aria-pressed=true])", "main .abar.on .seg button[aria-pressed=true]", "main .abar.on .ab-res", "main .abar.on .ab-sum-go", "main .was"]) {
       const el = document.querySelector(sel); if (!el) continue;
       const a = lum(rgb(getComputedStyle(el).color)), b = lum(bgOf(el)), r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
       if (r < min) bad.push(`${sel} ${r.toFixed(2)}:1`);
@@ -514,6 +515,77 @@ const CASES = [
     if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
     await ctx.close();
     if (problem) { fail++; console.log("✗ link wklejony do otwartej karty: " + problem); } else pass++;
+  }
+  // pasek założeń: po przewinięciu pod formularz przyklejony pod nagłówkiem; zmiana rachunku w pasku przelicza wynik
+  // (plakietka „było …”), zmienia adres, nie przewija strony i zostawia fokus; wybór przechodzi do innych zakładek, a link
+  // wklejony do karty ma pierwszeństwo; kontrast w obu motywach; telefon — linijka podsumowania i panel od dołu (Esc, fokus)
+  for (const scheme of ["light", "dark"]) {
+    let problem = "";
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, colorScheme: scheme });
+    const pg = await ctx.newPage();
+    const errors = [];
+    pg.on("pageerror", (e) => errors.push(e.message));
+    await pg.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      await pg.goto(base + "#zamiana");
+      await pg.waitForSelector("#z-out .verdict");
+      if (await pg.$eval("#z-abar", (e) => e.classList.contains("on"))) problem = "pasek widoczny nad formularzem";
+      await pg.evaluate(() => scrollTo(0, document.querySelector("#z-chart").getBoundingClientRect().top + scrollY - 250));
+      await pg.waitForSelector("#z-abar.on", { timeout: 3000 });
+      const y0 = await pg.evaluate(() => scrollY);
+      await pg.click('#z-abar [data-ab="acc"][data-v="ike"]');
+      const st = await pg.evaluate(() => ({ h: location.hash, y: scrollY, on: document.querySelector("#z-abar").classList.contains("on"),
+        was: document.querySelectorAll("#main .was").length, f: document.activeElement?.dataset?.v, res: document.querySelector("#z-abar .ab-res").textContent }));
+      if (!problem && !/ike=1/.test(st.h)) problem = "pasek: rachunek nie zmienił adresu " + st.h;
+      if (!problem && (Math.abs(st.y - y0) > 2 || !st.on)) problem = `pasek: strona przewinęła się (${y0} → ${st.y}) albo pasek zniknął`;
+      if (!problem && (!st.was || !/było/.test(st.res))) problem = "pasek: brak plakietki „było …” po zmianie";
+      if (!problem && st.f !== "ike") problem = "pasek: fokus nie wrócił na wybraną opcję";
+      const c = await contrastCheck(pg, 4.5);
+      if (!problem && c.bad.length) problem = "pasek: za słaby kontrast: " + c.bad.join(", ");
+      await pg.click("#tab-kupno");
+      await pg.waitForSelector("#b-out .verdict");
+      if (!problem && (await pg.$eval('button.chip[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "ike") problem = "IKE nie przeszło do „Co kupić?”";
+      await pg.click('button.chip[data-bsc="high"]');
+      await pg.click("#tab-portfel");
+      await pg.waitForSelector("#p-out .stats");
+      const pf = await pg.evaluate(() => [document.querySelector('button.chip[data-pacc][aria-pressed="true"]').dataset.pacc, document.querySelector('button.chip[data-psc][aria-pressed="true"]').dataset.psc]);
+      if (!problem && pf.join() !== "ike,high") problem = "rachunek/inflacja nie przeszły do portfela: " + pf.join();
+      await pg.evaluate(() => { location.hash = "#kupno&kw=5000&h=36&sc=base&ike=0"; });
+      await pg.waitForFunction(() => document.querySelector("#b-kw")?.value === "5000");
+      if (!problem && (await pg.$eval('button.chip[data-bacc][aria-pressed="true"]', (e) => e.dataset.bacc)) !== "std") problem = "link z ike=0 nie ma pierwszeństwa przed wspólnymi założeniami";
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    await ctx.close();
+    if (problem) { fail++; console.log(`✗ pasek założeń (${scheme === "dark" ? "ciemny" : "jasny"} motyw): ${problem}`); } else pass++;
+  }
+  {
+    let problem = "";
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const pg = await ctx.newPage();
+    const errors = [];
+    pg.on("pageerror", (e) => errors.push(e.message));
+    await pg.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+    try {
+      for (const [hash, p, ready] of [["#kupno", "b", "#b-out .verdict"], ["#portfel", "p", "#p-out .stats"], ["#zamiana", "z", "#z-out .verdict"]]) {
+        await pg.goto("about:blank");
+        await pg.goto(base + hash);
+        await pg.waitForSelector(ready);
+        await pg.evaluate((r) => scrollTo(0, document.querySelector(r).getBoundingClientRect().bottom + scrollY), ready);
+        await pg.waitForSelector(`#${p}-abar.on .ab-sum`, { timeout: 3000 });
+        if (await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth) > 1) { problem = `${hash}: pasek poszerza stronę`; break; }
+        if (p !== "b") continue;
+        await pg.tap("#b-abar .ab-sum");
+        if (await pg.$eval("#b-asheet", (e) => e.hidden || !e.contains(document.activeElement))) { problem = "panel się nie otworzył albo fokus poza panelem"; break; }
+        await pg.tap('#b-asheet [data-ab="acc"][data-v="ikze"]');
+        const st = await pg.evaluate(() => ({ open: !document.querySelector("#b-asheet").hidden, h: location.hash, was: document.querySelectorAll("#main .was").length }));
+        if (!st.open || !/ike=2/.test(st.h) || !st.was) { problem = `panel po wyborze IKZE: ${JSON.stringify(st)}`; break; }
+        await pg.keyboard.press("Escape");
+        if (!(await pg.evaluate(() => document.querySelector("#b-asheet").hidden && document.activeElement?.classList.contains("ab-sum")))) { problem = "Esc nie zamknął panelu albo fokus nie wrócił na „Zmień”"; break; }
+      }
+    } catch (e) { problem = e.message.split("\n")[0]; }
+    if (errors.length) problem = (problem ? problem + "; " : "") + "błędy JS: " + errors.join(" | ");
+    await ctx.close();
+    if (problem) { fail++; console.log("✗ pasek założeń (telefon): " + problem); } else pass++;
   }
   try {
     const xml = await (await fetch(base + "feed.xml")).text();
