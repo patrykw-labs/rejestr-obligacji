@@ -7,7 +7,6 @@ Wersje wydań na GitHubie: https://github.com/patrykw-labs/rejestr-obligacji/rel
 ## v1.6.0 — 2026-11-26
 
 - Licencja kodu zmieniona z MIT na GNU AGPL-3.0 (`AGPL-3.0-only`): zmienione wersje — także udostępniane tylko przez sieć — muszą być publikowane na tej samej licencji z kodem źródłowym. Wydania do v1.5.3 pozostają na licencji MIT. Stopka strony linkuje do kodu źródłowego i licencji.
-
 - Pasek założeń w kalkulatorze zamiany, „Co kupić?” i „Mój portfel”: po przewinięciu pod formularz przykleja się pod nagłówkiem z ustawieniami, które zmieniają cały wynik (rachunek zwykły / IKE / IKZE, inflacja, okres, wycena; w „Co kupić?” także kwota, w portfelu dzień wyceny), i ze skrótem wyniku. Zmiana od razu przelicza wykres i tabele bez przewijania do formularza. Na telefonie pasek to jedna linijka podsumowania z przyciskiem „Zmień”, który otwiera panel z ustawieniami.
 - Po zmianie rachunku, inflacji, okresu albo wyceny najważniejsze wyniki na chwilę się podświetlają, a obok widać poprzednią wartość („było …”).
 - Rachunek i scenariusz inflacji wybrane w jednej zakładce przechodzą do pozostałych (kalkulator, „Co kupić?”, „Mój portfel”); link z parametrami nadal ma pierwszeństwo.
